@@ -15,6 +15,7 @@ local capslock = require("my_modules/capslock")
 local psi_widget = require("my_modules/psi")
 local rotate_widget = require("my_modules/rotatescreen")
 local touch_widget = require("my_modules/touchscreen")
+local keyboard_widget = require("my_modules/keyboard")
 local helpers = require("my_modules/geo_helpers")
 local dpi = require('beautiful').xresources.apply_dpi
 hostname = io.popen("uname -n"):read()
@@ -413,6 +414,11 @@ if hostname == "innodellix" then
 				touch_widget:toggle()
 		end)
 	))
+	keyboard_widget:buttons(awful.util.table.join(
+		awful.button({}, 1, function() -- left click
+				keyboard_widget:toggle()
+		end)
+	))
 end
 
 docked = false
@@ -576,6 +582,7 @@ local function screen_organizer(s, primary)
 	if primary and my_utils.table_length(screen_table) == 1 and hostname == "innodellix" then
     table.insert(systray_right_widgets, touch_widget)
     table.insert(systray_right_widgets, rotate_widget)
+    table.insert(systray_right_widgets, keyboard_widget)
     table.insert(systray_right_widgets, separator_reverse)
 	end
   if (
@@ -719,6 +726,7 @@ globalkeys = gears.table.join(
   awful.key({ ctrl, alt    }, "p",					        				function () reset_pulse() end),
   awful.key({ win          }, "f",					        				function () awful.spawn(browser) end),
 	awful.key({ win          }, "l",					        				function () awful.spawn("sudo slock") end),
+	awful.key({ win          }, "a",					        				function () keyboard_widget:toggle() end),
 	awful.key({ win          }, "k",					        				function () awful.spawn("grobi apply mobile") end),
   awful.key({ win          }, "space",			        				function () awful.layout.inc(1) end),
   awful.key({ win          }, "v",					        				function () awful.spawn("innovpn-toggle") end),
@@ -879,7 +887,6 @@ awesome.connect_signal("startup", function(s, state)
 	run_once("telegram-desktop", "telegram", "chat")
 	run_once("wezterm start --class mainqterm", "mainqterm", "term")
 	run_once("picom", "picom")
-	run_once("gxkb", "gxkb")
 	run_once("nm-applet")
 	run_once("udiskie")
 	run_once("alttab -w 1 -t 400x300 -frame cyan -i 100x100 -font xft:firacode-20", "alttab")
