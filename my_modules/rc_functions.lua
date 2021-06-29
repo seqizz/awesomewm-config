@@ -122,6 +122,7 @@ function hide_stickies()
       c.y = 30
     else
       -- minimize request
+      c.fullscreen = false
       c.width = 50
       c.height = 50
       c.border_color = '#26b7d4'
