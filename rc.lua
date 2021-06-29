@@ -875,9 +875,6 @@ awful.tag.attached_connect_signal(s, "property::selected", function ()
 	end
 end)
 
--- Always enable numlock
-awful.spawn('numlockx')
-
 awesome.connect_signal("startup", function(s, state)
 	run_once("firefox", "firefox", "web")
 	if hostname == "innixos" or hostname == "innodellix" then
@@ -887,8 +884,6 @@ awesome.connect_signal("startup", function(s, state)
 	run_once("telegram-desktop", "telegram", "chat")
 	run_once("wezterm start --class mainqterm", "mainqterm", "term")
 	run_once("picom", "picom")
-	run_once("nm-applet")
-	run_once("udiskie")
 	run_once("alttab -w 1 -t 400x300 -frame cyan -i 100x100 -font xft:firacode-20", "alttab")
 end)
 
