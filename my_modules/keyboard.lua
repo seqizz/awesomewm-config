@@ -7,7 +7,7 @@ local keyboardwidget = wibox.widget {
   widget = wibox.widget.textbox,
   align = "center",
   valign = "center",
-  forced_width = 40,
+  forced_width = 80,
   font = my_theme.font,
 }
 
@@ -20,16 +20,14 @@ function keyboardwidget:set(state)
     text = "WM"
   end
   markup_value = my_utils.create_markup{
-    -- text="",
-    text=text,
-    fg=fg
-    -- size="large"
-    -- rise="-3000",
-    -- font="Ionicons"
+    text="⌨︁",
+    fg=fg,
+    size="large",
+    rise="-3000",
+    font="Font Awesome"
   }
 
-  -- self.markup = markup_value .. " " .. text
-  self.markup = markup_value
+  self.markup = markup_value .. " " .. text
 end
 
 function keyboardwidget:check()
@@ -50,16 +48,14 @@ function keyboardwidget:check()
           fg = "#FF0000"
         end
         markup_value = my_utils.create_markup{
-          -- text="",
-          text=text,
-          fg=fg
-          -- size="large"
-          -- rise="-3000",
-          -- font="Ionicons"
+          text="⌨︁",
+          fg=fg,
+          size="large",
+          rise="-3000",
+          font="Font Awesome"
         }
 
-        self.markup = markup_value
-        -- self.markup = markup_value .. " " .. text
+        self.markup = markup_value .. " " .. text
       end
     }
   )
