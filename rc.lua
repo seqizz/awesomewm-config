@@ -582,13 +582,14 @@ local function screen_organizer(s, primary)
 	if primary and my_utils.table_length(screen_table) == 1 and hostname == "innodellix" then
     table.insert(systray_right_widgets, touch_widget)
     table.insert(systray_right_widgets, rotate_widget)
-    table.insert(systray_right_widgets, keyboard_widget)
     table.insert(systray_right_widgets, separator_reverse)
 	end
   if (
 			primary and my_utils.table_length(screen_table) == 1
 		) or (
 			not primary and my_utils.table_length(screen_table) > 1 ) then
+    table.insert(systray_right_widgets, keyboard_widget)
+    table.insert(systray_right_widgets, separator_reverse)
     table.insert(systray_right_widgets, battery_widget)
     table.insert(systray_right_widgets, separator_reverse)
     table.insert(systray_right_widgets, psi_widget)
@@ -679,7 +680,7 @@ function register_all_screens()
 	dofile ("/home/gurkan/.config/awesome/my_modules/rc_clientbuttons.lua")
 	root.keys(globalkeys)
 	set_rules(clientkeys)
-	-- font_hacks()
+	font_hacks()
 
 	print(my_utils.dump(screen_table))
 	-- ::skipconfig::
