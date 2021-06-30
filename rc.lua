@@ -414,6 +414,11 @@ if hostname == "innodellix" then
 				touch_widget:toggle()
 		end)
 	))
+	capslock:buttons(awful.util.table.join(
+		awful.button({}, 1, function() -- left click
+				capslock:toggle()
+		end)
+	))
 	keyboard_widget:buttons(awful.util.table.join(
 		awful.button({}, 1, function() -- left click
 				keyboard_widget:toggle()

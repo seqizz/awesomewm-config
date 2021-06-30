@@ -26,7 +26,7 @@ function capslock:check()
           tooltip.text = "Caps Lock " .. status
           if status == "on" then
             self.markup = self.activated
-            self.forced_width = 50
+            self.forced_width = 60
           else
             self.markup = self.deactivated
             self.forced_width = 0
@@ -35,6 +35,10 @@ function capslock:check()
       end
     }
   )
+end
+
+function capslock:toggle()
+  awful.spawn("xdotool key Caps_Lock")
 end
 
 -- keybindings
