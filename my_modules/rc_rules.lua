@@ -117,7 +117,6 @@ function set_rules(clientkeys)
         sticky = true,
         skip_taskbar = true,
         width = 533,
-        y = 20,
         height = 860,
         callback = function(c) awful.placement.top_right(c, {honor_workarea=true}) end,
       };
