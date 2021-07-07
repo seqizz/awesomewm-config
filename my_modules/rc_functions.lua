@@ -78,7 +78,7 @@ function float_toggle(c)
     c.skip_taskbar = true
     c.width = 533
     c.height = 860
-    c.y = 30
+    c.y = 35
     awful.placement.top_right(client.focus, {honor_workarea=true})
   else
     c.ontop = false
