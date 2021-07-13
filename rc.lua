@@ -165,7 +165,7 @@ browser = "firefox"
 editor = os.getenv("EDITOR") or "nvim"
 editor_cmd = terminal .. " -e " .. editor
 greenclip_cmd = "rofi -modi 'clipboard:greenclip print' -show clipboard -run-command '{cmd}' "
-todo_cmd = "todotxtmenu -no-created-date -cmd rofi -todo /home/gurkan/syncfolder/todo/linux/todo.txt"
+-- todo_cmd = "todotxtmenu -no-created-date -cmd rofi -todo /home/gurkan/syncfolder/todo/linux/todo.txt"
 proxified_chromium_cmd = 'chromium-browser --incognito --proxy-server="socks://127.0.0.1:8080" --host-resolver-rules="MAP * ~NOTFOUND, EXCLUDE 127.0.0.1"'
 gather_town_cmd = 'chromium-browser --app="https://gather.town/app/7Rxu9DG6dVHm2qDR/sysadmin-tiny" --noerrdialogs --disable-translate --no-first-run --fast --fast-start --disable-infobars --class="gathertown"  --user-data-dir=/devel/.tmp_gather_profile'
 
@@ -724,14 +724,14 @@ globalkeys = gears.table.join(
   awful.key({ "Shift"      }, "Print",											function () awful.spawn("flameshot full -c") end),
   awful.key({ ctrl         }, "space",											function () awful.spawn("rofi -show run") end),
   awful.key({ ctrl, alt    }, "c",					        				function () awful.spawn(greenclip_cmd) end),
-  awful.key({ win					 }, "t",					        				function () awful.spawn(todo_cmd) end),
+  -- awful.key({ win					 }, "t",					        				function () awful.spawn(todo_cmd) end),
 	awful.key({ win          }, "p",					        				function () awful.spawn("rofi-pass") end),
   awful.key({ ctrl, alt    }, "t",					        				function () awful.spawn(terminal) end),
   awful.key({ win          }, "c",					        				function () awful.spawn("chromium-browser") end),
   awful.key({ ctrl, alt    }, "p",					        				function () reset_pulse() end),
   awful.key({ win          }, "f",					        				function () awful.spawn(browser) end),
 	awful.key({ win          }, "l",					        				function () awful.spawn("sudo slock") end),
-	awful.key({ win          }, "a",					        				function () keyboard_widget:toggle() end),
+	awful.key({ win          }, "F10",	  		        				function () keyboard_widget:toggle() end),
 	awful.key({ win          }, "k",					        				function () awful.spawn("grobi apply mobile") end),
   awful.key({ win          }, "space",			        				function () awful.layout.inc(1) end),
   awful.key({ win          }, "v",					        				function () awful.spawn("innovpn-toggle") end),
