@@ -54,6 +54,7 @@ theme.border_radius        = 2
 theme.notification_opacity = 0.9
 theme.notification_margin = dpi(15)
 theme.notification_icon_size = 80
+theme.notification_max_width = dpi(500)
 local ntf_shape = function(cr, width, height)
    shape.partially_rounded_rect(cr, width, height, true, false, true, true, 18)
 end

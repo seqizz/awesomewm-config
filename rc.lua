@@ -33,32 +33,49 @@ dofile ("/home/gurkan/.config/awesome/my_modules/rc_functions.lua")
 -- define tags at the beginning
 dofile ("/home/gurkan/.config/awesome/my_modules/rc_tags.lua")
 
--- stuff related to volume/brightness OSD notification
+-- stuff related to volume/brightness OSD notifications
 dofile ("/home/gurkan/.config/awesome/my_modules/rc_sliderstuff.lua")
 
 clientkeys = gears.table.join(
+  -- Increase/decrease windows sizes on tiled layout: Win + asdf
 	awful.key({ win							   }, "d",      function ()  awful.tag.incmwfact( 0.01)  end),
 	awful.key({ win								 }, "a",      function ()  awful.tag.incmwfact(-0.01)  end),
 	awful.key({ win							   }, "s",      function ()  awful.client.incwfact( 0.01)  end),
 	awful.key({ win							   }, "w",      function ()  awful.client.incwfact(-0.01)  end),
+	-- Quit window: Win + q
 	awful.key({ win								 }, "q",      function (c) c:kill() end),
+	-- Swap master windows: Win + enter
 	awful.key({ win								 }, "Return", function (c) c:swap(awful.client.getmaster()) end),
-	awful.key({ ctrl, win					 }, "Right",  function (c) c:relative_move(0, 0, dpi(20), 0) end),
-	awful.key({ ctrl, win, "Shift" }, "Left",   function (c) c:relative_move(0, 0, dpi(-20), 0) end),
-	awful.key({ ctrl, win					 }, "Left",   function (c) c:relative_move(dpi(-10), 0, dpi(10), 0) end),
-	awful.key({ ctrl, win, "Shift" }, "Right",  function (c) c:relative_move(dpi(10), 0, dpi(-10), 0) end),
-	awful.key({ ctrl, win					 }, "Down",   function (c) c:relative_move(0, 0, 0, dpi(20)) end),
-	awful.key({ ctrl, win, "Shift" }, "Up",     function (c) c:relative_move(0, 0, 0, dpi(-20)) end),
-	awful.key({ ctrl, win					 }, "Up",     function (c) c:relative_move(0, dpi(-10), 0, dpi(10)) end),
-	awful.key({ ctrl, win, "Shift" }, "Down",   function (c) c:relative_move(0, dpi(10), 0, dpi(-10)) end),
+	-- Movement and focus:
+	-- Win								+ Arrows -> Swap focus between windows
+	-- Win				+ Shift	+ Arrows -> Move windows to that direction
+	-- Win + Ctrl					+ Arrows -> Expand windows to that direction
+	-- Win + Ctrl + Shift + Arrows -> Shrink windows from that direction
+	awful.key({ ctrl, win					 }, "Right",  function (c) c:relative_move(0, 0, dpi(40), 0) end),
+	awful.key({ win, "Shift"			 }, "Left",   function (c) c:relative_move(dpi(-40), 0, 0, 0) end),
+	awful.key({ ctrl, win, "Shift" }, "Left",   function (c) c:relative_move(0, 0, dpi(-40), 0) end),
+	awful.key({ ctrl, win					 }, "Left",   function (c) c:relative_move(dpi(-20), 0, dpi(20), 0) end),
+	awful.key({ ctrl, win, "Shift" }, "Right",  function (c) c:relative_move(dpi(20), 0, dpi(-20), 0) end),
+	awful.key({ win, "Shift"			 }, "Right",  function (c) c:relative_move(dpi(40), 0, 0, 0) end),
+	awful.key({ ctrl, win					 }, "Down",   function (c) c:relative_move(0, 0, 0, dpi(40)) end),
+	awful.key({ ctrl, win, "Shift" }, "Up",     function (c) c:relative_move(0, 0, 0, dpi(-40)) end),
+	awful.key({ ctrl, win					 }, "Up",     function (c) c:relative_move(0, dpi(-20), 0, dpi(20)) end),
+	awful.key({ win, "Shift"			 }, "Down",   function (c) c:relative_move(0, dpi(40), 0, 0) end),
+	awful.key({ win, "Shift"			 }, "Up",     function (c) c:relative_move(0, dpi(-40), 0, 0) end),
+	awful.key({ ctrl, win, "Shift" }, "Down",   function (c) c:relative_move(0, dpi(20), 0, dpi(-20)) end),
 	awful.key({ win							   }, "Right",  function (c) switch_focus_without_mouse(c, "right") end),
 	awful.key({ win							   }, "Left",   function (c) switch_focus_without_mouse(c, "left") end),
 	awful.key({ win							   }, "Down",   function (c) awful.client.focus.bydirection("down") end),
 	awful.key({ win							   }, "Up",     function (c) awful.client.focus.bydirection("up") end),
+	-- Minimize window: Win + z
 	awful.key({ win								 }, "z",      function (c) c.minimized = true end),
+	-- Suspend the window's app with SIGSTOP: Ctrl + Alt + s
 	awful.key({ ctrl, alt					 }, "s",      function (c) suspend_toggle(c) end),
+	-- Shrink window and make it sticky & on top (e.g. conference call): Ctrl + Alt + w
 	awful.key({ ctrl, alt					 }, "w",		  function (c) float_toggle(c) end),
+	-- Sticky toggle for window: Ctrl + Alt + Shift + s
 	awful.key({ ctrl, alt, "Shift" }, "s",		  function (c) sticky_toggle(c) end),
+	-- Hide stickies to the bottom-right corner (toggle) : Win + Esc
 	awful.key({	win								 }, "Escape", function (c) hide_stickies() end)
 )
 
@@ -169,8 +186,7 @@ local screenshot_cmd = function()
 	return 'bash -c "maim -s -f jpg | xclip -selection clipboard -t image/jpeg"'
 end
 
--- greenclip_cmd = "rofi -modi 'clipboard:greenclip print' -show clipboard -run-command '{cmd}' "
--- todo_cmd = "todotxtmenu -no-created-date -cmd rofi -todo /home/gurkan/syncfolder/todo/linux/todo.txt"
+greenclip_cmd = "rofi -modi 'clipboard:greenclip print' -show clipboard -run-command '{cmd}' "
 proxified_chromium_cmd = 'chromium-browser --incognito --proxy-server="socks://127.0.0.1:8080" --host-resolver-rules="MAP * ~NOTFOUND, EXCLUDE 127.0.0.1"'
 gather_town_cmd = 'chromium-browser --app="https://gather.town/app/7Rxu9DG6dVHm2qDR/sysadmin-tiny" --noerrdialogs --disable-translate --no-first-run --fast --fast-start --disable-infobars --class="gathertown"  --user-data-dir=/devel/.tmp_gather_profile'
 
@@ -178,7 +194,7 @@ win = "Mod4"
 alt = "Mod1"
 ctrl = "Control"
 
--- default layout table, for reference
+-- default layout table, keeping for reference, I only need 2 of these
 layouts = {
   -- awful.layout.suit.floating,
   awful.layout.suit.tile,
@@ -239,9 +255,6 @@ local tasklist_buttons = gears.table.join(
       )
     end
   end),
-  -- awful.button({ }, 3, function()
-  -- awful.menu.client_list({ theme = { width = 250 } })
--- end),
   awful.button({ }, 4, function ()
 awful.client.focus.byidx(1)
   end),
@@ -635,12 +648,6 @@ function register_all_screens()
 
 	local changes_detected = false
 	for s in screen do
-		-- if my_utils.table_contains(screen_table, s, true) then
-			-- print('<<<<<<<<< ' .. screen_table[s]["name"] .. ' already registered')
-			-- new_screen_table[s] = screen_table[s]
-			-- goto continue
-		-- end
-
 		for screen_name, _ in pairs(s.outputs) do
 			if monitors_attached and string.find(screen_name, "eDP") then
 				print('<<<<<<<<< Skipping ' .. screen_name )
@@ -648,9 +655,6 @@ function register_all_screens()
 			end
 			print('<<<<<<<<< Doing ' .. screen_name )
 			screen_table[s] = {}
-			-- if we're in, that means this is a screen which has an output
-			-- and not yet registered
-			-- changes_detected = true
 
 			naughty.notify({text = "Screen: " .. screen_name, screen = s})
 			-- These are the cool guys
@@ -665,15 +669,8 @@ function register_all_screens()
 			screen_table[s]["tags"] = {}
 		end
 		::continue2::
-		-- ::continue::
 	end
 
-	-- if not changes_detected then
-		-- print("No changes detected, not changing configuration")
-		-- goto skipconfig
-	-- end
-
-	-- screen_table = new_screen_table
 	-- define rules since we have filled the screen table
 	dofile ("/home/gurkan/.config/awesome/my_modules/rc_rules.lua")
 
@@ -711,6 +708,7 @@ globalkeys = gears.table.join(
   capslock.keyWithAlt,
   capslock.keyWithWin,
   capslock.keyWithCtrl,
+	-- Standard X11 keys, comes from Fn keys etc.
   awful.key({							 }, "XF86MonBrightnessUp",   nil, function() set_brightness('5%+') end),
   awful.key({							 }, "XF86MonBrightnessDown", nil, function() set_brightness('5%-') end),
   awful.key({							 }, "XF86AudioRaiseVolume",  nil, function() set_volume('i') end),
@@ -724,14 +722,13 @@ globalkeys = gears.table.join(
 	-- For laptop, which doesn't have next/prev buttons
   awful.key({ ctrl				 }, "XF86AudioRaiseVolume",	 nil, function () handle_media("next") end),
   awful.key({ ctrl				 }, "XF86AudioLowerVolume",	 nil, function () handle_media("previous") end),
+	-- Dropdown terminal: F12
   awful.key({              }, "F12",									 nil, function () my_dropdown:toggle() end),
 	awful.key({              }, "Print",								 nil, function () awful.spawn(screenshot_cmd()) end),
   -- awful.key({              }, "Print",								 nil, function () awful.spawn("flameshot gui") end),
   -- awful.key({ "Shift"      }, "Print",											function () awful.spawn("flameshot full -c") end),
   awful.key({ ctrl         }, "space",											function () awful.spawn("rofi -show run") end),
-  awful.key({ ctrl, alt    }, "c",					        				function () awful.spawn("clipcat-menu") end),
-  -- awful.key({ ctrl, alt    }, "c",					        				function () awful.spawn(greenclip_cmd) end),
-  -- awful.key({ win					 }, "t",					        				function () awful.spawn(todo_cmd) end),
+	awful.key({ ctrl, alt    }, "c",					        				function () awful.spawn(greenclip_cmd) end),
 	awful.key({ win          }, "p",					        				function () awful.spawn("rofi-pass") end),
   awful.key({ ctrl, alt    }, "t",					        				function () awful.spawn(terminal) end),
   awful.key({ win          }, "c",					        				function () awful.spawn("chromium-browser") end),
@@ -739,18 +736,25 @@ globalkeys = gears.table.join(
   awful.key({ win          }, "f",					        				function () awful.spawn(browser) end),
 	awful.key({ win          }, "l",					        				function () awful.spawn("sudo slock") end),
 	awful.key({ win          }, "F10",	  		        				function () keyboard_widget:toggle() end),
+	-- If something goes wrong with grobi
 	awful.key({ win          }, "k",					        				function () awful.spawn("grobi apply mobile") end),
+	awful.key({ win, "Shift" }, "k",					        				function () awful.spawn("grobi apply inno-dell-dock") end),
+	-- Cycle between available layouts
   awful.key({ win          }, "space",			        				function () awful.layout.inc(1) end),
-  awful.key({ win          }, "v",					        				function () awful.spawn("innovpn-toggle") end),
-  awful.key({ win          }, "x",					        				function () awful.spawn("pcmanfm-qt") end),
+	awful.key({ win          }, "x",					        				function () awful.spawn("pcmanfm-qt") end),
   awful.key({ win,         }, "Tab",				        				function () awful.tag.viewnext(get_screen_of_focused()) end),
   awful.key({ win, "Shift" }, "Tab",				        				function () awful.tag.viewprev(get_screen_of_focused()) end),
   awful.key({ win, "Shift" }, "c",					        				function () awful.spawn(proxified_chromium_cmd) end),
-  awful.key({ win					 }, "g",					        				function () awful.spawn(gather_town_cmd) end),
   awful.key({ win, ctrl    }, "q",					        				awesome.quit),
   awful.key({ win, ctrl    }, "r",					        				awesome.restart),
   awful.key({ win, "Shift" }, "z",					        				unminimize_client)
 )
+if hostname == "innixos" or hostname == "innodellix" then
+  gears.table.merge(globalkeys, gears.table.join(
+		awful.key({ win          }, "v",					        				function () awful.spawn("innovpn-toggle") end),
+		awful.key({ win					 }, "g",					        				function () awful.spawn(gather_town_cmd) end)
+	))
+end
 
 -- run once on startup
 register_all_screens()
@@ -760,10 +764,6 @@ client.connect_signal("manage", function (c)
 	-- Set the windows at the slave,
 	-- i.e. put it at the end of others instead of setting it master.
 	if not awesome.startup then awful.client.setslave(c) end
-
-	-- if c.class ~= nil then
-		-- print("New client class is managed: " .. c.class)
-	-- end
 
 	if awesome.startup
 		and not c.size_hints.user_position
@@ -814,7 +814,7 @@ client.connect_signal("request::titlebars", function(c)
 end)
 
 tag.connect_signal("property::layout", function(t)
-  -- make the focused window master
+  -- make the focused window master on layout change
   local c = client.focus
   if c and awful.layout.get(t.screen).name == "max" then
     awful.client.setmaster(c)
@@ -847,6 +847,7 @@ client.connect_signal("unfocus", function(c)
 	end
 end)
 
+-- Show OSD notification of current status on volume:change signal
 awesome.connect_signal("volume::change", function()
 	-- update systray
 	volume_widget.update()
@@ -865,6 +866,7 @@ awesome.connect_signal("volume::change", function()
 	end)
 end)
 
+-- Show OSD notification of current brightness on brightness:change signal
 awesome.connect_signal("brightness:change", function()
   awful.spawn.easy_async("brightnessctl -q get", function(current)
     awful.spawn.easy_async("brightnessctl -q max", function(max)
@@ -889,6 +891,7 @@ end)
 
 awesome.connect_signal("startup", function(s, state)
 	run_once("firefox", "firefox", "web")
+	-- only makes sense while working
 	if hostname == "innixos" or hostname == "innodellix" then
 		run_once("slack", "slack", "chat")
 		run_once("thunderbird", "thunderbird", "mail")
@@ -899,4 +902,4 @@ awesome.connect_signal("startup", function(s, state)
 	run_once("alttab -w 1 -t 400x300 -frame cyan -i 100x100 -font xft:firacode-20", "alttab")
 end)
 
-	-- vim: set ts=2 sw=2 sts=2 tw=0 noet :
+-- vim: set ts=2 sw=2 sts=2 tw=0 noet :
