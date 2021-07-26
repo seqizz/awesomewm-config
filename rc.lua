@@ -183,7 +183,7 @@ editor = os.getenv("EDITOR") or "nvim"
 editor_cmd = terminal .. " -e " .. editor
 
 local screenshot_cmd = function()
-	return 'bash -c "maim -s -f jpg | xclip -selection clipboard -t image/jpeg"'
+	return 'bash -c "maim -s | xclip -selection clipboard -t image/png"'
 end
 
 greenclip_cmd = "rofi -modi 'clipboard:greenclip print' -show clipboard -run-command '{cmd}' "
@@ -898,7 +898,7 @@ awesome.connect_signal("startup", function(s, state)
 	end
 	run_once("telegram-desktop", "telegram", "chat")
 	run_once("wezterm start --class mainqterm", "mainqterm", "term")
-	run_once("picom", "picom")
+	run_once("picom --experimental-backends", "picom")
 	run_once("alttab -w 1 -t 400x300 -frame cyan -i 100x100 -font xft:firacode-20", "alttab")
 end)
 
