@@ -23,6 +23,7 @@ hostname = io.popen("uname -n"):read()
 
 -- my theme
 beautiful.init("/home/gurkan/.config/awesome/my_modules/my_theme.lua")
+local volume_widget = require("my_modules/sound-widget")
 
 -- print errors as naughty notifications
 dofile ("/home/gurkan/.config/awesome/my_modules/rc_errorhandling.lua")
@@ -181,11 +182,6 @@ terminal = "wezterm start"
 browser = "firefox"
 editor = os.getenv("EDITOR") or "nvim"
 editor_cmd = terminal .. " -e " .. editor
-
-local screenshot_cmd = function()
-	return 'bash -c "maim -s | xclip -selection clipboard -t image/png"'
-end
-
 greenclip_cmd = "rofi -modi 'clipboard:greenclip print' -show clipboard -run-command '{cmd}' "
 proxified_chromium_cmd = 'chromium-browser --incognito --proxy-server="socks://127.0.0.1:8080" --host-resolver-rules="MAP * ~NOTFOUND, EXCLUDE 127.0.0.1"'
 gather_town_cmd = 'chromium-browser --app="https://gather.town/app/7Rxu9DG6dVHm2qDR/sysadmin-tiny" --noerrdialogs --disable-translate --no-first-run --fast --fast-start --disable-infobars --class="gathertown"  --user-data-dir=/devel/.tmp_gather_profile'
@@ -288,88 +284,6 @@ separator_reverse = wibox.widget {
 		gears.shape.powerline(cr, width, height, (height / 2) * (-1))
 	end
 }
-
-volume_widget = lain.widget.pulse {
-	settings = function()
-		local soundlevel_emoji = my_utils.create_markup{
-			text="",
-			size="large",
-			fg="#6c71c4",
-			font="LineIcons"
-		}
-		local soundlevel_text = my_utils.create_markup{
-			text=volume_now.left .. '%',
-			rise="3000"
-		}
-		if volume_now.left == nil then
-			soundlevel_emoji = "X"
-		elseif tonumber(volume_now.left) > 120 then
-			soundlevel_emoji = my_utils.create_markup{
-				text="",
-				size="xx-large",
-				fg="#dc322f",
-				font="LineIcons"
-			}
-		elseif tonumber(volume_now.left) > 70 then
-			soundlevel_emoji = my_utils.create_markup{
-				text="",
-				size="xx-large",
-				fg="#6c71c4",
-				font="LineIcons"
-			}
-		elseif tonumber(volume_now.left) > 40 then
-			soundlevel_emoji = my_utils.create_markup{
-				text="",
-				size="xx-large",
-				fg="#6c71c4",
-				font="LineIcons"
-			}
-		elseif tonumber(volume_now.left) > 10 then
-			soundlevel_emoji = my_utils.create_markup{
-				text="",
-				size="x-large",
-				fg="#6c71c4",
-				font="LineIcons"
-			}
-		end
-		if volume_now.muted == "yes" then
-			soundlevel_emoji = my_utils.create_markup{
-				text="",
-				size="x-large",
-				fg="#ff8c40",
-				font="LineIcons"
-			}
-			soundlevel_text = my_utils.create_markup{
-				text=volume_now.left .. '%',
-				fg="#ff8c40",
-				rise="3000"
-			}
-		end
-		widget:set_markup(soundlevel_emoji .. " " .. soundlevel_text .. " ")
-	end
-}
-
-volume_widget.widget:buttons(awful.util.table.join(
-	awful.button({}, 1, function() -- left click
-			awful.spawn("pavucontrol")
-	end),
-	awful.button({}, 2, function() -- middle click
-			os.execute(string.format("pactl set-sink-mute %s toggle", volume_widget.device))
-			volume_widget.update()
-	end),
-	awful.button({}, 3, function() -- right click
-		os.execute('export SELECTED=`paoutput -g | rofi -dmenu`; if [[ ! -z $SELECTED ]]; then paoutput -s "$SELECTED"; fi')
-	end),
-	awful.button({}, 4, function() -- scroll up
-			os.execute(string.format("pactl set-sink-volume %s +5%%", volume_widget.device))
-			volume_widget.update()
-	end),
-	awful.button({}, 5, function() -- scroll down
-			os.execute(string.format("pactl set-sink-volume %s -5%%", volume_widget.device))
-			volume_widget.update()
-	end)
-))
-
 
 -- TODO: Declare whole table modularly
 
@@ -724,9 +638,8 @@ globalkeys = gears.table.join(
   awful.key({ ctrl				 }, "XF86AudioLowerVolume",	 nil, function () handle_media("previous") end),
 	-- Dropdown terminal: F12
   awful.key({              }, "F12",									 nil, function () my_dropdown:toggle() end),
-	awful.key({              }, "Print",								 nil, function () awful.spawn(screenshot_cmd()) end),
-  -- awful.key({              }, "Print",								 nil, function () awful.spawn("flameshot gui") end),
-  -- awful.key({ "Shift"      }, "Print",											function () awful.spawn("flameshot full -c") end),
+	awful.key({              }, "Print",								 nil, function () awful.spawn("flameshot gui") end),
+	awful.key({ "Shift"      }, "Print",											function () awful.spawn("flameshot full -c") end),
   awful.key({ ctrl         }, "space",											function () awful.spawn("rofi -show run") end),
 	awful.key({ ctrl, alt    }, "c",					        				function () awful.spawn(greenclip_cmd) end),
 	awful.key({ win          }, "p",					        				function () awful.spawn("rofi-pass") end),
@@ -735,10 +648,11 @@ globalkeys = gears.table.join(
   awful.key({ ctrl, alt    }, "p",					        				function () reset_pulse() end),
   awful.key({ win          }, "f",					        				function () awful.spawn(browser) end),
 	awful.key({ win          }, "l",					        				function () awful.spawn("sudo slock") end),
-	awful.key({ win          }, "F10",	  		        				function () keyboard_widget:toggle() end),
+	awful.key({ win          }, "k",		  		        				function () keyboard_widget:toggle() end),
+	awful.key({ win          }, "e",		  		        				function () keyboard_widget:toggle() end),
 	-- If something goes wrong with grobi
-	awful.key({ win          }, "k",					        				function () awful.spawn("grobi apply mobile") end),
-	awful.key({ win, "Shift" }, "k",					        				function () awful.spawn("grobi apply inno-dell-dock") end),
+	awful.key({ win          }, "m",					        				function () awful.spawn("grobi apply mobile") end),
+	awful.key({ win, "Shift" }, "m",					        				function () awful.spawn("grobi apply inno-dell-dock") end),
 	-- Cycle between available layouts
   awful.key({ win          }, "space",			        				function () awful.layout.inc(1) end),
 	awful.key({ win          }, "x",					        				function () awful.spawn("pcmanfm-qt") end),
