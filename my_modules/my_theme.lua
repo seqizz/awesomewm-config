@@ -13,11 +13,11 @@ local themes_path = gfs.get_themes_dir()
 local theme = {}
 
 -- theme.font = "Fira Code Medium " .. dpi(12)
-theme.font = "Fira Code Medium 12"
+theme.font = "FiraCode Nerd Font Medium 12"
 -- theme.font_big = "Fira Code Medium " .. dpi(14)
-theme.font_big = "Fira Code Medium 14"
+theme.font_big = "FiraCode Nerd Font Medium 14"
 -- theme.font_small = "Fira Code Medium " .. dpi(10)
-theme.font_small = "Fira Code Medium 10"
+theme.font_small = "FiraCode Nerd Font Medium 10"
 theme.emoji_font = "Twitter Color Emoji"
 
 theme.maximized_hide_border = true
@@ -54,7 +54,7 @@ theme.border_radius        = 2
 theme.notification_opacity = 0.9
 theme.notification_margin = dpi(15)
 theme.notification_icon_size = 80
-theme.notification_max_width = dpi(500)
+theme.notification_max_width = dpi(600)
 local ntf_shape = function(cr, width, height)
    shape.partially_rounded_rect(cr, width, height, true, false, true, true, 18)
 end
