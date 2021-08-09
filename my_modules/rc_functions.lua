@@ -208,3 +208,19 @@ function set_wallpaper(s)
       end
     end)
 end
+
+function save_current_tag()
+    local f = assert(io.open("/home/gurkan/.awesome-last-ws", "w"))
+    local t = client.focus and client.focus.first_tag or nil
+    f:write(t.name, "\n")
+    f:close()
+end
+
+function load_last_active_tag()
+	local f = assert(io.open("/home/gurkan/.awesome-last-ws", "r"))
+	tag_name = f:read("*line")
+	f:close()
+	local t = awful.tag.find_by_name(nil, tag_name)
+	awful.tag.viewnone()
+	awful.tag.viewtoggle(t)
+end

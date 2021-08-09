@@ -104,6 +104,20 @@ function set_rules(clientkeys)
     },
 
     {
+      rule = {
+        name = "Onboard"
+      },
+      properties = {
+        focusable = false,
+        ontop = true,
+        sticky = true,
+        skip_taskbar = true,
+        floating = true,
+        -- placement = awful.placement.top_right,
+      };
+    },
+
+    {
       rule_any = {
         class = {
           "chromium-browser",
