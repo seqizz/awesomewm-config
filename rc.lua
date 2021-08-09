@@ -660,7 +660,7 @@ globalkeys = gears.table.join(
   awful.key({ win, "Shift" }, "Tab",				        				function () awful.tag.viewprev(get_screen_of_focused()) end),
   awful.key({ win, "Shift" }, "c",					        				function () awful.spawn(proxified_chromium_cmd) end),
   awful.key({ win, ctrl    }, "q",					        				awesome.quit),
-  awful.key({ win, ctrl    }, "r",					        				awesome.restart),
+  awful.key({ win, ctrl    }, "r",													awesome.restart),
   awful.key({ win, "Shift" }, "z",					        				unminimize_client)
 )
 if hostname == "innixos" or hostname == "innodellix" then
@@ -685,6 +685,11 @@ client.connect_signal("manage", function (c)
 		-- Prevent clients from being unreachable after screen count changes.
 		awful.placement.no_offscreen(c)
 	end
+end)
+
+awesome.connect_signal("exit", function (c)
+	-- We are about to exit / restart awesome, save our last used tag
+	save_current_tag()
 end)
 
 -- Add a titlebar if titlebars_enabled is set to true in the rules.
@@ -816,4 +821,5 @@ awesome.connect_signal("startup", function(s, state)
 	run_once("alttab -w 1 -t 400x300 -frame cyan -i 100x100 -font xft:firacode-20", "alttab")
 end)
 
+load_last_active_tag()
 -- vim: set ts=2 sw=2 sts=2 tw=0 noet :
