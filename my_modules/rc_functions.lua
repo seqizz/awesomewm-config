@@ -221,6 +221,8 @@ function load_last_active_tag()
 	tag_name = f:read("*line")
 	f:close()
 	local t = awful.tag.find_by_name(nil, tag_name)
-	awful.tag.viewnone()
-	awful.tag.viewtoggle(t)
+    if t ~= nil then
+        awful.tag.viewnone()
+        awful.tag.viewtoggle(t)
+    end
 end
