@@ -70,6 +70,11 @@ function sticky_toggle(c)
   }
 end
 
+function shit(c)
+  nextcl = awful.client.next (1, c, true)
+  print(nextcl.name)
+end
+
 function float_toggle(c)
   awful.client.floating.toggle()
   if c.floating then
@@ -111,25 +116,36 @@ function hide_stickies()
     return
   end
   for idx, c in ipairs(stickies) do
-    if c.border_color == '#26b7d4' and c.opacity == 0.7 then
-      -- already minimized, unminimize
-      c.width = 533
-      c.height = 860
+    if c.marked then
+      -- already transparent
+      c.marked = false
       c.border_color = beautiful.border_normal
       c.border_width = beautiful.border_width
       c.opacity = 1
-      awful.placement.top_right(c)
-      c.y = 30
     else
-      -- minimize request
-      c.fullscreen = false
-      c.width = 50
-      c.height = 50
+      c.marked = true
       c.border_color = '#26b7d4'
       c.border_width = 10
-      c.opacity = 0.7
-      awful.placement.bottom_right(c)
     end
+    -- if c.border_color == '#26b7d4' and c.opacity == 0.7 then
+      -- -- already minimized, unminimize
+      -- c.width = 533
+      -- c.height = 860
+      -- c.border_color = beautiful.border_normal
+      -- c.border_width = beautiful.border_width
+      -- c.opacity = 1
+      -- awful.placement.top_right(c)
+      -- c.y = 30
+    -- else
+      -- -- minimize request
+      -- c.fullscreen = false
+      -- c.width = 50
+      -- c.height = 50
+      -- c.border_color = '#26b7d4'
+      -- c.border_width = 10
+      -- c.opacity = 0.7
+      -- awful.placement.bottom_right(c)
+    -- end
   end
 end
 
@@ -225,4 +241,138 @@ function load_last_active_tag()
         awful.tag.viewnone()
         awful.tag.viewtoggle(t)
     end
+end
+
+local function parse_transformations(text, assume_normal)
+  local rot = { normal = (assume_normal or false), left = false, right = false, inverted = false}
+  local refl = { x = false, y = false, normal = (assume_normal or false) }
+  for word in text:gmatch("(%w+)") do
+    for k, _v in pairs(rot) do
+      if k == word then rot[k] = true end
+    end
+    for k, _v in pairs(refl) do
+      if k == word:lower() then refl[k] = true end
+    end
+  end
+  return { rotations = rot, reflections = refl }
+end
+
+function xrandr_info(fp)
+  local info = { screens = {}, outputs = {} }
+  local current_output
+  local last_property
+  local pats = { 
+    ['^Screen (%d+): minimum (%d+) x (%d+), current (%d+) x (%d+), maximum (%d+) x (%d+)$'] = function(matches)
+      -- X screens. Usually just one, when used with Xinerama
+      info.screens[tonumber(matches[1])] = { 
+        minimum = { tonumber(matches[2]), tonumber(matches[3]) },
+        resolution = { tonumber(matches[4]), tonumber(matches[5]) },
+        maximum = { tonumber(matches[6]), tonumber(matches[7]) } 
+      }
+    end,
+    ['^([-%a%d]+) connected ([%S]-)%s*(%d+)x(%d+)+(%d+)+(%d+)%s*(.-)%(([%a%s]+)%) (%d+)mm x (%d+)mm$'] = function(matches)
+      -- Match connected and active outputs
+      current_output = {
+        name = matches[1],
+
+        resolution = { tonumber(matches[3]), tonumber(matches[4]) },
+        offset = { tonumber(matches[5]), tonumber(matches[6]) },
+        transformations = parse_transformations(matches[7]),
+        available_transformations = parse_transformations(matches[8], false),
+        physical_size = { tonumber(matches[9]), tonumber(matches[10]) },
+        connected = true,
+        on = true,
+        primary = (matches[2] == 'primary'),
+        modes = {},
+        properties = {},
+        edid = ''
+      }
+      info.outputs[matches[1]] = current_output
+    end,
+    ['^([-%a%d]+) connected %(([%a%s]+)%)$'] = function(matches)
+      -- DVI-1 connected (normal left inverted right x axis y axis)
+      -- Match outputs that are connected but disabled
+      current_output = {
+        name = matches[1],
+        available_transformations = parse_transformations(matches[2], false),
+        transformations = parse_transformations(''),
+        modes = {},
+        connected = true,
+        on = false,
+        properties = {},
+        edid = ''
+      }
+      info.outputs[matches[1]] = current_output
+    end,
+    ['^([-%a%d]+) disconnected .*%(([%a%s]+)%)$'] = function(matches)
+      -- Match disconnected outputs
+      current_output = {
+        available_transformations = parse_transformations(matches[2], false),
+        connected = false, on = false,
+        properties = {},
+        edid = ''
+      }
+      info.outputs[matches[1]] = current_output
+    end,
+    ['^%s%s%s(%d+)x(%d+)%s+(.+)$'] = function(matches)
+      -- Match modelines. Only care about resolution and refresh.
+      local w = tonumber(matches[1])
+      local h = tonumber(matches[2])
+      for refresh, symbols in matches[3]:gmatch('([%d.]+)(..)') do
+        local mode = { w, h, math.floor(tonumber(refresh)) }
+        local modes = current_output.modes
+        modes[#modes + 1] = mode
+        if symbols:find('%*') then
+          current_output.current_mode = mode
+        end
+        if symbols:find('%+') then
+          current_output.default_mode = mode
+        end
+      end
+    end,
+    ['^\t(.+):%s+(.+)%s+$'] = function(matches)
+      -- Match properties, which are rather freeform
+      last_property = matches[1]
+      local properties = current_output.properties
+      properties[last_property] = { value = matches[2] }
+    end,
+    ['^\t\tsupported:%s+(.+)$'] = function(matches)
+      -- Match supported property values, freeform but comma separated
+      if last_property ~= nil then 
+        local prop = current_output.properties[last_property]
+        local supported = { }
+        for word in matches[1]:gmatch('([^,]+),?%s?') do
+          supported[#supported + 1] = word
+        end
+        prop.supported = supported
+      end
+    end,
+    ['^\t\t(' .. string.rep('[0-9a-f]', 32) .. ')$'] = function(matches)
+      -- Match EDID block
+      current_output.edid = current_output.edid .. matches[1]
+    end,
+    ['^\t\trange:%s+%((%d+), (%d+)%)$'] = function(matches)
+      -- Match ranged property values, e.g. brightness
+      if last_property ~= nil then
+        local prop = current_output.properties[last_property]
+        local range = { tonumber(matches[1]), tonumber(matches[2]) }
+        prop.range = range
+      end
+    end
+  }
+
+  fp = fp or io.popen('xrandr --query --prop', 'r')
+  for line in fp:lines() do
+    for pat, func in pairs(pats) do
+      local res 
+      res = {line:find(pat)}
+      if #res > 0 then
+        table.remove(res, 1)
+        table.remove(res, 1)
+        func(res)
+        break
+      end
+    end
+  end
+  return info
 end
