@@ -372,9 +372,10 @@ end
 
 local function check_available_screens()
   if ( docked and screen:count() == 1 ) or ( not docked and screen:count() == 2 ) then
-    print(">>>>>> Detected docking change, restarting awesomewm")
-    -- awesome.restart()
-    register_all_screens()
+    debug_print("Detected docking change, restarting awesomewm")
+    -- Sadly we have to restart, can't reliably move stuff with
+    -- 2 consecutive screen add/remove actions
+    awesome.restart()
   end
 end
 
@@ -397,33 +398,6 @@ psi_timer = gears.timer {
 local function screen_organizer(s, primary)
   -- Wallpaper -- one for each screen
   set_wallpaper(s)
-
-  -- grab needed tags
-  if primary then
-    tag_web.screen = s
-    screen_table[s]["tags"]["web"] = tag_web
-  end
-  if (
-      primary and my_utils.table_length(screen_table) == 1
-    ) or (
-      not primary and my_utils.table_length(screen_table) > 1 ) then
-    tag_term.screen = s
-    if not primary then
-      tag_term.selected = true
-    end
-    screen_table[s]["tags"]["term"] = tag_term
-  end
-  if primary and ( hostname == "innixos" or hostname == "innodellix" ) then
-    tag_mail.screen = s
-    screen_table[s]["tags"]["mail"] = tag_mail
-  end
-  if (
-      primary and my_utils.table_length(screen_table) == 1
-    ) or (
-      not primary and my_utils.table_length(screen_table) > 1 ) then
-    tag_chat.screen = s
-    screen_table[s]["tags"]["chat"] = tag_chat
-  end
 
   -- Create an imagebox widget which will contain an icon indicating which layout we're using.
   -- We need one layoutbox per screen.
@@ -524,15 +498,18 @@ local function screen_organizer(s, primary)
   }
 
   table.insert(systray_right_widgets, separator_empty)
-  if primary and my_utils.table_length(screen_table) == 1 and hostname == "innodellix" then
+  -- if primary and my_utils.table_length(screen_table) == 1 and hostname == "innodellix" then
+  if primary and screen:count() == 1 and hostname == "innodellix" then
     table.insert(systray_right_widgets, touch_widget)
     table.insert(systray_right_widgets, rotate_widget)
     table.insert(systray_right_widgets, separator_reverse)
   end
   if (
-      primary and my_utils.table_length(screen_table) == 1
+      -- primary and my_utils.table_length(screen_table) == 1
+      primary and screen:count() == 1
     ) or (
-      not primary and my_utils.table_length(screen_table) > 1 ) then
+      -- not primary and my_utils.table_length(screen_table) > 1 ) then
+      not primary and screen:count() > 1 ) then
     table.insert(systray_right_widgets, keyboard_widget)
     table.insert(systray_right_widgets, separator_reverse)
     table.insert(systray_right_widgets, battery_widget)
@@ -560,19 +537,11 @@ local function screen_organizer(s, primary)
   }
 end
 
-known_primary_screens = {
-  "eDP1", -- laptop monitor
-  "eDP-1", -- laptop monitor
-  "DP3-2", -- main external monitor on dock
-  "DP-3-2", -- main external monitor on dock
-}
-
-function register_all_screens(systray)
-
-	for name, output in pairs(xrandr_info().outputs) do
-		if output.connected and output.on then
-			local text
-			local monitor_id
+function xrandr_get_screens()
+  for name, output in pairs(xrandr_info().outputs) do
+    if output.connected and output.on then
+      local text
+      local monitor_id
       if output.edid ~= "" then
         parsed = edid.parse_edid(output.edid)
         local monitor_name = edid.monitor_name(output.edid)
@@ -585,55 +554,107 @@ function register_all_screens(systray)
         end
       else
         text = name
-			end
-			monitor_unique_id = text .. "_" .. man_code .. "_" .. serial_number
-			print(monitor_unique_id .. " <<<<<<<<<<__---^^^^")
-			xrandr_table[monitor_unique_id] = {}
-		end
-	end
-
-  local changes_detected = false
-  for s in screen do
-    for screen_name, _ in pairs(s.outputs) do
-      print('<<<<<<<<< Doing ' .. screen_name )
-      screen_table[s] = {}
-
-      naughty.notify({text = "Screen: " .. screen_name, screen = s})
-      -- These are the cool guys
-      -- One is laptop monitor, other is main monitor
-      if my_utils.table_contains(known_primary_screens, screen_name) then
-        screen_table[s]["role"] = "primary"
-      else
-        -- I am secondary
-        screen_table[s]["role"] = "secondary"
-				systray:set_screen(s)
-				print('<<<<<<<<< set systray screen as ' .. screen_name )
       end
-      screen_table[s]["name"] = screen_name
-      screen_table[s]["tags"] = {}
+      monitor_unique_id = text .. "_" .. man_code .. "_" .. serial_number
+      xrandr_table[text] = {}
+      xrandr_table[text]["manufacturer_code"] = man_code
+      xrandr_table[text]["serial_number"] = serial_number
     end
   end
+end
+
+function reorg_tags_and_systray(systray, from_signal)
+
+	-- Safety switches
+	local reassigned_tags = 0
+  local reorg_done = false
+
+  -- Get all screens under xrandr_table, just for fun, no real usage for now
+  xrandr_get_screens()
+
+  debug_print("Hellooo, here are all the screens: " .. my_utils.dump(xrandr_table))
+
+	local screens_handled = {}
+
+	-- TODO: handle MSI laptop too
+  if screen:count() == 1 and my_utils.table_contains(xrandr_table, "eDP-1", true) then
+    debug_print("There is only laptop screen")
+    laptop_screen = my_utils.find_screen_by_name("eDP-1")
+
+    systray:set_screen(laptop_screen)
+    for _, tag in pairs(root.tags()) do
+			if tag.screen == laptop_screen and from_signal then
+				goto continue
+			end
+			reassigned_tags = reassigned_tags + 1
+			tag.screen = laptop_screen
+      if tag.name == "web" then
+        tag.index = 1
+      elseif tag.name == "mail" then
+        tag.index = 2
+      elseif tag.name == "term" then
+        tag.index = 3
+      elseif tag.name == "chat" then
+        tag.index = 4
+      end
+		  ::continue::
+    end
+
+		if reassigned_tags == 0 and from_signal then
+			debug_print('Nothing needs change..')
+			goto finish
+		end
+    screen_organizer(laptop_screen, true)
+    reorg_done = true
+  elseif screen:count() == 2 and not my_utils.table_contains(xrandr_table, "eDP-1", true) then
+    debug_print("We're on a docking station")
+    for _, tag in pairs(root.tags()) do
+      local tag_moved = false
+      for s in screen do
+        if my_utils.is_screen_primary(s) and ( tag.name == "web" or tag.name == "mail") then
+          tag.screen = s
+          tag_moved = true
+        elseif not my_utils.is_screen_primary(s) and ( tag.name == "term" or tag.name == "chat") then
+          tag.screen = s
+          tag_moved = true
+        end
+      end
+
+      if tag_moved then
+        if tag.name == "web" or tag.name == "term" then
+          tag.index = 1
+        else
+          tag.index = 0
+        end
+      end
+    end
+
+		if reassigned_tags == 0 and from_signal then
+			debug_print('Nothing needs change..')
+			goto finish
+		end
+		for s in screen do
+			-- First systray
+			if not my_utils.is_screen_primary(s) then
+				systray:set_screen(s)
+			end
+			screen_organizer(s, my_utils.is_screen_primary(s))
+		end
+
+    reorg_done = true
+  end
+  -- else do nothing, it's an intermediate state
 
   -- define rules since we have filled the screen table
   dofile ("/home/gurkan/.config/awesome/my_modules/rc_rules.lua")
-
-  -- configure each screen and grab required tags etc.
-  for screen, _ in pairs(screen_table) do
-    screen_organizer(
-      screen,
-      screen_table[screen]["role"] == "primary"
-    )
-  end
 
   clientkeys, globalkeys = set_keys_after_screen(clientkeys, globalkeys)
   dofile ("/home/gurkan/.config/awesome/my_modules/rc_clientbuttons.lua")
   root.keys(globalkeys)
   set_rules(clientkeys)
   font_hacks()
-
-  print(my_utils.dump(screen_table))
+	::finish::
 end
--- }}}
 
 -- {{{ Mouse bindings
 root.buttons(gears.table.join(
@@ -681,6 +702,8 @@ globalkeys = gears.table.join(
   -- If something goes wrong with grobi
   awful.key({ win          }, "m",                          function () awful.spawn("grobi apply mobile") end),
   awful.key({ win, "Shift" }, "m",                          function () awful.spawn("grobi apply inno-dell-dock") end),
+  -- awful.key({ win          }, "b",            function () my_utils.find_screen_by_name("eDP-1"):emit_signal('list') end),
+  awful.key({ win          }, "b",            function () my_utils.find_screen_by_name("DP-3-3"):emit_signal('list') end),
   -- Cycle between available layouts
   awful.key({ win          }, "space",                      function () awful.layout.inc(1) end),
   awful.key({ win          }, "x",                          function () awful.spawn("pcmanfm-qt") end),
@@ -699,7 +722,7 @@ if hostname == "innixos" or hostname == "innodellix" then
 end
 
 -- run once on startup
-register_all_screens(my_systray)
+-- register_all_screens(my_systray)
 
 -- Signal function to execute when a new client appears.
 client.connect_signal("manage", function (c)
@@ -715,25 +738,39 @@ client.connect_signal("manage", function (c)
   end
 end)
 
+-- Screen handling
+screen.connect_signal("list", function()
+  naughty.notify({text = "Reorganizing tags"})
+  reorg_tags_and_systray(my_systray, true)
+end)
+
+reorg_tags_and_systray(my_systray, false)
+
+tag.connect_signal("request::screen", function(t)
+  -- recover tags on a removed screen
+  naughty.notify({text = "Recovering tag: " .. t.name})
+  for s in screen do t.screen = s return end
+end)
+
 client.connect_signal("mouse::enter", function (c)
   if c.ontop and c.sticky and c.skip_taskbar and c.marked then
-		c.opacity = 0.9
-		-- Run away from mouse
-		if c.x > 500 then
-			awful.placement.top_left(c, {honor_workarea=true})
-		else
-			awful.placement.top_right(c, {honor_workarea=true})
-		end
-	end
+    c.opacity = 0.9
+    -- Run away from mouse
+    if c.x > 500 then
+      awful.placement.top_left(c, {honor_workarea=true})
+    else
+      awful.placement.top_right(c, {honor_workarea=true})
+    end
+  end
 end)
 
 -- @Reference: Reflect click to the client below
 -- client.connect_signal("button::press", function (c)
   -- if c.ontop and c.sticky and c.skip_taskbar and c.marked then
-		-- next_client = awful.client.next (1, c, true)
+    -- next_client = awful.client.next (1, c, true)
     -- helpers.async("xdotool click --window " .. next_client.window .. " 1", function(out)
-		-- end)
-	-- end
+    -- end)
+  -- end
 -- end)
 
 awesome.connect_signal("exit", function (c)
