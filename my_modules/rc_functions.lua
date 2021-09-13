@@ -4,6 +4,10 @@ local beautiful = require("beautiful")
 local naughty = require("naughty")
 local my_utils = require('my_modules/my_utils')
 
+function debug_print(text)
+  print('<<<<<<< ' .. text)
+end
+
 function mark_client()
   c = client.focus
   if c == nil or c.sticky then
@@ -226,20 +230,36 @@ function set_wallpaper(s)
 end
 
 function save_current_tag()
-    local f = assert(io.open("/home/gurkan/.awesome-last-ws", "w"))
-    local t = client.focus and client.focus.first_tag or nil
-    f:write(t.name, "\n")
-    f:close()
+    for s in screen do
+        local screen_name
+        for name, _ in pairs(s.outputs) do
+            screen_name = name
+        end
+        local f = assert(io.open("/home/gurkan/.awesome-last-ws-" .. screen_name, "w"))
+        for _, tagobj in pairs(s.selected_tags) do
+            -- XXX: Does not support multiple active tags yet
+            f:write(tagobj.name, "\n")
+            f:close()
+        end
+    end
 end
 
 function load_last_active_tag()
-	local f = assert(io.open("/home/gurkan/.awesome-last-ws", "r"))
-	tag_name = f:read("*line")
-	f:close()
-	local t = awful.tag.find_by_name(nil, tag_name)
-    if t ~= nil then
+    local last_tags = {}
+    for s in screen do
+        local screen_name
+        for name, _ in pairs(s.outputs) do
+            screen_name = name
+        end
+        local f = assert(io.open("/home/gurkan/.awesome-last-ws-" .. screen_name, "r"))
+        tag_name = f:read("*line")
+        f:close()
+	    local t = awful.tag.find_by_name(nil, tag_name)
+        table.insert(last_tags, t)
+    end
+    if next(last_tags) ~= nil then
         awful.tag.viewnone()
-        awful.tag.viewtoggle(t)
+        awful.tag.viewmore(last_tags)
     end
 end
 

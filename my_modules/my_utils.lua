@@ -12,14 +12,6 @@ function my_utils.am_i_on_screen(screen_name)
     return answer
 end
 
-function my_utils.is_screen_primary(s)
-    local answer = false
-		if screen_table[s]["role"] == "primary" then
-      answer = true
-    end
-    return answer
-end
-
 function my_utils.dump(o, level)
   -- a shitty pretty print implementation
   level = level or 0
@@ -53,6 +45,24 @@ function my_utils.table_contains(table, element, check_key)
     end
   end
   return false
+end
+
+function my_utils.is_screen_primary(s)
+    local answer = false
+
+    known_primary_screens = {
+        "eDP1", -- laptop monitor (innodellix)
+        "eDP-1", -- laptop monitor (msi)
+        "DP3-2", -- main external monitor on dock
+        "DP-3-2", -- main external monitor on dock
+    }
+    for screen_name, _ in pairs(s.outputs) do
+        if my_utils.table_contains(known_primary_screens, screen_name) then
+            answer = true
+        end
+        -- debug_print(screen_name .. " is primary? " .. tostring(answer))
+    end
+    return answer
 end
 
 function my_utils.table_removekey(inputtable, key)
@@ -116,6 +126,16 @@ end
 -- Returns true if one value is falsey and the other is truthy, returns false otherwise
 function my_utils.xor(a, b)
   return a ~= b
+end
+
+function my_utils.find_screen_by_name(name)
+  for s in screen do
+    for screen_name, _ in pairs(s.outputs) do
+      if screen_name == name then
+        return s
+      end
+    end
+  end
 end
 
 return my_utils

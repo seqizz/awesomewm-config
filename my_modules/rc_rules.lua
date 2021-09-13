@@ -2,23 +2,6 @@ local awful = require("awful")
 local beautiful = require("beautiful")
 local my_utils = require('my_modules/my_utils')
 
-local function find_tag_for(tagname, role)
-  role = role or 'primary'
-
-  if my_utils.table_length(screen_table) == 1 and role ~= 'primary' then
-    -- if there is only 1 screen, it's also secondary
-    role = "primary"
-  end
-
-  for screen, values in pairs(screen_table) do
-    if values["role"] == role then
-      if my_utils.table_contains(values["tags"], tagname, true) then
-        return values["tags"][tagname]
-      end
-    end
-  end
-end
-
 function set_rules(clientkeys)
   -- {{{ Rules
   -- Rules to apply to new clients (through the "manage" signal).
@@ -127,7 +110,7 @@ function set_rules(clientkeys)
       properties = {
         ontop = true,
         floating = true,
-        screen = secondary_screen_name,
+        -- screen = secondary_screen_name,
         sticky = true,
         skip_taskbar = true,
         width = 533,
@@ -182,8 +165,8 @@ function set_rules(clientkeys)
         }
       },
       properties = {
-        tag    = find_tag_for("web"),
-        screen = screen_table["primary"],
+        tag    = awful.tag.find_by_name(nil, "web"),
+        -- screen = screen_table["primary"],
       }
     },
 
@@ -201,8 +184,8 @@ function set_rules(clientkeys)
         }
       },
       properties = {
-        tag    = find_tag_for("term", "secondary"),
-        screen = screen_table["secondary"],
+        tag    = awful.tag.find_by_name(nil, "term"),
+        -- screen = screen_table["secondary"],
       }
     },
     {
@@ -216,8 +199,8 @@ function set_rules(clientkeys)
         }
       },
       properties = {
-        tag    = find_tag_for("chat", "secondary"),
-        screen = screen_table["secondary"],
+        tag    = awful.tag.find_by_name(nil, "chat"),
+        -- screen = screen_table["secondary"],
       }
     },
     {
@@ -230,8 +213,8 @@ function set_rules(clientkeys)
         }
       },
       properties = {
-        tag    = find_tag_for("mail"),
-        screen = screen_table["primary"],
+        tag    = awful.tag.find_by_name(nil, "mail"),
+        -- screen = screen_table["primary"],
       }
     },
   }
