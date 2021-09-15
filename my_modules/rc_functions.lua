@@ -230,36 +230,30 @@ function set_wallpaper(s)
 end
 
 function save_current_tag()
+    active_tags = {}
     for s in screen do
-        local screen_name
-        for name, _ in pairs(s.outputs) do
-            screen_name = name
-        end
-        local f = assert(io.open("/home/gurkan/.awesome-last-ws-" .. screen_name, "w"))
+        os.remove("/home/gurkan/.awesome-last-ws")
         for _, tagobj in pairs(s.selected_tags) do
-            -- XXX: Does not support multiple active tags yet
-            f:write(tagobj.name, "\n")
-            f:close()
+            table.insert(active_tags, tagobj)
         end
     end
+    local f = assert(io.open("/home/gurkan/.awesome-last-ws", "a+"))
+    for _, tagobj in pairs(active_tags) do
+        f:write(tagobj.name, "\n")
+    end
+    f:close()
 end
 
 function load_last_active_tag()
-    local last_tags = {}
-    for s in screen do
-        local screen_name
-        for name, _ in pairs(s.outputs) do
-            screen_name = name
+    tag_list = my_utils.read_lines_from("/home/gurkan/.awesome-last-ws")
+    if next(tag_list) ~= nil then
+        local previous_tags = {}
+        for _, tag_name in pairs(tag_list) do
+            local t = awful.tag.find_by_name(nil, tag_name)
+            table.insert(previous_tags, t)
         end
-        local f = assert(io.open("/home/gurkan/.awesome-last-ws-" .. screen_name, "r"))
-        tag_name = f:read("*line")
-        f:close()
-	    local t = awful.tag.find_by_name(nil, tag_name)
-        table.insert(last_tags, t)
-    end
-    if next(last_tags) ~= nil then
         awful.tag.viewnone()
-        awful.tag.viewmore(last_tags)
+        awful.tag.viewmore(previous_tags)
     end
 end
 
