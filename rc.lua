@@ -755,12 +755,12 @@ end)
 client.connect_signal("mouse::enter", function (c)
   if c.ontop and c.sticky and c.skip_taskbar and c.marked then
     c.opacity = 0.9
-    -- Run away from mouse
-    if c.x > 500 then
-      awful.placement.top_left(c, {honor_workarea=true})
-    else
-      awful.placement.top_right(c, {honor_workarea=true})
-    end
+    -- Run away from mouse, to the other side of the screen
+    if c.x > (c.screen.geometry.x + c.screen.geometry.width - 600) then
+			c:relative_move(-(c.screen.geometry.width - c.width), 0, 0, 0)
+		else
+			c:relative_move((c.screen.geometry.width - c.width), 0, 0, 0)
+		end
   end
 end)
 
