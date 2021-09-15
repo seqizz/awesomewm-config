@@ -81,7 +81,6 @@ function set_rules(clientkeys)
         sticky = true,
         skip_taskbar = true,
         floating = true,
-        -- placement = awful.placement.top_right,
         callback = function(c) awful.placement.top_right(c, {honor_workarea=true}) end,
       };
     },
@@ -96,7 +95,6 @@ function set_rules(clientkeys)
         sticky = true,
         skip_taskbar = true,
         floating = true,
-        -- placement = awful.placement.top_right,
       };
     },
 
@@ -110,7 +108,6 @@ function set_rules(clientkeys)
       properties = {
         ontop = true,
         floating = true,
-        -- screen = secondary_screen_name,
         sticky = true,
         skip_taskbar = true,
         width = 533,
@@ -166,7 +163,6 @@ function set_rules(clientkeys)
       },
       properties = {
         tag    = awful.tag.find_by_name(nil, "web"),
-        -- screen = screen_table["primary"],
       }
     },
 
@@ -184,8 +180,8 @@ function set_rules(clientkeys)
         }
       },
       properties = {
-        tag    = awful.tag.find_by_name(nil, "term"),
-        -- screen = screen_table["secondary"],
+        tag = awful.tag.find_by_name(nil, "term"),
+        size_hints_honor = false, -- don't try to be clever
       }
     },
     {
@@ -200,7 +196,6 @@ function set_rules(clientkeys)
       },
       properties = {
         tag    = awful.tag.find_by_name(nil, "chat"),
-        -- screen = screen_table["secondary"],
       }
     },
     {
@@ -209,12 +204,11 @@ function set_rules(clientkeys)
           "Daily",
           "Mail",
           "Thunderbird"
-          -- "Soffice" -- << Really? Hidden class per open files, FUCK LIBREOFFICE
+          -- "Soffice" -- << Really? Hidden class for open files, FUCK LIBREOFFICE
         }
       },
       properties = {
         tag    = awful.tag.find_by_name(nil, "mail"),
-        -- screen = screen_table["primary"],
       }
     },
   }
