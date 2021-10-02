@@ -329,6 +329,26 @@ battery_widget.widget:buttons(awful.util.table.join(
   end)
 ))
 
+-- testing
+function notifytest()
+	added_notification = naughty.notify(
+			{
+					category = "x.vendor.class.device.added",
+					title = "testing crap",
+					timeout = 0,
+					actions = {
+							["OK"] = function ()
+								print('pressed OK')
+								naughty.destroy(added_notification)
+							end,
+							["Cancel"] = function ()
+								naughty.destroy(added_notification)
+							end
+					},
+			}
+	)
+end
+
 -- Create a textclock widget and attach the calendar
 mytextclock = wibox.widget.textclock()
 cw = lain.widget.cal({
@@ -694,7 +714,8 @@ globalkeys = gears.table.join(
   awful.key({ win          }, "p",                          function () awful.spawn("rofi-pass") end),
   awful.key({ ctrl, alt    }, "t",                          function () awful.spawn(terminal) end),
   awful.key({ win          }, "c",                          function () awful.spawn("chromium-browser") end),
-  awful.key({ ctrl, alt    }, "p",                          function () reset_pulse() end),
+  -- awful.key({ ctrl, alt    }, "p",                          function () reset_pulse() end),
+  awful.key({ ctrl, alt    }, "p",                          function () notifytest() end),
   awful.key({ win          }, "f",                          function () awful.spawn(browser) end),
   awful.key({ win          }, "l",                          function () awful.spawn("sudo slock") end),
   awful.key({ win          }, "k",                          function () keyboard_widget:toggle() end),
@@ -736,6 +757,19 @@ client.connect_signal("manage", function (c)
     -- Prevent clients from being unreachable after screen count changes.
     awful.placement.no_offscreen(c)
   end
+end)
+
+client.connect_signal("property::minimized", function(c)
+	-- If a sticky window is minimized, ensure it's visible on taskbar
+	if c.sticky then
+		c.skip_taskbar = false
+	end
+end)
+client.connect_signal("focus", function(c)
+	-- If a sticky window is unminimized, remove from taskbar
+	if c.sticky and not c.minimized then
+		c.skip_taskbar = true
+	end
 end)
 
 -- Screen handling
