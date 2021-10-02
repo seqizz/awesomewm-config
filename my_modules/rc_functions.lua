@@ -8,34 +8,6 @@ function debug_print(text)
   print('<<<<<<< ' .. text)
 end
 
-function mark_client()
-  c = client.focus
-  if c == nil or c.sticky then
-    -- we don't care
-    return
-  end
-
-  if c.opacity == 0.89 then
-    -- marked one, unmark
-    c.opacity = 1
-    c.border_width = 0
-  end
-end
-
-function unmark_client()
-  c = client.focus
-  if c == nil or c.sticky then
-    -- we don't care
-    return
-  end
-
-  if c.opacity ~= 0.89 then
-    -- unmarked one, mark
-    c.opacity = 0.89
-    c.border_width = 15
-  end
-end
-
 function suspend_toggle(c)
   awful.spawn.easy_async("ps -q " .. c.pid .. " -o state --no-headers",
                          function(stdout, stderr, reason, exit_code)
@@ -123,33 +95,23 @@ function hide_stickies()
     if c.marked then
       -- already transparent
       c.marked = false
+      c.width = 533
+      c.height = 860
       c.border_color = beautiful.border_normal
       c.border_width = beautiful.border_width
       c.opacity = 1
+      awful.placement.top_right(c)
+      c.y = 30
     else
       c.marked = true
+      c.opacity = 0.9
+      c.height = 200
+      c.width = 300
       c.border_color = '#26b7d4'
       c.border_width = 10
+      awful.placement.top_right(c)
+      c.y = 30
     end
-    -- if c.border_color == '#26b7d4' and c.opacity == 0.7 then
-      -- -- already minimized, unminimize
-      -- c.width = 533
-      -- c.height = 860
-      -- c.border_color = beautiful.border_normal
-      -- c.border_width = beautiful.border_width
-      -- c.opacity = 1
-      -- awful.placement.top_right(c)
-      -- c.y = 30
-    -- else
-      -- -- minimize request
-      -- c.fullscreen = false
-      -- c.width = 50
-      -- c.height = 50
-      -- c.border_color = '#26b7d4'
-      -- c.border_width = 10
-      -- c.opacity = 0.7
-      -- awful.placement.bottom_right(c)
-    -- end
   end
 end
 
@@ -275,13 +237,13 @@ function xrandr_info(fp)
   local info = { screens = {}, outputs = {} }
   local current_output
   local last_property
-  local pats = { 
+  local pats = {
     ['^Screen (%d+): minimum (%d+) x (%d+), current (%d+) x (%d+), maximum (%d+) x (%d+)$'] = function(matches)
       -- X screens. Usually just one, when used with Xinerama
-      info.screens[tonumber(matches[1])] = { 
+      info.screens[tonumber(matches[1])] = {
         minimum = { tonumber(matches[2]), tonumber(matches[3]) },
         resolution = { tonumber(matches[4]), tonumber(matches[5]) },
-        maximum = { tonumber(matches[6]), tonumber(matches[7]) } 
+        maximum = { tonumber(matches[6]), tonumber(matches[7]) }
       }
     end,
     ['^([-%a%d]+) connected ([%S]-)%s*(%d+)x(%d+)+(%d+)+(%d+)%s*(.-)%(([%a%s]+)%) (%d+)mm x (%d+)mm$'] = function(matches)
@@ -352,7 +314,7 @@ function xrandr_info(fp)
     end,
     ['^\t\tsupported:%s+(.+)$'] = function(matches)
       -- Match supported property values, freeform but comma separated
-      if last_property ~= nil then 
+      if last_property ~= nil then
         local prop = current_output.properties[last_property]
         local supported = { }
         for word in matches[1]:gmatch('([^,]+),?%s?') do
@@ -378,7 +340,7 @@ function xrandr_info(fp)
   fp = fp or io.popen('xrandr --query --prop', 'r')
   for line in fp:lines() do
     for pat, func in pairs(pats) do
-      local res 
+      local res
       res = {line:find(pat)}
       if #res > 0 then
         table.remove(res, 1)
