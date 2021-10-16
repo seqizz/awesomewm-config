@@ -75,8 +75,7 @@ function get_results_as_table(command)
     return lines
 end
 
-
-local sound_popup = awful.popup {
+sound_popup = awful.popup {
     ontop = true,
     visible = false,
     shape = function(cr, width, height)
@@ -84,7 +83,7 @@ local sound_popup = awful.popup {
     end,
     border_width = 1,
     border_color = beautiful.bg_focus,
-    maximum_width = 400,
+    maximum_width = 500,
     offset = { y = 5 },
     widget = {}
 }
