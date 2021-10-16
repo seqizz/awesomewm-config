@@ -329,25 +329,25 @@ battery_widget.widget:buttons(awful.util.table.join(
   end)
 ))
 
--- testing
-function notifytest()
-	added_notification = naughty.notify(
-			{
-					category = "x.vendor.class.device.added",
-					title = "testing crap",
-					timeout = 0,
-					actions = {
-							["OK"] = function ()
-								print('pressed OK')
-								naughty.destroy(added_notification)
-							end,
-							["Cancel"] = function ()
-								naughty.destroy(added_notification)
-							end
-					},
-			}
-	)
+-- When a new sound device is added/removed,
+-- create a temporary popup to change default output device
+function sound_device_change(signal)
+	refresh_sound_popup()
+	temp_sound_popup = sound_popup
+	awful.placement.top_right(temp_sound_popup, {honor_workarea=true})
+	temp_sound_popup.visible = true
+	hide_popup = gears.timer {
+    timeout   = 10,
+		single_shot = true,
+    callback  = function()
+			temp_sound_popup.visible = false
+			temp_sound_popup = nil
+    end
+	}
+	hide_popup:start()
 end
+dbus.add_match("system","type='signal',interface='org.custom.gurkan'")
+dbus.connect_signal("org.custom.gurkan", sound_device_change)
 
 -- Create a textclock widget and attach the calendar
 mytextclock = wibox.widget.textclock()
@@ -710,6 +710,7 @@ globalkeys = gears.table.join(
   awful.key({              }, "Print",                 nil, function () awful.spawn("flameshot gui") end),
   awful.key({ "Shift"      }, "Print",                      function () awful.spawn("flameshot full -c") end),
   awful.key({ ctrl         }, "space",                      function () awful.spawn("rofi -show run") end),
+  awful.key({              }, "F9",                    nil, function () awful.spawn("rofi -show emoji -modi emoji") end),
   awful.key({ ctrl, alt    }, "c",                          function () awful.spawn(greenclip_cmd) end),
   awful.key({ win          }, "p",                          function () awful.spawn("rofi-pass") end),
   awful.key({ ctrl, alt    }, "t",                          function () awful.spawn(terminal) end),
