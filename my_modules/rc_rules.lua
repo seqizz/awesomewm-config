@@ -72,11 +72,12 @@ function set_rules(clientkeys)
 
     {
       rule = {
-        name = "Microsoft Teams Notification",
-        type = "notification"
+        name = "Microsoft Teams Notification"
       },
       properties = {
-        focusable = false,
+        focus = false,
+        draw_backdrop = false,
+        skip_decoration = true,
         ontop = true,
         sticky = true,
         skip_taskbar = true,

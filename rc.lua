@@ -590,7 +590,7 @@ function reorg_tags_and_systray(systray, from_signal)
   local reorg_done = false
 
   -- Get all screens under xrandr_table, just for fun, no real usage for now
-  xrandr_get_screens()
+	xrandr_get_screens()
 
   debug_print("Hellooo, here are all the screens: " .. my_utils.dump(xrandr_table))
 
@@ -722,7 +722,7 @@ globalkeys = gears.table.join(
   awful.key({ win          }, "k",                          function () keyboard_widget:toggle() end),
   awful.key({ win          }, "e",                          function () keyboard_widget:toggle() end),
   -- If something goes wrong with grobi
-  awful.key({ win          }, "m",                          function () awful.spawn("grobi apply mobile") end),
+  awful.key({ win          }, "m",                          function () awful.spawn("systemctl --user stop grobi && grobi apply mobile") end),
   awful.key({ win, "Shift" }, "m",                          function () awful.spawn("grobi apply inno-dell-dock") end),
   -- awful.key({ win          }, "b",            function () my_utils.find_screen_by_name("eDP-1"):emit_signal('list') end),
   awful.key({ win          }, "b",            function () my_utils.find_screen_by_name("DP-3-3"):emit_signal('list') end),
