@@ -14,6 +14,7 @@ local theme = {}
 
 -- theme.font = "Fira Code Medium " .. dpi(12)
 theme.font = "FiraCode Nerd Font Medium 12"
+-- theme.font = "Broken Console Regular 10"
 -- theme.font_big = "Fira Code Medium " .. dpi(14)
 theme.font_big = "FiraCode Nerd Font Medium 14"
 -- theme.font_small = "Fira Code Medium " .. dpi(10)

@@ -164,7 +164,7 @@ function font_hacks()
   -- some magic for terminal font size
 	if screen:count() > 1 then
     awful.spawn('sed -i --follow-symlinks "s/size: .*/size: 13.0/" /home/gurkan/.config/alacritty/alacritty.yml')
-    awful.spawn('sed -i --follow-symlinks "s/    font_size = .*/    font_size = 14.0,/" /home/gurkan/.wezterm.lua')
+    awful.spawn('sed -i --follow-symlinks "s/    font_size = .*/    font_size = 16.0,/" /home/gurkan/.wezterm.lua')
   else
     awful.spawn('sed -i --follow-symlinks "s/size: .*/size: 10.0/" /home/gurkan/.config/alacritty/alacritty.yml')
     awful.spawn('sed -i --follow-symlinks "s/    font_size = .*/    font_size = 17.5,/" /home/gurkan/.wezterm.lua')
