@@ -10,7 +10,7 @@ vb_slider = awful.popup {
   {
     max_value        = 100,
     value            = 33,
-    forced_height    = 35,
+    forced_height    = 8,
     forced_width     = 300,
     --border_width     = 0,
     border_color     = beautiful.border_normal, -- .. " 00",
@@ -51,6 +51,8 @@ slider_timer = gears.timer({
 })
 
 triggerwibox = function(action)
+  vb_slider.visible = false
+  vb_textinfo.visible = false
   vb_slider.screen = awful.screen.focused()
   vb_textinfo.screen = awful.screen.focused()
   if action == 'volume' then
