@@ -55,6 +55,7 @@ function my_utils.is_screen_primary(s)
         "eDP-1", -- laptop monitor (msi)
         "DP3-2", -- main external monitor on dock
         "DP-3-2", -- main external monitor on dock
+        "DP-1-3", -- main external monitor on dock
     }
     for screen_name, _ in pairs(s.outputs) do
         if my_utils.table_contains(known_primary_screens, screen_name) then

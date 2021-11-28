@@ -38,6 +38,11 @@ dofile ("/home/gurkan/.config/awesome/my_modules/rc_tags.lua")
 -- stuff related to volume/brightness OSD notifications
 dofile ("/home/gurkan/.config/awesome/my_modules/rc_sliderstuff.lua")
 
+docked = false
+if screen:count() > 1 then
+  docked = true
+end
+
 clientkeys = gears.table.join(
   -- Increase/decrease windows sizes on tiled layout: Win + asdf
   awful.key({ win                }, "d",      function ()  awful.tag.incmwfact( 0.01)  end),
@@ -252,11 +257,14 @@ local tasklist_buttons = gears.table.join(
       )
     end
   end),
+  awful.button({ }, 2, function (c)
+		c:kill()
+	end),
   awful.button({ }, 4, function ()
-awful.client.focus.byidx(1)
+		awful.client.focus.byidx(1)
   end),
   awful.button({ }, 5, function ()
-  awful.client.focus.byidx(-1)
+		awful.client.focus.byidx(-1)
 end)
 )
 
@@ -334,6 +342,16 @@ battery_widget.widget:buttons(awful.util.table.join(
 function sound_device_change(signal)
 	refresh_sound_popup()
 	temp_sound_popup = sound_popup
+	primary_screen = awful.screen.focused()
+	if docked then
+		-- Use secondary screen, on the right side
+		for s in screen do
+				if not my_utils.is_screen_primary(s) then
+						primary_screen = s
+				end
+		end
+	end
+	temp_sound_popup.screen = primary_screen
 	awful.placement.top_right(temp_sound_popup, {honor_workarea=true})
 	temp_sound_popup.visible = true
 	hide_popup = gears.timer {
@@ -383,11 +401,6 @@ if hostname == "innodellix" then
         keyboard_widget:toggle()
     end)
   ))
-end
-
-docked = false
-if screen:count() > 1 then
-  docked = true
 end
 
 local function check_available_screens()
@@ -557,30 +570,21 @@ local function screen_organizer(s, primary)
   }
 end
 
-function xrandr_get_screens()
-  for name, output in pairs(xrandr_info().outputs) do
-    if output.connected and output.on then
-      local text
-      local monitor_id
-      if output.edid ~= "" then
-        parsed = edid.parse_edid(output.edid)
-        local monitor_name = edid.monitor_name(output.edid)
-        serial_number = edid.parse_edid(output.edid).serial_number
-        man_code = edid.parse_edid(output.edid).manufacturer_code
-        if monitor_name then
-          text = name .. "\n" .. edid.monitor_name(output.edid)
-        else
-          text = name
-        end
-      else
-        text = name
-      end
-      monitor_unique_id = text .. "_" .. man_code .. "_" .. serial_number
-      xrandr_table[text] = {}
-      xrandr_table[text]["manufacturer_code"] = man_code
-      xrandr_table[text]["serial_number"] = serial_number
-    end
-  end
+local function get_xrandr_outputs()
+	local output_tbl = {}
+	local xrandr = io.popen("xrandr -q --current")
+
+	if xrandr then
+			for line in xrandr:lines() do
+					local output = line:match("^([%w-]+) connected [0-9]")
+					if output then
+							output_tbl[#output_tbl + 1] = output
+					end
+			end
+			xrandr:close()
+	end
+
+	return output_tbl
 end
 
 function reorg_tags_and_systray(systray, from_signal)
@@ -590,41 +594,47 @@ function reorg_tags_and_systray(systray, from_signal)
   local reorg_done = false
 
   -- Get all screens under xrandr_table, just for fun, no real usage for now
-	xrandr_get_screens()
+	xrandr_table = get_xrandr_outputs()
 
-  debug_print("Hellooo, here are all the screens: " .. my_utils.dump(xrandr_table))
+	debug_print("Hellooo, here are all the screens: " .. my_utils.dump(xrandr_table))
 
 	local screens_handled = {}
 
 	-- TODO: handle MSI laptop too
-  if screen:count() == 1 and my_utils.table_contains(xrandr_table, "eDP-1", true) then
-    debug_print("There is only laptop screen")
-    laptop_screen = my_utils.find_screen_by_name("eDP-1")
+  if screen:count() == 1 then
+    debug_print("There is only one screen")
+		if my_utils.table_contains(xrandr_table, "eDP-1", true) then
+			debug_print("And it is the laptop screen")
+			active_screen = my_utils.find_screen_by_name("eDP-1")
+		else
+			debug_print("And it is the not laptop screen")
+			active_screen = my_utils.find_screen_by_name("DP-1-3")
+		end
 
-    systray:set_screen(laptop_screen)
-    for _, tag in pairs(root.tags()) do
-			if tag.screen == laptop_screen and from_signal then
+		systray:set_screen(active_screen)
+		for _, tag in pairs(root.tags()) do
+			if tag.screen == active_screen and from_signal then
 				goto continue
 			end
 			reassigned_tags = reassigned_tags + 1
-			tag.screen = laptop_screen
-      if tag.name == "web" then
-        tag.index = 1
-      elseif tag.name == "mail" then
-        tag.index = 2
-      elseif tag.name == "term" then
-        tag.index = 3
-      elseif tag.name == "chat" then
-        tag.index = 4
-      end
-		  ::continue::
-    end
+			tag.screen = active_screen
+			if tag.name == "web" then
+				tag.index = 1
+			elseif tag.name == "mail" then
+				tag.index = 2
+			elseif tag.name == "term" then
+				tag.index = 3
+			elseif tag.name == "chat" then
+				tag.index = 4
+			end
+			::continue::
+		end
 
 		if reassigned_tags == 0 and from_signal then
 			debug_print('Nothing needs change..')
 			goto finish
 		end
-    screen_organizer(laptop_screen, true)
+    screen_organizer(active_screen, true)
     reorg_done = true
   elseif screen:count() == 2 and not my_utils.table_contains(xrandr_table, "eDP-1", true) then
     debug_print("We're on a docking station")
@@ -722,7 +732,7 @@ globalkeys = gears.table.join(
   awful.key({ win          }, "k",                          function () keyboard_widget:toggle() end),
   awful.key({ win          }, "e",                          function () keyboard_widget:toggle() end),
   -- If something goes wrong with grobi
-  awful.key({ win          }, "m",                          function () awful.spawn("systemctl --user stop grobi && grobi apply mobile") end),
+  awful.key({ win          }, "m",                          function () awful.spawn("grobi apply mobile && systemctl --user stop grobi") end),
   awful.key({ win, "Shift" }, "m",                          function () awful.spawn("grobi apply inno-dell-dock") end),
   -- awful.key({ win          }, "b",            function () my_utils.find_screen_by_name("eDP-1"):emit_signal('list') end),
   awful.key({ win          }, "b",            function () my_utils.find_screen_by_name("DP-3-3"):emit_signal('list') end),
