@@ -233,6 +233,23 @@ local function parse_transformations(text, assume_normal)
   return { rotations = rot, reflections = refl }
 end
 
+function get_xrandr_outputs()
+	local output_tbl = {}
+	local xrandr = io.popen("xrandr -q --current")
+
+	if xrandr then
+			for line in xrandr:lines() do
+					local output = line:match("^([%w-]+) connected [0-9]")
+					if output then
+							output_tbl[#output_tbl + 1] = output
+					end
+			end
+			xrandr:close()
+	end
+
+	return output_tbl
+end
+
 function xrandr_info(fp)
   local info = { screens = {}, outputs = {} }
   local current_output

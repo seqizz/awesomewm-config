@@ -39,7 +39,8 @@ dofile ("/home/gurkan/.config/awesome/my_modules/rc_tags.lua")
 dofile ("/home/gurkan/.config/awesome/my_modules/rc_sliderstuff.lua")
 
 docked = false
-if screen:count() > 1 then
+xrandr_table = get_xrandr_outputs()
+if screen:count() == 1 and not my_utils.table_contains(xrandr_table, "eDP-1", true) then
   docked = true
 end
 
@@ -404,7 +405,14 @@ if hostname == "innodellix" then
 end
 
 local function check_available_screens()
-  if ( docked and screen:count() == 1 ) or ( not docked and screen:count() == 2 ) then
+	xrandr_table = get_xrandr_outputs()
+  if (
+			docked and ( screen:count() == 1 and my_utils.table_contains(xrandr_table, "eDP-1", true) )
+		) or (
+			not docked and screen:count() == 2
+		) or (
+			not docked and ( screen:count() == 1 and not my_utils.table_contains(xrandr_table, "eDP-1", true) )
+		) then
     debug_print("Detected docking change, restarting awesomewm")
     -- Sadly we have to restart, can't reliably move stuff with
     -- 2 consecutive screen add/remove actions
@@ -531,17 +539,14 @@ local function screen_organizer(s, primary)
   }
 
   table.insert(systray_right_widgets, separator_empty)
-  -- if primary and my_utils.table_length(screen_table) == 1 and hostname == "innodellix" then
-  if primary and screen:count() == 1 and hostname == "innodellix" then
+  if primary and not docked and hostname == "innodellix" then
     table.insert(systray_right_widgets, touch_widget)
     table.insert(systray_right_widgets, rotate_widget)
     table.insert(systray_right_widgets, separator_reverse)
   end
   if (
-      -- primary and my_utils.table_length(screen_table) == 1
       primary and screen:count() == 1
     ) or (
-      -- not primary and my_utils.table_length(screen_table) > 1 ) then
       not primary and screen:count() > 1 ) then
     table.insert(systray_right_widgets, keyboard_widget)
     table.insert(systray_right_widgets, separator_reverse)
@@ -568,23 +573,6 @@ local function screen_organizer(s, primary)
     s.mytasklist, -- Middle widget
     systray_right_widgets
   }
-end
-
-local function get_xrandr_outputs()
-	local output_tbl = {}
-	local xrandr = io.popen("xrandr -q --current")
-
-	if xrandr then
-			for line in xrandr:lines() do
-					local output = line:match("^([%w-]+) connected [0-9]")
-					if output then
-							output_tbl[#output_tbl + 1] = output
-					end
-			end
-			xrandr:close()
-	end
-
-	return output_tbl
 end
 
 function reorg_tags_and_systray(systray, from_signal)
