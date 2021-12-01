@@ -51,30 +51,35 @@ slider_timer = gears.timer({
 })
 
 triggerwibox = function(action)
-  vb_slider.visible = false
-  vb_textinfo.visible = false
   vb_slider.screen = awful.screen.focused()
   vb_textinfo.screen = awful.screen.focused()
   if action == 'volume' then
     vb_slider.widget.color = beautiful.slider_sound_fg
+    vb_textinfo.visible = false
     vb_slider.visible = true
   elseif action == 'brightness' then
     vb_slider.widget.color = beautiful.slider_brightness_fg
+    vb_textinfo.visible = false
     vb_slider.visible = true
   elseif action == 'mute' then
     vb_textinfo.widget.markup = '  🔇 Mute Toggle'
+    vb_slider.visible = false
     vb_textinfo.visible = true
   elseif string.match(action, 'Stopped') then
     vb_textinfo.widget.markup = '⬛ Stopped'
+    vb_slider.visible = false
     vb_textinfo.visible = true
   elseif string.match(action, 'Playing') then
     vb_textinfo.widget.markup = '▶️ Playing'
+    vb_slider.visible = false
     vb_textinfo.visible = true
   elseif string.match(action, 'Paused') then
     vb_textinfo.widget.markup = '⏸️ Paused'
+    vb_slider.visible = false
     vb_textinfo.visible = true
   elseif action == 'micmute' then
     vb_textinfo.widget.markup = '🎙️🔇 Mic Mute Toggle'
+    vb_slider.visible = false
     vb_textinfo.visible = true
   end
   slider_timer:again()
