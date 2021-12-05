@@ -4,6 +4,7 @@ local wibox = require("wibox")
 local gears = require("gears")
 local my_utils = require('my_modules/my_utils')
 local beautiful = require("beautiful")
+local dpi = require('beautiful').xresources.apply_dpi
 
 volume_widget = lain.widget.pulse {
 	settings = function()
@@ -83,7 +84,7 @@ sound_popup = awful.popup {
     end,
     border_width = 1,
     border_color = beautiful.bg_focus,
-    maximum_width = 500,
+    maximum_width = dpi(400),
     offset = { y = 5 },
     widget = {}
 }

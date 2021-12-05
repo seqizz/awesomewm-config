@@ -160,17 +160,6 @@ function lock(action)
 
 end
 
-function font_hacks()
-  -- some magic for terminal font size
-	if screen:count() > 1 then
-    awful.spawn('sed -i --follow-symlinks "s/size: .*/size: 13.0/" /home/gurkan/.config/alacritty/alacritty.yml')
-    awful.spawn('sed -i --follow-symlinks "s/    font_size = .*/    font_size = 16.0,/" /home/gurkan/.wezterm.lua')
-  else
-    awful.spawn('sed -i --follow-symlinks "s/size: .*/size: 10.0/" /home/gurkan/.config/alacritty/alacritty.yml')
-    awful.spawn('sed -i --follow-symlinks "s/    font_size = .*/    font_size = 17.5,/" /home/gurkan/.wezterm.lua')
-  end
-end
-
 function set_wallpaper(s)
   -- choose random wallpaper
   awful.spawn.easy_async(
@@ -233,18 +222,19 @@ local function parse_transformations(text, assume_normal)
   return { rotations = rot, reflections = refl }
 end
 
+function string:firstword()
+    return self:match("^([%w\\-]+)"); -- matches the first word and returns it, or it returns nil
+end
+
 function get_xrandr_outputs()
 	local output_tbl = {}
-	local xrandr = io.popen("xrandr -q --current")
+	local xrandr = io.popen("xrandr -q --current | grep -E ' connected (primary )?[0-9]'")
 
 	if xrandr then
-			for line in xrandr:lines() do
-					local output = line:match("^([%w-]+) connected [0-9]")
-					if output then
-							output_tbl[#output_tbl + 1] = output
-					end
-			end
-			xrandr:close()
+        for line in xrandr:lines() do
+            output_tbl[#output_tbl + 1] = line:firstword()
+        end
+        xrandr:close()
 	end
 
 	return output_tbl
@@ -368,4 +358,21 @@ function xrandr_info(fp)
     end
   end
   return info
+end
+
+function font_hacks()
+  -- some magic for terminal font size
+  if screen:count() > 1 then
+    awful.spawn('sed -i --follow-symlinks "s/size: .*/size: 13.0/" /home/gurkan/.config/alacritty/alacritty.yml')
+    awful.spawn('sed -i --follow-symlinks "s/    font_size = .*/    font_size = 16.0,/" /home/gurkan/.wezterm.lua')
+  else
+    xrandr_table = get_xrandr_outputs()
+    debug_print(my_utils.dump(xrandr_table))
+    if my_utils.table_contains(xrandr_table, "DP-1-2", false) then
+      awful.spawn('sed -i --follow-symlinks "s/    font_size = .*/    font_size = 13.0,/" /home/gurkan/.wezterm.lua')
+    else
+      awful.spawn('sed -i --follow-symlinks "s/size: .*/size: 10.0/" /home/gurkan/.config/alacritty/alacritty.yml')
+      awful.spawn('sed -i --follow-symlinks "s/    font_size = .*/    font_size = 17.5,/" /home/gurkan/.wezterm.lua')
+    end
+  end
 end
