@@ -2,12 +2,13 @@ local awful = require("awful")
 local wibox = require("wibox")
 local my_utils = require('my_modules/my_utils')
 local my_theme = require('my_modules/my_theme')
+local dpi = require('beautiful').xresources.apply_dpi
 
 local mypsi = wibox.widget {
   widget = wibox.widget.textbox,
   align = "center",
   valign = "center",
-  forced_width = 100,
+  forced_width = dpi(80),
   font = my_theme.font,
 }
 

@@ -38,9 +38,12 @@ dofile ("/home/gurkan/.config/awesome/my_modules/rc_tags.lua")
 -- stuff related to volume/brightness OSD notifications
 dofile ("/home/gurkan/.config/awesome/my_modules/rc_sliderstuff.lua")
 
+-- stuff including usernames etc
+dofile ("/home/gurkan/.config/awesome/my_modules/rc_secret.lua")
+
 docked = false
 xrandr_table = get_xrandr_outputs()
-if screen:count() == 1 and not my_utils.table_contains(xrandr_table, "eDP-1", true) then
+if screen:count() == 1 and not my_utils.table_contains(xrandr_table, "eDP-1", false) then
   docked = true
 end
 
@@ -189,7 +192,9 @@ terminal = "wezterm start"
 browser = "firefox"
 editor = os.getenv("EDITOR") or "nvim"
 editor_cmd = terminal .. " -e " .. editor
-greenclip_cmd = "rofi -modi 'clipboard:greenclip print' -show clipboard -run-command '{cmd}' "
+greenclip_cmd = "rofi -dpi " .. dpi(80) .. " -modi 'clipboard:greenclip print' -show clipboard -run-command '{cmd}' "
+rofi_cmd = "rofi -dpi " .. dpi(80) .. " -show run"
+rofi_emoji_cmd = "rofi -dpi " .. dpi(80) .. " -show emoji -modi emoji"
 proxified_chromium_cmd = 'chromium-browser --incognito --proxy-server="socks://127.0.0.1:8080" --host-resolver-rules="MAP * ~NOTFOUND, EXCLUDE 127.0.0.1"'
 gather_town_cmd = 'chromium-browser --app="https://gather.town/app/7Rxu9DG6dVHm2qDR/sysadmin-tiny" --noerrdialogs --disable-translate --no-first-run --fast --fast-start --disable-infobars --class="gathertown"  --user-data-dir=/devel/.tmp_gather_profile'
 
@@ -369,7 +374,11 @@ dbus.add_match("system","type='signal',interface='org.custom.gurkan'")
 dbus.connect_signal("org.custom.gurkan", sound_device_change)
 
 -- Create a textclock widget and attach the calendar
-mytextclock = wibox.widget.textclock()
+mytextclock = wibox.widget{
+   widget = wibox.widget.textclock,
+   format = " %d %b %H:%M (%a) ",
+   refresh = 30
+}
 cw = lain.widget.cal({
   followtag = true,
   week_number = "left",
@@ -407,11 +416,11 @@ end
 local function check_available_screens()
 	xrandr_table = get_xrandr_outputs()
   if (
-			docked and ( screen:count() == 1 and my_utils.table_contains(xrandr_table, "eDP-1", true) )
+			docked and ( screen:count() == 1 and my_utils.table_contains(xrandr_table, "eDP-1", false) )
 		) or (
 			not docked and screen:count() == 2
 		) or (
-			not docked and ( screen:count() == 1 and not my_utils.table_contains(xrandr_table, "eDP-1", true) )
+			not docked and ( screen:count() == 1 and not my_utils.table_contains(xrandr_table, "eDP-1", false) )
 		) then
     debug_print("Detected docking change, restarting awesomewm")
     -- Sadly we have to restart, can't reliably move stuff with
@@ -452,7 +461,7 @@ local function screen_organizer(s, primary)
 
   -- Create a taglist widget
   if screen:count() > 1 then
-    taglist_width = dpi(220)
+    taglist_width = dpi(250)
   else
     taglist_width = dpi(300)
   end
@@ -531,7 +540,7 @@ local function screen_organizer(s, primary)
   s.mywibox = awful.wibar({
     position = "top",
     screen = s,
-    height = 30
+    height = dpi(23)
   })
 
   systray_right_widgets = {
@@ -591,12 +600,12 @@ function reorg_tags_and_systray(systray, from_signal)
 	-- TODO: handle MSI laptop too
   if screen:count() == 1 then
     debug_print("There is only one screen")
-		if my_utils.table_contains(xrandr_table, "eDP-1", true) then
+		if my_utils.table_contains(xrandr_table, "eDP-1", false) then
 			debug_print("And it is the laptop screen")
 			active_screen = my_utils.find_screen_by_name("eDP-1")
 		else
 			debug_print("And it is the not laptop screen")
-			active_screen = my_utils.find_screen_by_name("DP-1-3")
+			active_screen = my_utils.find_screen_by_name("DP-1-2")
 		end
 
 		systray:set_screen(active_screen)
@@ -624,7 +633,7 @@ function reorg_tags_and_systray(systray, from_signal)
 		end
     screen_organizer(active_screen, true)
     reorg_done = true
-  elseif screen:count() == 2 and not my_utils.table_contains(xrandr_table, "eDP-1", true) then
+  elseif screen:count() == 2 and not my_utils.table_contains(xrandr_table, "eDP-1", false) then
     debug_print("We're on a docking station")
     for _, tag in pairs(root.tags()) do
       local tag_moved = false
@@ -700,6 +709,8 @@ globalkeys = gears.table.join(
   awful.key({              }, "XF86AudioStop",         nil, function () handle_media("stop") end),
   awful.key({              }, "XF86AudioPrev",         nil, function () handle_media("previous") end),
   awful.key({              }, "XF86AudioNext",         nil, function () handle_media("next") end),
+	-- Smart plug toggle
+  awful.key({              }, "XF86HomePage",          nil, function () awful.spawn(bulb_toggle) end),
   -- For laptop, which doesn't have next/prev buttons
   awful.key({ ctrl         }, "XF86AudioRaiseVolume",  nil, function () handle_media("next") end),
   awful.key({ ctrl         }, "XF86AudioLowerVolume",  nil, function () handle_media("previous") end),
@@ -707,8 +718,8 @@ globalkeys = gears.table.join(
   awful.key({              }, "F12",                   nil, function () my_dropdown:toggle() end),
   awful.key({              }, "Print",                 nil, function () awful.spawn("flameshot gui") end),
   awful.key({ "Shift"      }, "Print",                      function () awful.spawn("flameshot full -c") end),
-  awful.key({ ctrl         }, "space",                      function () awful.spawn("rofi -show run") end),
-  awful.key({              }, "F9",                    nil, function () awful.spawn("rofi -show emoji -modi emoji") end),
+  awful.key({ ctrl         }, "space",                      function () awful.spawn(rofi_cmd) end),
+  awful.key({              }, "F9",                    nil, function () awful.spawn(rofi_emoji_cmd) end),
   awful.key({ ctrl, alt    }, "c",                          function () awful.spawn(greenclip_cmd) end),
   awful.key({ win          }, "p",                          function () awful.spawn("rofi-pass") end),
   awful.key({ ctrl, alt    }, "t",                          function () awful.spawn(terminal) end),
@@ -736,7 +747,8 @@ globalkeys = gears.table.join(
 )
 if hostname == "innixos" or hostname == "innodellix" then
   gears.table.merge(globalkeys, gears.table.join(
-    awful.key({ win          }, "v",                          function () awful.spawn("innovpn-toggle") end),
+    awful.key({ win          }, "v",                          function () awful.spawn("innovpn-toggle aw") end),
+    awful.key({ win, "Shift" }, "v",                          function () awful.spawn("innovpn-toggle af") end),
     awful.key({ win          }, "g",                          function () awful.spawn(gather_town_cmd) end)
   ))
 end

@@ -3,6 +3,7 @@ local beautiful = require("beautiful")
 local gears = require("gears")
 local helpers = require("my_modules/geo_helpers")
 local wibox = require("wibox")
+local dpi = require('beautiful').xresources.apply_dpi
 
 -- {{{ Brightness / mute / sound slider - notify stuff
 vb_slider = awful.popup {
@@ -10,8 +11,8 @@ vb_slider = awful.popup {
   {
     max_value        = 100,
     value            = 33,
-    forced_height    = 8,
-    forced_width     = 300,
+    forced_height    = dpi(4),
+    forced_width     = dpi(250),
     --border_width     = 0,
     border_color     = beautiful.border_normal, -- .. " 00",
     background_color = beautiful.slider_bg,
@@ -28,8 +29,8 @@ vb_slider = awful.popup {
 vb_textinfo= awful.popup {
   widget =
   {
-    forced_height    = 30,
-    forced_width     = 200,
+    forced_height    = dpi(20),
+    forced_width     = dpi(150),
     border_color     = beautiful.border_normal, -- .. " 00",
     background_color = beautiful.slider_bg,
     color            = beautiful.slider_bg,
