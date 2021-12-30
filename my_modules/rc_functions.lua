@@ -3,6 +3,8 @@ local gears = require("gears")
 local beautiful = require("beautiful")
 local naughty = require("naughty")
 local my_utils = require('my_modules/my_utils')
+local xresources = require("beautiful.xresources")
+local dpi = xresources.apply_dpi
 
 function debug_print(text)
   print('<<<<<<< ' .. text)
@@ -57,8 +59,8 @@ function float_toggle(c)
     c.ontop = true
     c.sticky = true
     c.skip_taskbar = true
-    c.width = 533
-    c.height = 860
+    c.width = dpi(500)
+    c.height = dpi(700)
     c.y = 35
     awful.placement.top_right(client.focus, {honor_workarea=true})
   else
@@ -95,13 +97,13 @@ function hide_stickies()
     if c.marked then
       -- already transparent
       c.marked = false
-      c.width = 533
-      c.height = 860
+      c.width = dpi(500)
+      c.height = dpi(700)
       c.border_color = beautiful.border_normal
       c.border_width = beautiful.border_width
       c.opacity = 1
       awful.placement.top_right(c)
-      c.y = 30
+      c.y = dpi(30)
     else
       c.marked = true
       c.opacity = 0.9
@@ -110,7 +112,7 @@ function hide_stickies()
       c.border_color = '#26b7d4'
       c.border_width = 10
       awful.placement.top_right(c)
-      c.y = 30
+      c.y = dpi(30)
     end
   end
 end
