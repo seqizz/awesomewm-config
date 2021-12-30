@@ -1,6 +1,8 @@
 local awful = require("awful")
 local beautiful = require("beautiful")
 local my_utils = require('my_modules/my_utils')
+local xresources = require("beautiful.xresources")
+local dpi = xresources.apply_dpi
 
 function set_rules(clientkeys)
   -- {{{ Rules
@@ -88,6 +90,19 @@ function set_rules(clientkeys)
 
     {
       rule = {
+        name = "Picture-in-Picture"
+      },
+      properties = {
+        ontop = true,
+        sticky = true,
+        skip_taskbar = true,
+        floating = true,
+        dockable = false,
+      };
+    },
+
+    {
+      rule = {
         name = "Onboard"
       },
       properties = {
@@ -111,8 +126,8 @@ function set_rules(clientkeys)
         floating = true,
         sticky = true,
         skip_taskbar = true,
-        width = 533,
-        height = 860,
+        width = dpi(500),
+        height = dpi(700),
         callback = function(c) awful.placement.top_right(c, {honor_workarea=true}) end,
       };
     },
