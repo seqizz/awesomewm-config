@@ -11,6 +11,7 @@ local naughty = require("naughty")
 local my_utils = require('my_modules/my_utils')
 local lain = require("lain")
 local capslock = require("my_modules/capslock")
+local spotify = require("my_modules/spotify")
 local psi_widget = require("my_modules/psi")
 local rotate_widget = require("my_modules/rotatescreen")
 local touch_widget = require("my_modules/touchscreen")
@@ -411,6 +412,20 @@ if hostname == "innodellix" then
         keyboard_widget:toggle()
     end)
   ))
+  spotify:buttons(awful.util.table.join(
+    awful.button({}, 1, function()
+			handle_media("play-pause")
+      spotify:check()
+    end),
+    awful.button({}, 4, function()
+			handle_media("previous")
+      spotify:check()
+    end),
+    awful.button({}, 5, function()
+			handle_media("next")
+      spotify:check()
+    end)
+  ))
 end
 
 local function check_available_screens()
@@ -442,6 +457,15 @@ psi_timer = gears.timer {
   autostart = true,
   callback = function()
     psi_widget:check()
+  end
+}
+
+spotify_timer = gears.timer {
+  timeout = 15,
+  autostart = true,
+	call_now = true,
+  callback = function()
+    spotify:check()
   end
 }
 
@@ -557,12 +581,14 @@ local function screen_organizer(s, primary)
       primary and screen:count() == 1
     ) or (
       not primary and screen:count() > 1 ) then
+    table.insert(systray_right_widgets, separator_reverse)
     table.insert(systray_right_widgets, keyboard_widget)
     table.insert(systray_right_widgets, separator_reverse)
     table.insert(systray_right_widgets, battery_widget)
     table.insert(systray_right_widgets, separator_reverse)
     table.insert(systray_right_widgets, psi_widget)
     table.insert(systray_right_widgets, separator_reverse)
+    table.insert(systray_right_widgets, spotify)
     table.insert(systray_right_widgets, volume_widget)
     table.insert(systray_right_widgets, separator_reverse)
     table.insert(systray_right_widgets, my_systray)
@@ -707,13 +733,25 @@ globalkeys = gears.table.join(
   awful.key({              }, "XF86AudioMicMute" ,     nil, mic_mute),
   awful.key({              }, "XF86AudioPlay",         nil, function () handle_media("play-pause") end),
   awful.key({              }, "XF86AudioStop",         nil, function () handle_media("stop") end),
-  awful.key({              }, "XF86AudioPrev",         nil, function () handle_media("previous") end),
-  awful.key({              }, "XF86AudioNext",         nil, function () handle_media("next") end),
+  awful.key({              }, "XF86AudioPrev",         nil, function ()
+																															handle_media("previous")
+																															spotify:check()
+																														end),
+  awful.key({              }, "XF86AudioNext",         nil, function ()
+																															handle_media("next")
+																															spotify:check()
+																														end),
 	-- Smart plug toggle
   awful.key({              }, "XF86HomePage",          nil, function () awful.spawn(bulb_toggle) end),
   -- For laptop, which doesn't have next/prev buttons
-  awful.key({ ctrl         }, "XF86AudioRaiseVolume",  nil, function () handle_media("next") end),
-  awful.key({ ctrl         }, "XF86AudioLowerVolume",  nil, function () handle_media("previous") end),
+  awful.key({ ctrl         }, "XF86AudioRaiseVolume",  nil, function ()
+																															handle_media("next")
+																															spotify:check()
+																														end),
+  awful.key({ ctrl         }, "XF86AudioLowerVolume",  nil, function ()
+																															handle_media("next")
+																															spotify:check()
+																														end),
   -- Dropdown terminal: F12
   awful.key({              }, "F12",                   nil, function () my_dropdown:toggle() end),
   awful.key({              }, "Print",                 nil, function () awful.spawn("flameshot gui") end),
