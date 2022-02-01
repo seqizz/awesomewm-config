@@ -97,8 +97,13 @@ function hide_stickies()
     if c.marked then
       -- already transparent
       c.marked = false
-      c.width = dpi(500)
-      c.height = dpi(700)
+      if c.class == "gathertown" then
+        c.width = dpi(1800)
+        c.height = dpi(250)
+      else
+        c.width = dpi(500)
+        c.height = dpi(700)
+      end
       c.border_color = beautiful.border_normal
       c.border_width = beautiful.border_width
       c.opacity = 1

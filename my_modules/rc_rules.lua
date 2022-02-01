@@ -126,8 +126,8 @@ function set_rules(clientkeys)
         floating = true,
         sticky = true,
         skip_taskbar = true,
-        width = dpi(500),
-        height = dpi(700),
+        width = dpi(1800),
+        height = dpi(250),
         callback = function(c) awful.placement.top_right(c, {honor_workarea=true}) end,
       };
     },
