@@ -575,7 +575,6 @@ local function screen_organizer(s, primary)
   if primary and not docked and hostname == "innodellix" then
     table.insert(systray_right_widgets, touch_widget)
     table.insert(systray_right_widgets, rotate_widget)
-    table.insert(systray_right_widgets, separator_reverse)
   end
   if (
       primary and screen:count() == 1
