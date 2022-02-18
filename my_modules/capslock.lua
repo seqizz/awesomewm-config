@@ -1,6 +1,7 @@
 local awful = require("awful")
 local wibox = require("wibox")
 local my_theme = require('my_modules/my_theme')
+local dpi = require('beautiful').xresources.apply_dpi
 
 local capslock = wibox.widget {
   widget = wibox.widget.textbox,
@@ -26,7 +27,7 @@ function capslock:check()
           tooltip.text = "Caps Lock " .. status
           if status == "on" then
             self.markup = self.activated
-            self.forced_width = 60
+            self.forced_width = dpi(50)
           else
             self.markup = self.deactivated
             self.forced_width = 0
