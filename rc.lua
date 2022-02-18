@@ -44,7 +44,8 @@ dofile ("/home/gurkan/.config/awesome/my_modules/rc_secret.lua")
 
 docked = false
 xrandr_table = get_xrandr_outputs()
-if screen:count() == 1 and not my_utils.table_contains(xrandr_table, "eDP-1", false) then
+-- TODO: Fix for all environments
+if screen:count() == 2 and not my_utils.table_contains(xrandr_table, "eDP-1", false) then
   docked = true
 end
 
@@ -77,8 +78,30 @@ clientkeys = gears.table.join(
   awful.key({ ctrl, win, "Shift" }, "Down",   function (c) c:relative_move(0, dpi(20), 0, dpi(-20)) end),
   awful.key({ win                }, "Right",  function (c) switch_focus_without_mouse(c, "right") end),
   awful.key({ win                }, "Left",   function (c) switch_focus_without_mouse(c, "left") end),
-  awful.key({ win                }, "Down",   function (c) awful.client.focus.bydirection("down") end),
-  awful.key({ win                }, "Up",     function (c) awful.client.focus.bydirection("up") end),
+  -- awful.key({ win                }, "Down",   function (c) awful.client.focus.bydirection("down") end),
+  awful.key({ win                }, "Down",   function (c)
+																													if c.sticky then
+																														awful.client.focus.history.previous()
+																												  else
+																														awful.client.focus.bydirection("down")
+																													end
+																							end),
+  -- awful.key({ win                }, "Up",     function (c) awful.client.focus.bydirection("up") end),
+  awful.key({ win                }, "Up",     function (c)
+																													local cls = client.get()
+																													local stickies = {}
+																													-- Get all the stickies
+																													for _, c in ipairs(cls) do
+																														if c.sticky then
+																															table.insert(stickies, c)
+																														end
+																													end
+																													if my_utils.table_length(stickies) == 0 then
+																														awful.client.focus.bydirection("up")
+																													else
+																														awful.client.focus.history.previous()
+																													end
+																							end),
   -- Minimize window: Win + z
   awful.key({ win                }, "z",      function (c) c.minimized = true end),
   -- Suspend the window's app with SIGSTOP: Ctrl + Alt + s
@@ -430,17 +453,22 @@ end
 
 local function check_available_screens()
 	xrandr_table = get_xrandr_outputs()
-  if (
-			docked and ( screen:count() == 1 and my_utils.table_contains(xrandr_table, "eDP-1", false) )
-		) or (
-			not docked and screen:count() == 2
-		) or (
-			not docked and ( screen:count() == 1 and not my_utils.table_contains(xrandr_table, "eDP-1", false) )
-		) then
+	unstable_state = false
+  if docked and ( screen:count() == 1 and my_utils.table_contains(xrandr_table, "eDP-1", false) ) then
+    debug_print("docked but have 1 screen, which is laptop screen")
+		unstable_state = true
+	elseif not docked and screen:count() == 2 then
+    debug_print("Not docked but 2 screens found")
+		unstable_state = true
+	elseif not docked and ( screen:count() == 1 and not my_utils.table_contains(xrandr_table, "eDP-1", false) ) then
+    debug_print("Not docked but 1 screens found, which is not laptop screen")
+		unstable_state = true
+	end
+	if unstable_state then
     debug_print("Detected docking change, restarting awesomewm")
     -- Sadly we have to restart, can't reliably move stuff with
     -- 2 consecutive screen add/remove actions
-    awesome.restart()
+		awesome.restart()
   end
 end
 
@@ -629,7 +657,7 @@ function reorg_tags_and_systray(systray, from_signal)
 			debug_print("And it is the laptop screen")
 			active_screen = my_utils.find_screen_by_name("eDP-1")
 		else
-			debug_print("And it is the not laptop screen")
+			debug_print("And it is not the laptop screen")
 			active_screen = my_utils.find_screen_by_name("DP-1-2")
 		end
 
@@ -980,7 +1008,7 @@ awesome.connect_signal("startup", function(s, state)
   run_once("firefox", "firefox", "web")
   -- only makes sense while working
   if hostname == "innixos" or hostname == "innodellix" then
-    run_once("slack", "slack", "chat")
+    run_once("slack -s", "slack", "chat")
     run_once("thunderbird", "thunderbird", "mail")
   end
   run_once("telegram-desktop", "telegram", "chat")
