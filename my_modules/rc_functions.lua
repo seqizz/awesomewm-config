@@ -123,7 +123,7 @@ function hide_stickies()
 end
 
 function run_once(program, grep_for, on_tag)
-	grep_for = grep_for or program
+	grep_for = grep_for or program:gmatch("%w+")() -- get first word
 	awful.spawn.easy_async(
 		"pgrep -f " .. grep_for,
 		function(stdout, stderr, reason, exit_code)
