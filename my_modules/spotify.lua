@@ -11,15 +11,38 @@ local spotify = wibox.widget {
   font = my_theme.font,
 }
 
-function spotify:set(state)
+-- set text of spotify widget
+function spotify:set(state, is_playing)
+    if is_playing then
+      logo = ""
+    else
+      logo = ""
+    end
+
     markup_value = my_utils.create_markup{
-        text="",
+        text=logo,
         fg="#268bd2",
         size="large",
-        rise="-3000",
+        rise="-2500",
         font="Font Awesome"
     }
     self.markup = markup_value .. " " .. awful.util.escape(state)
+end
+
+-- Raise spotify and make its tag visible
+function spotify:raise()
+  local cls = client.get()
+  for _, c in ipairs(cls) do
+    if c.name == "Spotify" then
+        c:raise()
+        local tags = root.tags()
+        for _, t in ipairs(tags) do
+            if my_utils.table_contains(t:clients(), c, false) then
+                t:view_only()
+            end
+        end
+    end
+  end
 end
 
 function spotify:check()
@@ -33,10 +56,14 @@ function spotify:check()
         end
       end,
       stdout = function (line)
+        is_playing = true
+        if line == "Paused" then
+          is_playing = false
+        end
         awful.spawn.easy_async(
-            "bash -c \"playerctl -p spotify metadata | grep -w 'xesam:title' | sed 's/.*xesam:title\\s*//;s/$/ /'\"",
-            function(stdout, stderr, reason, exit_code)
-                spotify:set(stdout:sub(1,50))
+          "bash -c \"playerctl -p spotify metadata | grep -w 'xesam:title' | sed 's/.*xesam:title\\s*//;s/$/ /'\"",
+          function(stdout, stderr, reason, exit_code)
+            spotify:set(stdout:sub(1,50), is_playing)
         end)
         self.forced_width = nil
       end

@@ -436,15 +436,18 @@ if hostname == "innodellix" then
     end)
   ))
   spotify:buttons(awful.util.table.join(
-    awful.button({}, 1, function()
+    awful.button({}, 1, function() -- left click
 			handle_media("play-pause")
       spotify:check()
     end),
-    awful.button({}, 4, function()
+    awful.button({}, 3, function() -- right click
+      spotify:raise()
+    end),
+    awful.button({}, 4, function() -- scroll up
 			handle_media("previous")
       spotify:check()
     end),
-    awful.button({}, 5, function()
+    awful.button({}, 5, function() -- scroll down
 			handle_media("next")
       spotify:check()
     end)
@@ -616,8 +619,8 @@ local function screen_organizer(s, primary)
     table.insert(systray_right_widgets, psi_widget)
     table.insert(systray_right_widgets, separator_reverse)
     table.insert(systray_right_widgets, spotify)
-    table.insert(systray_right_widgets, volume_widget)
-    table.insert(systray_right_widgets, separator_reverse)
+    -- table.insert(systray_right_widgets, volume_widget)
+    -- table.insert(systray_right_widgets, separator_reverse)
     table.insert(systray_right_widgets, my_systray)
   end
   table.insert(systray_right_widgets, capslock)
@@ -1005,16 +1008,21 @@ awful.tag.attached_connect_signal(s, "property::selected", function ()
 end)
 
 awesome.connect_signal("startup", function(s, state)
-  run_once("firefox", "firefox", "web")
+  run_once("firefox")
+  -- run_once("firefox", "firefox", "web")
   -- only makes sense while working
   if hostname == "innixos" or hostname == "innodellix" then
-    run_once("slack -s", "slack", "chat")
-    run_once("thunderbird", "thunderbird", "mail")
+    run_once("slack -s")
+    -- run_once("slack -s", "slack", "chat")
+    run_once("thunderbird")
+    -- run_once("thunderbird", "thunderbird", "mail")
   end
-  run_once("telegram-desktop", "telegram", "chat")
+  run_once("telegram-desktop")
+  -- run_once("telegram-desktop", "telegram", "chat")
+  run_once("pasystray")
   run_once("wezterm start --class mainqterm", "mainqterm", "term")
-  run_once("picom --experimental-backends", "picom")
-  run_once("alttab -w 1 -t 400x300 -frame cyan -i 100x100 -font xft:firacode-20", "alttab")
+  run_once("picom --experimental-backends")
+  run_once("alttab -w 1 -t 400x300 -frame cyan -i 100x100 -font xft:firacode-20")
 end)
 
 load_last_active_tag()
