@@ -70,6 +70,64 @@ function float_toggle(c)
   end
 end
 
+function move_or_expand(c, action, direction)
+  -- Check if client is floating
+  if c.floating then
+    if action == "expand" then
+      if direction == "right" then
+        c:relative_move(0, 0, dpi(40), 0)
+      elseif direction == "left" then
+        c:relative_move(dpi(-20), 0, dpi(20), 0)
+      elseif direction == "up" then
+        c:relative_move(0, dpi(-20), 0, dpi(20))
+      elseif direction == "down" then
+        c:relative_move(0, 0, 0, dpi(40))
+      end
+    elseif action == "shrink" then
+      if direction == "right" then
+        c:relative_move(dpi(20), 0, dpi(-20), 0)
+      elseif direction == "left" then
+        c:relative_move(0, 0, dpi(-40), 0)
+      elseif direction == "up" then
+        c:relative_move(0, 0, 0, dpi(-40))
+      elseif direction == "down" then
+        c:relative_move(0, dpi(20), 0, dpi(-20))
+      end
+    elseif action == "move" then
+      if direction == "right" then
+        c:relative_move(dpi(40), 0, 0, 0)
+      elseif direction == "left" then
+        c:relative_move(dpi(-40), 0, 0, 0)
+      elseif direction == "up" then
+        c:relative_move(0, dpi(-40), 0, 0)
+      elseif direction == "down" then
+        c:relative_move(0, dpi(40), 0, 0)
+      end
+    end
+  else
+    -- Not a floating one, sooo.. let's start moving tiling factors.
+    if direction == "right" then
+      awful.tag.incmwfact(0.02)
+    elseif direction == "left" then
+      awful.tag.incmwfact(-0.02)
+    elseif direction == "up" then
+      if c.y > 100 then
+        -- A guess at this point, this client is on bottom
+        awful.client.incwfact(0.05)
+      else
+        awful.client.incwfact(-0.05)
+      end
+    elseif direction == "down" then
+      if c.y > 100 then
+        -- A guess at this point, this client is on bottom
+        awful.client.incwfact(-0.05)
+      else
+        awful.client.incwfact(0.05)
+      end
+    end
+  end
+end
+
 function switch_focus_without_mouse(c, dir)
   -- Get the mouse position
   mouselocation_x = mouse.coords().x
