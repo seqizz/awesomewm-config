@@ -47,7 +47,7 @@ end
 
 function spotify:check()
   awful.spawn.with_line_callback(
-    "bash -c 'sleep 0.5 && playerctl -p spotify status'",
+    "bash -c 'sleep 1 && playerctl -p spotify status'",
     {
       stderr = function (line)
         if line == "No players found" then

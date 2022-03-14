@@ -64,21 +64,20 @@ clientkeys = gears.table.join(
   -- Win        + Shift + Arrows -> Move windows to that direction
   -- Win + Ctrl         + Arrows -> Expand windows to that direction
   -- Win + Ctrl + Shift + Arrows -> Shrink windows from that direction
-  awful.key({ ctrl, win          }, "Right",  function (c) c:relative_move(0, 0, dpi(40), 0) end),
-  awful.key({ win, "Shift"       }, "Left",   function (c) c:relative_move(dpi(-40), 0, 0, 0) end),
-  awful.key({ ctrl, win, "Shift" }, "Left",   function (c) c:relative_move(0, 0, dpi(-40), 0) end),
-  awful.key({ ctrl, win          }, "Left",   function (c) c:relative_move(dpi(-20), 0, dpi(20), 0) end),
-  awful.key({ ctrl, win, "Shift" }, "Right",  function (c) c:relative_move(dpi(20), 0, dpi(-20), 0) end),
-  awful.key({ win, "Shift"       }, "Right",  function (c) c:relative_move(dpi(40), 0, 0, 0) end),
-  awful.key({ ctrl, win          }, "Down",   function (c) c:relative_move(0, 0, 0, dpi(40)) end),
-  awful.key({ ctrl, win, "Shift" }, "Up",     function (c) c:relative_move(0, 0, 0, dpi(-40)) end),
-  awful.key({ ctrl, win          }, "Up",     function (c) c:relative_move(0, dpi(-20), 0, dpi(20)) end),
-  awful.key({ win, "Shift"       }, "Down",   function (c) c:relative_move(0, dpi(40), 0, 0) end),
-  awful.key({ win, "Shift"       }, "Up",     function (c) c:relative_move(0, dpi(-40), 0, 0) end),
-  awful.key({ ctrl, win, "Shift" }, "Down",   function (c) c:relative_move(0, dpi(20), 0, dpi(-20)) end),
+  awful.key({ ctrl, win          }, "Right",  function (c) move_or_expand(c, "expand", "right") end),
+  awful.key({ win, "Shift"       }, "Left",   function (c) move_or_expand(c, "move", "left") end),
+  awful.key({ ctrl, win, "Shift" }, "Left",   function (c) move_or_expand(c, "shrink", "left") end),
+  awful.key({ ctrl, win          }, "Left",   function (c) move_or_expand(c, "expand", "left") end),
+  awful.key({ ctrl, win, "Shift" }, "Right",  function (c) move_or_expand(c, "shrink", "right") end),
+  awful.key({ win, "Shift"       }, "Right",  function (c) move_or_expand(c, "move", "right") end),
+  awful.key({ ctrl, win          }, "Down",   function (c) move_or_expand(c, "expand", "down") end),
+  awful.key({ ctrl, win, "Shift" }, "Up",     function (c) move_or_expand(c, "shrink", "up") end),
+  awful.key({ ctrl, win          }, "Up",     function (c) move_or_expand(c, "expand", "up") end),
+  awful.key({ win, "Shift"       }, "Down",   function (c) move_or_expand(c, "move", "down") end),
+  awful.key({ win, "Shift"       }, "Up",     function (c) move_or_expand(c, "move", "up") end),
+  awful.key({ ctrl, win, "Shift" }, "Down",   function (c) move_or_expand(c, "shrink", "down") end),
   awful.key({ win                }, "Right",  function (c) switch_focus_without_mouse(c, "right") end),
   awful.key({ win                }, "Left",   function (c) switch_focus_without_mouse(c, "left") end),
-  -- awful.key({ win                }, "Down",   function (c) awful.client.focus.bydirection("down") end),
   awful.key({ win                }, "Down",   function (c)
 																													if c.sticky then
 																														awful.client.focus.history.previous()
@@ -86,7 +85,6 @@ clientkeys = gears.table.join(
 																														awful.client.focus.bydirection("down")
 																													end
 																							end),
-  -- awful.key({ win                }, "Up",     function (c) awful.client.focus.bydirection("up") end),
   awful.key({ win                }, "Up",     function (c)
 																													local cls = client.get()
 																													local stickies = {}
@@ -394,8 +392,8 @@ function sound_device_change(signal)
 	}
 	hide_popup:start()
 end
-dbus.add_match("system","type='signal',interface='org.custom.gurkan'")
-dbus.connect_signal("org.custom.gurkan", sound_device_change)
+-- dbus.add_match("system","type='signal',interface='org.custom.gurkan'")
+-- dbus.connect_signal("org.custom.gurkan", sound_device_change)
 
 -- Create a textclock widget and attach the calendar
 mytextclock = wibox.widget{
@@ -592,10 +590,15 @@ local function screen_organizer(s, primary)
   }
 
   -- Create the wibox
+	if screen:count() == 1 then
+		wibar_height = dpi(23)
+	else
+		wibar_height = dpi(28)
+	end
   s.mywibox = awful.wibar({
     position = "top",
     screen = s,
-    height = dpi(23)
+    height = wibar_height
   })
 
   systray_right_widgets = {
