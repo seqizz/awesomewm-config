@@ -168,7 +168,7 @@ function set_rules(clientkeys)
     {
       rule_any = {
         class = {
-          "Firefox",
+          "firefox",
           "browser"
         },
       },

@@ -827,6 +827,10 @@ end
 -- run once on startup
 -- register_all_screens(my_systray)
 
+-- client.connect_signal("button::press", function (c)
+	-- client.focus = c
+-- end)
+
 -- Signal function to execute when a new client appears.
 client.connect_signal("manage", function (c)
   -- Set the windows at the slave,
