@@ -51,6 +51,7 @@ theme.slider_brightness_fg = "#ff8c40"
 theme.border_radius        = 2
 
 -- Notifications
+-- theme.notification_font = "Operator Mono Lig, Twitter Color Emoji"
 theme.notification_opacity = 0.9
 theme.notification_margin = dpi(15)
 theme.notification_icon_size = dpi(50)
