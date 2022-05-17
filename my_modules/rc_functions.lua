@@ -6,8 +6,13 @@ local my_utils = require('my_modules/my_utils')
 local xresources = require("beautiful.xresources")
 local dpi = xresources.apply_dpi
 
-function debug_print(text)
-  print('<<<<<<< ' .. text)
+function debug_print(text, needed)
+  if needed == nil then
+      needed = true
+  end
+  if needed then
+    print('<<<<<<< ' .. text)
+  end
 end
 
 function suspend_toggle(c)
@@ -298,6 +303,9 @@ function get_xrandr_outputs()
 	if xrandr then
         for line in xrandr:lines() do
             output_tbl[#output_tbl + 1] = line:firstword()
+            if string.match(line, " primary ") then
+                output_tbl['primary'] = line:firstword()
+            end
         end
         xrandr:close()
 	end
@@ -432,7 +440,6 @@ function font_hacks()
     awful.spawn('sed -i --follow-symlinks "s/    font_size = .*/    font_size = 16.0,/" /home/gurkan/.wezterm.lua')
   else
     xrandr_table = get_xrandr_outputs()
-    debug_print(my_utils.dump(xrandr_table))
     if my_utils.table_contains(xrandr_table, "DP-1-2", false) then
       awful.spawn('sed -i --follow-symlinks "s/    font_size = .*/    font_size = 13.0,/" /home/gurkan/.wezterm.lua')
     else

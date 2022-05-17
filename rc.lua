@@ -22,10 +22,11 @@ local dpi = require('beautiful').xresources.apply_dpi
 hostname = io.popen("uname -n"):read()
 -- debug stuff
 -- local inspect = require 'inspect'
+local printmore = false
 
 -- my theme
 beautiful.init("/home/gurkan/.config/awesome/my_modules/my_theme.lua")
-local volume_widget = require("my_modules/sound-widget")
+-- local volume_widget = require("my_modules/sound-widget")
 
 -- print errors as naughty notifications
 dofile ("/home/gurkan/.config/awesome/my_modules/rc_errorhandling.lua")
@@ -112,6 +113,102 @@ clientkeys = gears.table.join(
   awful.key({ win                }, "Escape", function (c) hide_stickies() end)
 )
 
+function set_keys_after_screen_new(clientkeys, globalkeys)
+  if screen:count() > 1 then
+    clientkeys = gears.table.join(clientkeys,
+      awful.key({ win, "Shift" }, "Left",   function (c) c:move_to_screen(c.screen.index-1) end),
+      awful.key({ win, "Shift" }, "Right",  function (c) c:move_to_screen(c.screen.index+1) end)
+  )
+  end
+
+  for global_tag_number = 1, 9 do
+    globalkeys = gears.table.join(globalkeys,
+                                  awful.key({win}, "#" .. global_tag_number + 9,
+                                            function()
+      local local_tag_number = global_tag_number
+      -- only makes sense if I have more than 1 screens
+      if screen:count() > 1 then
+        if my_utils.is_screen_primary_new(awful.screen.focused()) then
+          -- i am on primary
+          if global_tag_number
+            > my_utils.table_length(awful.screen.focused().tags) then
+            -- need to go to second screen, if exists
+            next_screen = awful.screen.focused():get_next_in_direction("right")
+            if next_screen then
+              -- subtract the tag count before focusing it
+              local_tag_number = global_tag_number - my_utils.table_length(awful.screen.focused().tags)
+              awful.screen.focus_relative(1)
+            end
+          end
+        else
+          -- i am on secondary
+          prev_screen = awful.screen.focused():get_next_in_direction("left")
+          if prev_screen then
+            if global_tag_number <= my_utils.table_length(prev_screen.tags) then
+              -- need to go to previous screen
+              awful.screen.focus_bydirection("left")
+            else
+              -- just subtract the tag count
+              local_tag_number = global_tag_number - my_utils.table_length(prev_screen.tags)
+            end
+          end
+        end
+      end
+      -- default stuff below
+      local screen = awful.screen.focused()
+      local tag = screen.tags[local_tag_number]
+      if tag then
+        tag:view_only()
+      end
+    end), -- Move client to tag.
+    awful.key({win, "Shift"}, "#" .. global_tag_number + 9, function()
+      if client.focus then
+        local_tag_number = global_tag_number
+        screen_to_move = awful.screen.focused()
+        -- only makes sense if I have more than 1 screens
+        if screen:count() > 1 then
+          if my_utils.is_screen_primary(awful.screen.focused()) then
+            -- i am on primary
+            if global_tag_number
+              > my_utils.table_length(awful.screen.focused().tags) then
+              -- need to move to second screen, if exists
+              next_screen =
+                awful.screen.focused():get_next_in_direction("right")
+              if next_screen then
+                screen_to_move = next_screen
+                -- subtract the tag count
+                local_tag_number = global_tag_number
+                                     - my_utils.table_length(
+                                       awful.screen.focused().tags)
+              end
+            end
+          else
+            -- i am on secondary
+            prev_screen = awful.screen.focused():get_next_in_direction("left")
+            if prev_screen then
+              if global_tag_number <= my_utils.table_length(prev_screen.tags) then
+                -- need to go to previous screen
+                screen_to_move = prev_screen
+              else
+                -- just subtract the tag count
+                local_tag_number = global_tag_number
+                                     - my_utils.table_length(prev_screen.tags)
+              end
+            end
+          end
+        end
+        -- default stuff below
+        local tag = screen_to_move.tags[local_tag_number]
+        if tag then
+          client.focus:move_to_tag(tag)
+        end
+      end
+    end))
+  end
+
+  return clientkeys, globalkeys
+
+end
 function set_keys_after_screen(clientkeys, globalkeys)
   if screen:count() > 1 then
     clientkeys = gears.table.join(clientkeys,
@@ -322,11 +419,6 @@ separator_reverse = wibox.widget {
   end
 }
 
--- TODO: Declare whole table modularly
-
-screen_table = {}
-xrandr_table = {}
-
 -- widgets I need
 my_systray = wibox.widget.systray()
 
@@ -456,17 +548,17 @@ local function check_available_screens()
 	xrandr_table = get_xrandr_outputs()
 	unstable_state = false
   if docked and ( screen:count() == 1 and my_utils.table_contains(xrandr_table, "eDP-1", false) ) then
-    debug_print("docked but have 1 screen, which is laptop screen")
+    debug_print("docked but have 1 screen, which is laptop screen", printmore)
 		unstable_state = true
 	elseif not docked and screen:count() == 2 then
-    debug_print("Not docked but 2 screens found")
+    debug_print("Not docked but 2 screens found", printmore)
 		unstable_state = true
 	elseif not docked and ( screen:count() == 1 and not my_utils.table_contains(xrandr_table, "eDP-1", false) ) then
-    debug_print("Not docked but 1 screens found, which is not laptop screen")
+    debug_print("Not docked but 1 screens found, which is not laptop screen", printmore)
 		unstable_state = true
 	end
 	if unstable_state then
-    debug_print("Detected docking change, restarting awesomewm")
+    debug_print("Detected docking change, restarting awesomewm", printmore)
     -- Sadly we have to restart, can't reliably move stuff with
     -- 2 consecutive screen add/remove actions
 		awesome.restart()
@@ -477,7 +569,7 @@ restart_timer = gears.timer {
   timeout = 2,
   autostart = true,
   callback = function()
-    check_available_screens()
+		check_available_screens()
   end
 }
 
@@ -606,14 +698,11 @@ local function screen_organizer(s, primary)
   }
 
   table.insert(systray_right_widgets, separator_empty)
-  if primary and not docked and hostname == "innodellix" then
-    table.insert(systray_right_widgets, touch_widget)
-    table.insert(systray_right_widgets, rotate_widget)
-  end
-  if (
-      primary and screen:count() == 1
-    ) or (
-      not primary and screen:count() > 1 ) then
+  if primary then
+		if screen:count() == 1 and hostname == "innodellix" then
+			table.insert(systray_right_widgets, touch_widget)
+			table.insert(systray_right_widgets, rotate_widget)
+		end
     table.insert(systray_right_widgets, separator_reverse)
     table.insert(systray_right_widgets, keyboard_widget)
     table.insert(systray_right_widgets, separator_reverse)
@@ -643,94 +732,72 @@ local function screen_organizer(s, primary)
   }
 end
 
-function reorg_tags_and_systray(systray, from_signal)
+function place_tags(screen_obj, primary)
+	if screen:count() == 1 then
+		-- Only 1 screen here, no need for drama
+		for _, tag in pairs(root.tags()) do
+			if tag.screen ~= screen_obj then
+				tag.screen = screen_obj
+			end
+		end
+	else
+		for _, tag in pairs(root.tags()) do
+			if primary == false and ( tag.name == "web" or tag.name == "mail") then
+				if tag.screen ~= screen_obj then
+					debug_print("Re-assigning " .. tag.name, printmore)
+					tag.screen = screen_obj
+				end
+			elseif primary == true and ( tag.name == "term" or tag.name == "chat") then
+				if tag.screen ~= screen_obj then
+					debug_print("Re-assigning " .. tag.name, printmore)
+					tag.screen = screen_obj
+				end
+			end
+		end
+	end
 
-	-- Safety switches
-	local reassigned_tags = 0
-  local reorg_done = false
+	-- ordering shit
+	for _, tag in pairs(root.tags()) do
+		if tag.name == "web" then
+			tag.index = 1
+		elseif screen:count() > 1 and tag.name == "term" then
+				tag.index = 1
+		else
+			tag.index = 0
+		end
+	end
+end
 
-  -- Get all screens under xrandr_table, just for fun, no real usage for now
+function process_screen(systray)
+
+	systray = systray or nil
+
 	xrandr_table = get_xrandr_outputs()
 
-	debug_print("Hellooo, here are all the screens: " .. my_utils.dump(xrandr_table))
+	debug_print("Xrandr result: " .. my_utils.dump(xrandr_table), printmore)
 
-	local screens_handled = {}
+	for number, name in pairs(xrandr_table) do
+		if number == "primary" then
+			-- that is the helper value, ignore
+			goto skip
+		end
 
-	-- TODO: handle MSI laptop too
-  if screen:count() == 1 then
-    debug_print("There is only one screen")
-		if my_utils.table_contains(xrandr_table, "eDP-1", false) then
-			debug_print("And it is the laptop screen")
-			active_screen = my_utils.find_screen_by_name("eDP-1")
+		screen_obj = my_utils.find_screen_by_name(name)
+		debug_print("Got screen object: " .. my_utils.dump(screen_obj), printmore)
+
+		if xrandr_table["primary"] == name then
+			-- this is the "primary" screen so it should have the systray
+			systray:set_screen(screen_obj)
+			screen_organizer(screen_obj, true)
+			debug_print("Checking tags for: " .. name .. " (primary) ", printmore)
+			place_tags(screen_obj, true)
 		else
-			debug_print("And it is not the laptop screen")
-			active_screen = my_utils.find_screen_by_name("DP-1-2")
+			screen_organizer(screen_obj, false)
+			debug_print("Checking tags for: " .. name .. " (not primary) ", printmore)
+			place_tags(screen_obj, false)
 		end
-
-		systray:set_screen(active_screen)
-		for _, tag in pairs(root.tags()) do
-			if tag.screen == active_screen and from_signal then
-				goto continue
-			end
-			reassigned_tags = reassigned_tags + 1
-			tag.screen = active_screen
-			if tag.name == "web" then
-				tag.index = 1
-			elseif tag.name == "mail" then
-				tag.index = 2
-			elseif tag.name == "term" then
-				tag.index = 3
-			elseif tag.name == "chat" then
-				tag.index = 4
-			end
-			::continue::
-		end
-
-		if reassigned_tags == 0 and from_signal then
-			debug_print('Nothing needs change..')
-			goto finish
-		end
-    screen_organizer(active_screen, true)
-    reorg_done = true
-  elseif screen:count() == 2 and not my_utils.table_contains(xrandr_table, "eDP-1", false) then
-    debug_print("We're on a docking station")
-    for _, tag in pairs(root.tags()) do
-      local tag_moved = false
-      for s in screen do
-        if my_utils.is_screen_primary(s) and ( tag.name == "web" or tag.name == "mail") then
-          tag.screen = s
-          tag_moved = true
-        elseif not my_utils.is_screen_primary(s) and ( tag.name == "term" or tag.name == "chat") then
-          tag.screen = s
-          tag_moved = true
-        end
-      end
-
-      if tag_moved then
-        if tag.name == "web" or tag.name == "term" then
-          tag.index = 1
-        else
-          tag.index = 0
-        end
-      end
-    end
-
-		if reassigned_tags == 0 and from_signal then
-			debug_print('Nothing needs change..')
-			goto finish
-		end
-		for s in screen do
-			-- First systray
-			if not my_utils.is_screen_primary(s) then
-				systray:set_screen(s)
-			end
-			screen_organizer(s, my_utils.is_screen_primary(s))
-		end
-
-    reorg_done = true
-  end
-  -- else do nothing, it's an intermediate state
-
+		::skip::
+	end
   -- define rules since we have filled the screen table
   dofile ("/home/gurkan/.config/awesome/my_modules/rc_rules.lua")
 
@@ -739,12 +806,10 @@ function reorg_tags_and_systray(systray, from_signal)
   root.keys(globalkeys)
   set_rules(clientkeys)
   font_hacks()
-	::finish::
 end
 
 -- {{{ Mouse bindings
 root.buttons(gears.table.join(
-  -- awful.button({ }, 3, function () awful.spawn("rofi -show run") end),
   awful.button({ }, 4, awful.tag.viewprev),
   awful.button({ }, 5, awful.tag.viewnext)
       ))
@@ -861,10 +926,10 @@ end)
 -- Screen handling
 screen.connect_signal("list", function()
   naughty.notify({text = "Reorganizing tags"})
-  reorg_tags_and_systray(my_systray, true)
+	process_screen(my_systray)
 end)
 
-reorg_tags_and_systray(my_systray, false)
+process_screen(my_systray)
 
 tag.connect_signal("request::screen", function(t)
   -- recover tags on a removed screen
@@ -975,7 +1040,7 @@ end)
 -- Show OSD notification of current status on volume:change signal
 awesome.connect_signal("volume::change", function()
   -- update systray
-  volume_widget.update()
+  -- volume_widget.update()
   -- check if it's muted first
   awful.spawn.easy_async(
     "pamixer --get-mute",
