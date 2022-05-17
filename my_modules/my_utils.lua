@@ -47,6 +47,18 @@ function my_utils.table_contains(table, element, check_key)
   return false
 end
 
+function my_utils.is_screen_primary_new(s)
+    local answer = false
+
+	xrandr_table = get_xrandr_outputs()
+    for screen_name, _ in pairs(s.outputs) do
+        if my_utils.table_contains(xrandr_table, screen_name) then
+            answer = true
+        end
+    end
+    return answer
+end
+
 function my_utils.is_screen_primary(s)
     local answer = false
 
@@ -61,7 +73,7 @@ function my_utils.is_screen_primary(s)
         if my_utils.table_contains(known_primary_screens, screen_name) then
             answer = true
         end
-        -- debug_print(screen_name .. " is primary? " .. tostring(answer))
+        -- debug_print(screen_name .. " is primary? " .. tostring(answer), true)
     end
     return answer
 end
