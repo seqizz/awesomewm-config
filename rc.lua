@@ -7,7 +7,6 @@ local wibox = require("wibox")
 local menubar = require("menubar")
 local beautiful = require("beautiful")
 local naughty = require("naughty")
--- local cst = require("naughty.constants")
 local my_utils = require('my_modules/my_utils')
 local lain = require("lain")
 local capslock = require("my_modules/capslock")
@@ -20,13 +19,13 @@ local helpers = require("my_modules/geo_helpers")
 local edid = require('my_modules/edid')
 local dpi = require('beautiful').xresources.apply_dpi
 hostname = io.popen("uname -n"):read()
+
 -- debug stuff
 -- local inspect = require 'inspect'
 local printmore = false
 
 -- my theme
 beautiful.init("/home/gurkan/.config/awesome/my_modules/my_theme.lua")
--- local volume_widget = require("my_modules/sound-widget")
 
 -- print errors as naughty notifications
 dofile ("/home/gurkan/.config/awesome/my_modules/rc_errorhandling.lua")
@@ -81,6 +80,7 @@ clientkeys = gears.table.join(
   awful.key({ win                }, "Left",   function (c) switch_focus_without_mouse(c, "left") end),
   awful.key({ win                }, "Down",   function (c)
 																													if c.sticky then
+																														-- in case it's on top
 																														awful.client.focus.history.previous()
 																												  else
 																														awful.client.focus.bydirection("down")
@@ -160,7 +160,8 @@ function set_keys_after_screen_new(clientkeys, globalkeys)
       if tag then
         tag:view_only()
       end
-    end), -- Move client to tag.
+    end),
+		-- Move client to tag.
     awful.key({win, "Shift"}, "#" .. global_tag_number + 9, function()
       if client.focus then
         local_tag_number = global_tag_number
@@ -457,33 +458,34 @@ battery_widget.widget:buttons(awful.util.table.join(
   end)
 ))
 
+-- @Reference
 -- When a new sound device is added/removed,
 -- create a temporary popup to change default output device
-function sound_device_change(signal)
-	refresh_sound_popup()
-	temp_sound_popup = sound_popup
-	primary_screen = awful.screen.focused()
-	if docked then
-		-- Use secondary screen, on the right side
-		for s in screen do
-				if not my_utils.is_screen_primary(s) then
-						primary_screen = s
-				end
-		end
-	end
-	temp_sound_popup.screen = primary_screen
-	awful.placement.top_right(temp_sound_popup, {honor_workarea=true})
-	temp_sound_popup.visible = true
-	hide_popup = gears.timer {
-    timeout   = 10,
-		single_shot = true,
-    callback  = function()
-			temp_sound_popup.visible = false
-			temp_sound_popup = nil
-    end
-	}
-	hide_popup:start()
-end
+-- function sound_device_change(signal)
+	-- refresh_sound_popup()
+	-- temp_sound_popup = sound_popup
+	-- primary_screen = awful.screen.focused()
+	-- if docked then
+		-- -- Use secondary screen, on the right side
+		-- for s in screen do
+				-- if not my_utils.is_screen_primary(s) then
+						-- primary_screen = s
+				-- end
+		-- end
+	-- end
+	-- temp_sound_popup.screen = primary_screen
+	-- awful.placement.top_right(temp_sound_popup, {honor_workarea=true})
+	-- temp_sound_popup.visible = true
+	-- hide_popup = gears.timer {
+    -- timeout   = 10,
+		-- single_shot = true,
+    -- callback  = function()
+			-- temp_sound_popup.visible = false
+			-- temp_sound_popup = nil
+    -- end
+	-- }
+	-- hide_popup:start()
+-- end
 -- dbus.add_match("system","type='signal',interface='org.custom.gurkan'")
 -- dbus.connect_signal("org.custom.gurkan", sound_device_change)
 
@@ -493,7 +495,7 @@ mytextclock = wibox.widget{
    format = " %d %b %H:%M (%a) ",
    refresh = 30
 }
-cw = lain.widget.cal({
+calendarwidget = lain.widget.cal({
   followtag = true,
   week_number = "left",
   attach_to = { mytextclock },
@@ -515,34 +517,34 @@ if hostname == "innodellix" then
         touch_widget:toggle()
     end)
   ))
-  capslock:buttons(awful.util.table.join(
-    awful.button({}, 1, function() -- left click
-        capslock:toggle()
-    end)
-  ))
-  keyboard_widget:buttons(awful.util.table.join(
-    awful.button({}, 1, function() -- left click
-        keyboard_widget:toggle()
-    end)
-  ))
-  spotify:buttons(awful.util.table.join(
-    awful.button({}, 1, function() -- left click
-			handle_media("play-pause")
-      spotify:check()
-    end),
-    awful.button({}, 3, function() -- right click
-      spotify:raise()
-    end),
-    awful.button({}, 4, function() -- scroll up
-			handle_media("previous")
-      spotify:check()
-    end),
-    awful.button({}, 5, function() -- scroll down
-			handle_media("next")
-      spotify:check()
-    end)
-  ))
 end
+capslock:buttons(awful.util.table.join(
+	awful.button({}, 1, function() -- left click
+			capslock:toggle()
+	end)
+))
+keyboard_widget:buttons(awful.util.table.join(
+	awful.button({}, 1, function() -- left click
+			keyboard_widget:toggle()
+	end)
+))
+spotify:buttons(awful.util.table.join(
+	awful.button({}, 1, function() -- left click
+		handle_media("play-pause")
+		spotify:check()
+	end),
+	awful.button({}, 3, function() -- right click
+		spotify:raise()
+	end),
+	awful.button({}, 4, function() -- scroll up
+		handle_media("previous")
+		spotify:check()
+	end),
+	awful.button({}, 5, function() -- scroll down
+		handle_media("next")
+		spotify:check()
+	end)
+))
 
 local function check_available_screens()
 	xrandr_table = get_xrandr_outputs()
@@ -711,8 +713,6 @@ local function screen_organizer(s, primary)
     table.insert(systray_right_widgets, psi_widget)
     table.insert(systray_right_widgets, separator_reverse)
     table.insert(systray_right_widgets, spotify)
-    -- table.insert(systray_right_widgets, volume_widget)
-    -- table.insert(systray_right_widgets, separator_reverse)
     table.insert(systray_right_widgets, my_systray)
   end
   table.insert(systray_right_widgets, capslock)
@@ -868,9 +868,6 @@ globalkeys = gears.table.join(
   awful.key({ win          }, "e",                          function () keyboard_widget:toggle() end),
   -- If something goes wrong with grobi
   awful.key({ win          }, "m",                          function () awful.spawn("grobi apply mobile") end),
-  -- awful.key({ win, "Shift" }, "m",                          function () awful.spawn("grobi apply inno-dell-dock") end),
-  -- awful.key({ win          }, "b",            function () my_utils.find_screen_by_name("eDP-1"):emit_signal('list') end),
-  awful.key({ win          }, "b",            function () my_utils.find_screen_by_name("DP-3-3"):emit_signal('list') end),
   -- Cycle between available layouts
   awful.key({ win          }, "space",                      function () awful.layout.inc(1) end),
   awful.key({ win          }, "x",                          function () awful.spawn("pcmanfm-qt") end),
@@ -888,13 +885,6 @@ if hostname == "innixos" or hostname == "innodellix" then
     awful.key({ win          }, "g",                          function () awful.spawn(gather_town_cmd) end)
   ))
 end
-
--- run once on startup
--- register_all_screens(my_systray)
-
--- client.connect_signal("button::press", function (c)
-	-- client.focus = c
--- end)
 
 -- Signal function to execute when a new client appears.
 client.connect_signal("manage", function (c)
@@ -950,6 +940,7 @@ client.connect_signal("mouse::enter", function (c)
 end)
 
 -- @Reference: Reflect click to the client below
+-- Still can't "undo" click on the original client, but fun to play
 -- client.connect_signal("button::press", function (c)
   -- if c.ontop and c.sticky and c.skip_taskbar and c.marked then
     -- next_client = awful.client.next (1, c, true)
@@ -1039,8 +1030,6 @@ end)
 
 -- Show OSD notification of current status on volume:change signal
 awesome.connect_signal("volume::change", function()
-  -- update systray
-  -- volume_widget.update()
   -- check if it's muted first
   awful.spawn.easy_async(
     "pamixer --get-mute",
@@ -1081,16 +1070,12 @@ end)
 
 awesome.connect_signal("startup", function(s, state)
   run_once("firefox")
-  -- run_once("firefox", "firefox", "web")
-  -- only makes sense while working
+  -- only makes sense on this laptop
   if hostname == "innixos" or hostname == "innodellix" then
     run_once("slack -s")
-    -- run_once("slack -s", "slack", "chat")
     run_once("thunderbird")
-    -- run_once("thunderbird", "thunderbird", "mail")
   end
   run_once("telegram-desktop")
-  -- run_once("telegram-desktop", "telegram", "chat")
   run_once("pasystray")
   run_once("wezterm start --class mainqterm", "mainqterm", "term")
   run_once("picom --experimental-backends")
