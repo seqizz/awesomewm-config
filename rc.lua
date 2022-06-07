@@ -847,7 +847,7 @@ globalkeys = gears.table.join(
 																															spotify:check()
 																														end),
   awful.key({ ctrl         }, "XF86AudioLowerVolume",  nil, function ()
-																															handle_media("next")
+																															handle_media("previous")
 																															spotify:check()
 																														end),
   -- Dropdown terminal: F12
