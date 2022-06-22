@@ -79,28 +79,28 @@ clientkeys = gears.table.join(
   awful.key({ win                }, "Right",  function (c) switch_focus_without_mouse(c, "right") end),
   awful.key({ win                }, "Left",   function (c) switch_focus_without_mouse(c, "left") end),
   awful.key({ win                }, "Down",   function (c)
-																													if c.sticky then
-																														-- in case it's on top
-																														awful.client.focus.history.previous()
-																												  else
-																														awful.client.focus.bydirection("down")
-																													end
-																							end),
+                                                          if c.sticky then
+                                                            -- in case it's on top
+                                                            awful.client.focus.history.previous()
+                                                          else
+                                                            awful.client.focus.bydirection("down")
+                                                          end
+                                              end),
   awful.key({ win                }, "Up",     function (c)
-																													local cls = client.get()
-																													local stickies = {}
-																													-- Get all the stickies
-																													for _, c in ipairs(cls) do
-																														if c.sticky then
-																															table.insert(stickies, c)
-																														end
-																													end
-																													if my_utils.table_length(stickies) == 0 then
-																														awful.client.focus.bydirection("up")
-																													else
-																														awful.client.focus.history.previous()
-																													end
-																							end),
+                                                          local cls = client.get()
+                                                          local stickies = {}
+                                                          -- Get all the stickies
+                                                          for _, c in ipairs(cls) do
+                                                            if c.sticky then
+                                                              table.insert(stickies, c)
+                                                            end
+                                                          end
+                                                          if my_utils.table_length(stickies) == 0 then
+                                                            awful.client.focus.bydirection("up")
+                                                          else
+                                                            awful.client.focus.history.previous()
+                                                          end
+                                              end),
   -- Minimize window: Win + z
   awful.key({ win                }, "z",      function (c) c.minimized = true end),
   -- Suspend the window's app with SIGSTOP: Ctrl + Alt + s
@@ -115,97 +115,98 @@ clientkeys = gears.table.join(
 
 function set_keys_after_screen_new(clientkeys, globalkeys)
   if screen:count() > 1 then
+    -- Shortcut for moving window between screens
     clientkeys = gears.table.join(clientkeys,
       awful.key({ win, "Shift" }, "Left",   function (c) c:move_to_screen(c.screen.index-1) end),
       awful.key({ win, "Shift" }, "Right",  function (c) c:move_to_screen(c.screen.index+1) end)
   )
   end
 
-  for global_tag_number = 1, 9 do
-    globalkeys = gears.table.join(globalkeys,
-                                  awful.key({win}, "#" .. global_tag_number + 9,
-                                            function()
-      local local_tag_number = global_tag_number
-      -- only makes sense if I have more than 1 screens
-      if screen:count() > 1 then
-        if my_utils.is_screen_primary_new(awful.screen.focused()) then
-          -- i am on primary
-          if global_tag_number
-            > my_utils.table_length(awful.screen.focused().tags) then
-            -- need to go to second screen, if exists
-            next_screen = awful.screen.focused():get_next_in_direction("right")
-            if next_screen then
-              -- subtract the tag count before focusing it
-              local_tag_number = global_tag_number - my_utils.table_length(awful.screen.focused().tags)
-              awful.screen.focus_relative(1)
-            end
-          end
-        else
-          -- i am on secondary
-          prev_screen = awful.screen.focused():get_next_in_direction("left")
-          if prev_screen then
-            if global_tag_number <= my_utils.table_length(prev_screen.tags) then
-              -- need to go to previous screen
-              awful.screen.focus_bydirection("left")
-            else
-              -- just subtract the tag count
-              local_tag_number = global_tag_number - my_utils.table_length(prev_screen.tags)
-            end
-          end
-        end
-      end
-      -- default stuff below
-      local screen = awful.screen.focused()
-      local tag = screen.tags[local_tag_number]
-      if tag then
-        tag:view_only()
-      end
-    end),
-		-- Move client to tag.
-    awful.key({win, "Shift"}, "#" .. global_tag_number + 9, function()
-      if client.focus then
-        local_tag_number = global_tag_number
-        screen_to_move = awful.screen.focused()
-        -- only makes sense if I have more than 1 screens
-        if screen:count() > 1 then
-          if my_utils.is_screen_primary(awful.screen.focused()) then
-            -- i am on primary
-            if global_tag_number
-              > my_utils.table_length(awful.screen.focused().tags) then
-              -- need to move to second screen, if exists
-              next_screen =
-                awful.screen.focused():get_next_in_direction("right")
-              if next_screen then
-                screen_to_move = next_screen
-                -- subtract the tag count
-                local_tag_number = global_tag_number
-                                     - my_utils.table_length(
-                                       awful.screen.focused().tags)
-              end
-            end
-          else
-            -- i am on secondary
-            prev_screen = awful.screen.focused():get_next_in_direction("left")
-            if prev_screen then
-              if global_tag_number <= my_utils.table_length(prev_screen.tags) then
-                -- need to go to previous screen
-                screen_to_move = prev_screen
-              else
-                -- just subtract the tag count
-                local_tag_number = global_tag_number
-                                     - my_utils.table_length(prev_screen.tags)
-              end
-            end
-          end
-        end
-        -- default stuff below
-        local tag = screen_to_move.tags[local_tag_number]
-        if tag then
-          client.focus:move_to_tag(tag)
-        end
-      end
-    end))
-  end
+  -- for global_tag_number = 1, 9 do
+    -- globalkeys = gears.table.join(globalkeys,
+                                  -- awful.key({win}, "#" .. global_tag_number + 9,
+                                            -- function()
+      -- local local_tag_number = global_tag_number
+      -- -- only makes sense if I have more than 1 screens
+      -- if screen:count() > 1 then
+        -- if my_utils.is_screen_primary_new(awful.screen.focused()) then
+          -- -- i am on primary
+          -- if global_tag_number
+            -- > my_utils.table_length(awful.screen.focused().tags) then
+            -- -- need to go to second screen, if exists
+            -- next_screen = awful.screen.focused():get_next_in_direction("right")
+            -- if next_screen then
+              -- -- subtract the tag count before focusing it
+              -- local_tag_number = global_tag_number - my_utils.table_length(awful.screen.focused().tags)
+              -- awful.screen.focus_relative(1)
+            -- end
+          -- end
+        -- else
+          -- -- i am on secondary
+          -- prev_screen = awful.screen.focused():get_next_in_direction("left")
+          -- if prev_screen then
+            -- if global_tag_number <= my_utils.table_length(prev_screen.tags) then
+              -- -- need to go to previous screen
+              -- awful.screen.focus_bydirection("left")
+            -- else
+              -- -- just subtract the tag count
+              -- local_tag_number = global_tag_number - my_utils.table_length(prev_screen.tags)
+            -- end
+          -- end
+        -- end
+      -- end
+      -- -- default stuff below
+      -- local screen = awful.screen.focused()
+      -- local tag = screen.tags[local_tag_number]
+      -- if tag then
+        -- tag:view_only()
+      -- end
+    -- end),
+    -- -- Move client to tag.
+    -- awful.key({win, "Shift"}, "#" .. global_tag_number + 9, function()
+      -- if client.focus then
+        -- local_tag_number = global_tag_number
+        -- screen_to_move = awful.screen.focused()
+        -- -- only makes sense if I have more than 1 screens
+        -- if screen:count() > 1 then
+          -- if my_utils.is_screen_primary(awful.screen.focused()) then
+            -- -- i am on primary
+            -- if global_tag_number
+              -- > my_utils.table_length(awful.screen.focused().tags) then
+              -- -- need to move to second screen, if exists
+              -- next_screen =
+                -- awful.screen.focused():get_next_in_direction("right")
+              -- if next_screen then
+                -- screen_to_move = next_screen
+                -- -- subtract the tag count
+                -- local_tag_number = global_tag_number
+                                     -- - my_utils.table_length(
+                                       -- awful.screen.focused().tags)
+              -- end
+            -- end
+          -- else
+            -- -- i am on secondary
+            -- prev_screen = awful.screen.focused():get_next_in_direction("left")
+            -- if prev_screen then
+              -- if global_tag_number <= my_utils.table_length(prev_screen.tags) then
+                -- -- need to go to previous screen
+                -- screen_to_move = prev_screen
+              -- else
+                -- -- just subtract the tag count
+                -- local_tag_number = global_tag_number
+                                     -- - my_utils.table_length(prev_screen.tags)
+              -- end
+            -- end
+          -- end
+        -- end
+        -- -- default stuff below
+        -- local tag = screen_to_move.tags[local_tag_number]
+        -- if tag then
+          -- client.focus:move_to_tag(tag)
+        -- end
+      -- end
+    -- end))
+  -- end
 
   return clientkeys, globalkeys
 
@@ -384,13 +385,13 @@ local tasklist_buttons = gears.table.join(
     end
   end),
   awful.button({ }, 2, function (c)
-		c:kill()
-	end),
+    c:kill()
+  end),
   awful.button({ }, 4, function ()
-		awful.client.focus.byidx(1)
+    awful.client.focus.byidx(1)
   end),
   awful.button({ }, 5, function ()
-		awful.client.focus.byidx(-1)
+    awful.client.focus.byidx(-1)
 end)
 )
 
@@ -462,29 +463,29 @@ battery_widget.widget:buttons(awful.util.table.join(
 -- When a new sound device is added/removed,
 -- create a temporary popup to change default output device
 -- function sound_device_change(signal)
-	-- refresh_sound_popup()
-	-- temp_sound_popup = sound_popup
-	-- primary_screen = awful.screen.focused()
-	-- if docked then
-		-- -- Use secondary screen, on the right side
-		-- for s in screen do
-				-- if not my_utils.is_screen_primary(s) then
-						-- primary_screen = s
-				-- end
-		-- end
-	-- end
-	-- temp_sound_popup.screen = primary_screen
-	-- awful.placement.top_right(temp_sound_popup, {honor_workarea=true})
-	-- temp_sound_popup.visible = true
-	-- hide_popup = gears.timer {
-    -- timeout   = 10,
-		-- single_shot = true,
-    -- callback  = function()
-			-- temp_sound_popup.visible = false
-			-- temp_sound_popup = nil
+  -- refresh_sound_popup()
+  -- temp_sound_popup = sound_popup
+  -- primary_screen = awful.screen.focused()
+  -- if docked then
+    -- -- Use secondary screen, on the right side
+    -- for s in screen do
+        -- if not my_utils.is_screen_primary(s) then
+            -- primary_screen = s
+        -- end
     -- end
-	-- }
-	-- hide_popup:start()
+  -- end
+  -- temp_sound_popup.screen = primary_screen
+  -- awful.placement.top_right(temp_sound_popup, {honor_workarea=true})
+  -- temp_sound_popup.visible = true
+  -- hide_popup = gears.timer {
+    -- timeout   = 10,
+    -- single_shot = true,
+    -- callback  = function()
+      -- temp_sound_popup.visible = false
+      -- temp_sound_popup = nil
+    -- end
+  -- }
+  -- hide_popup:start()
 -- end
 -- dbus.add_match("system","type='signal',interface='org.custom.gurkan'")
 -- dbus.connect_signal("org.custom.gurkan", sound_device_change)
@@ -519,61 +520,32 @@ if hostname == "innodellix" then
   ))
 end
 capslock:buttons(awful.util.table.join(
-	awful.button({}, 1, function() -- left click
-			capslock:toggle()
-	end)
+  awful.button({}, 1, function() -- left click
+      capslock:toggle()
+  end)
 ))
 keyboard_widget:buttons(awful.util.table.join(
-	awful.button({}, 1, function() -- left click
-			keyboard_widget:toggle()
-	end)
+  awful.button({}, 1, function() -- left click
+      keyboard_widget:toggle()
+  end)
 ))
 spotify:buttons(awful.util.table.join(
-	awful.button({}, 1, function() -- left click
-		handle_media("play-pause")
-		spotify:check()
-	end),
-	awful.button({}, 3, function() -- right click
-		spotify:raise()
-	end),
-	awful.button({}, 4, function() -- scroll up
-		handle_media("previous")
-		spotify:check()
-	end),
-	awful.button({}, 5, function() -- scroll down
-		handle_media("next")
-		spotify:check()
-	end)
+  awful.button({}, 1, function() -- left click
+    handle_media("play-pause")
+    spotify:check()
+  end),
+  awful.button({}, 3, function() -- right click
+    spotify:raise()
+  end),
+  awful.button({}, 4, function() -- scroll up
+    handle_media("previous")
+    spotify:check()
+  end),
+  awful.button({}, 5, function() -- scroll down
+    handle_media("next")
+    spotify:check()
+  end)
 ))
-
-local function check_available_screens()
-	xrandr_table = get_xrandr_outputs()
-	unstable_state = false
-  if docked and ( screen:count() == 1 and my_utils.table_contains(xrandr_table, "eDP-1", false) ) then
-    debug_print("docked but have 1 screen, which is laptop screen", printmore)
-		unstable_state = true
-	elseif not docked and screen:count() == 2 then
-    debug_print("Not docked but 2 screens found", printmore)
-		unstable_state = true
-	elseif not docked and ( screen:count() == 1 and not my_utils.table_contains(xrandr_table, "eDP-1", false) ) then
-    debug_print("Not docked but 1 screens found, which is not laptop screen", printmore)
-		unstable_state = true
-	end
-	if unstable_state then
-    debug_print("Detected docking change, restarting awesomewm", printmore)
-    -- Sadly we have to restart, can't reliably move stuff with
-    -- 2 consecutive screen add/remove actions
-		awesome.restart()
-  end
-end
-
-restart_timer = gears.timer {
-  timeout = 2,
-  autostart = true,
-  callback = function()
-		check_available_screens()
-  end
-}
 
 psi_timer = gears.timer {
   timeout = 15,
@@ -586,13 +558,13 @@ psi_timer = gears.timer {
 spotify_timer = gears.timer {
   timeout = 15,
   autostart = true,
-	call_now = true,
+  call_now = true,
   callback = function()
     spotify:check()
   end
 }
 
-local function screen_organizer(s, primary)
+local function screen_organizer(s, primary, is_extra)
   -- Wallpaper -- one for each screen
   set_wallpaper(s)
 
@@ -606,89 +578,91 @@ local function screen_organizer(s, primary)
     awful.button({ }, 5, function () awful.layout.inc(-1) end)
   ))
 
-  -- Create a taglist widget
-  if screen:count() > 1 then
-    taglist_width = dpi(250)
-  else
-    taglist_width = dpi(300)
-  end
-  s.mytaglist = awful.widget.taglist {
-    screen  = s,
-    filter  = awful.widget.taglist.filter.all,
-    style   = {
-        shape = gears.shape.powerline
-    },
-    layout   = {
-        spacing = -15,
-        spacing_widget = {
-            color  = beautiful.bg_normal,
-            shape  = gears.shape.powerline,
-            widget = wibox.widget.separator,
-        },
-        layout  = wibox.layout.flex.horizontal,
-        forced_width = taglist_width
-        -- max_widget_width = taglist_width /50
-    },
-    widget_template = {
-        {
-            {
-                {
-                    id     = 'text_role',
-                    widget = wibox.widget.textbox,
-                },
-                layout = wibox.layout.flex.horizontal,
-            },
-            left  = 24,
-            right = 12,
-            widget = wibox.container.margin
-        },
-        id     = 'background_role',
-        widget = wibox.container.background,
-    },
-    buttons = taglist_buttons
-  }
+  if not is_extra then
+    -- Create a taglist widget
+    if screen:count() > 1 then
+      taglist_width = dpi(250)
+    else
+      taglist_width = dpi(300)
+    end
+    s.mytaglist = awful.widget.taglist {
+      screen  = s,
+      filter  = awful.widget.taglist.filter.all,
+      style   = {
+          shape = gears.shape.powerline
+      },
+      layout   = {
+          spacing = -15,
+          spacing_widget = {
+              color  = beautiful.bg_normal,
+              shape  = gears.shape.powerline,
+              widget = wibox.widget.separator,
+          },
+          layout  = wibox.layout.flex.horizontal,
+          forced_width = taglist_width
+          -- max_widget_width = taglist_width /50
+      },
+      widget_template = {
+          {
+              {
+                  {
+                      id     = 'text_role',
+                      widget = wibox.widget.textbox,
+                  },
+                  layout = wibox.layout.flex.horizontal,
+              },
+              left  = 24,
+              right = 12,
+              widget = wibox.container.margin
+          },
+          id     = 'background_role',
+          widget = wibox.container.background,
+      },
+      buttons = taglist_buttons
+    }
 
-  -- Create a tasklist widget
-  s.mytasklist = awful.widget.tasklist {
-    screen  = s,
-    filter  = awful.widget.tasklist.filter.currenttags,
-    style   = {
-        shape = gears.shape.powerline
-    },
-    layout   = {
-        spacing = -15,
-        spacing_widget = {
-            color  = beautiful.bg_normal,
-            shape  = gears.shape.powerline,
-            widget = wibox.widget.separator,
-        },
-        layout  = wibox.layout.flex.horizontal
-    },
-    widget_template = {
-        {
-            {
-                {
-                    id     = 'text_role',
-                    widget = wibox.widget.textbox,
-                },
-                layout = wibox.layout.flex.horizontal,
-            },
-            left  = 18,
-            right = 18,
-            widget = wibox.container.margin
-        },
-        id     = 'background_role',
-        widget = wibox.container.background,
-    },
-    buttons = tasklist_buttons
-  }
+    -- Create a tasklist widget
+    s.mytasklist = awful.widget.tasklist {
+      screen  = s,
+      filter  = awful.widget.tasklist.filter.currenttags,
+      style   = {
+          shape = gears.shape.powerline
+      },
+      layout   = {
+          spacing = -15,
+          spacing_widget = {
+              color  = beautiful.bg_normal,
+              shape  = gears.shape.powerline,
+              widget = wibox.widget.separator,
+          },
+          layout  = wibox.layout.flex.horizontal
+      },
+      widget_template = {
+          {
+              {
+                  {
+                      id     = 'text_role',
+                      widget = wibox.widget.textbox,
+                  },
+                  layout = wibox.layout.flex.horizontal,
+              },
+              left  = 18,
+              right = 18,
+              widget = wibox.container.margin
+          },
+          id     = 'background_role',
+          widget = wibox.container.background,
+      },
+      buttons = tasklist_buttons
+    }
+  end
 
   -- Create the wibox
-	if screen:count() == 1 then
-		wibar_height = dpi(23)
-	else
-		wibar_height = dpi(28)
-	end
+  if screen:count() == 1 then
+    wibar_height = dpi(23)
+  else
+    wibar_height = dpi(25)
+  end
   s.mywibox = awful.wibar({
     position = "top",
     screen = s,
@@ -701,10 +675,10 @@ local function screen_organizer(s, primary)
 
   table.insert(systray_right_widgets, separator_empty)
   if primary then
-		if screen:count() == 1 and hostname == "innodellix" then
-			table.insert(systray_right_widgets, touch_widget)
-			table.insert(systray_right_widgets, rotate_widget)
-		end
+    if screen:count() == 1 and hostname == "innodellix" then
+      table.insert(systray_right_widgets, touch_widget)
+      table.insert(systray_right_widgets, rotate_widget)
+    end
     table.insert(systray_right_widgets, separator_reverse)
     table.insert(systray_right_widgets, keyboard_widget)
     table.insert(systray_right_widgets, separator_reverse)
@@ -720,92 +694,116 @@ local function screen_organizer(s, primary)
   table.insert(systray_right_widgets, s.mylayoutbox)
 
   -- Add widgets to the wibox
-  s.mywibox:setup {
-    layout = wibox.layout.align.horizontal,
-    { -- Left widgets
+  if is_extra then
+    -- Doesn't get much stuff on this screen
+    s.mywibox:setup {
       layout = wibox.layout.align.horizontal,
-      s.mytaglist,
-      separator,
-    },
-    s.mytasklist, -- Middle widget
-    systray_right_widgets
-  }
+      { -- Left widgets
+        layout = wibox.layout.align.horizontal,
+        separator,
+      },
+      systray_right_widgets
+    }
+  else
+    -- Normal setup, tag and taskslists
+    s.mywibox:setup {
+      layout = wibox.layout.align.horizontal,
+      { -- Left widgets
+        layout = wibox.layout.align.horizontal,
+        s.mytaglist,
+        separator,
+      },
+      s.mytasklist, -- Middle widget
+      systray_right_widgets
+    }
+  end
 end
 
 function place_tags(screen_obj, primary)
-	if screen:count() == 1 then
-		-- Only 1 screen here, no need for drama
-		for _, tag in pairs(root.tags()) do
-			if tag.screen ~= screen_obj then
-				tag.screen = screen_obj
-			end
-		end
-	else
-		for _, tag in pairs(root.tags()) do
-			if primary == false and ( tag.name == "web" or tag.name == "mail") then
-				if tag.screen ~= screen_obj then
-					debug_print("Re-assigning " .. tag.name, printmore)
-					tag.screen = screen_obj
-				end
-			elseif primary == true and ( tag.name == "term" or tag.name == "chat") then
-				if tag.screen ~= screen_obj then
-					debug_print("Re-assigning " .. tag.name, printmore)
-					tag.screen = screen_obj
-				end
-			end
-		end
-	end
+  if screen:count() == 1 then
+    -- Only 1 screen here, no need for drama
+    for _, tag in pairs(root.tags()) do
+      if tag.screen ~= screen_obj then
+        tag.screen = screen_obj
+      end
+    end
+  else
+    for _, tag in pairs(root.tags()) do
+      if primary == false and ( tag.name == "web" or tag.name == "mail") then
+        if tag.screen ~= screen_obj then
+          debug_print("Re-assigning " .. tag.name, printmore)
+          tag.screen = screen_obj
+        end
+      elseif primary == true and ( tag.name == "term" or tag.name == "chat") then
+        if tag.screen ~= screen_obj then
+          debug_print("Re-assigning " .. tag.name, printmore)
+          tag.screen = screen_obj
+        end
+      end
+    end
+  end
 
-	-- ordering shit
-	for _, tag in pairs(root.tags()) do
-		if tag.name == "web" then
-			tag.index = 1
-		elseif screen:count() > 1 and tag.name == "term" then
-				tag.index = 1
-		else
-			tag.index = 0
-		end
-	end
+  -- ordering shit
+  for _, tag in pairs(root.tags()) do
+    if tag.name == "term" then
+      tag.index = 3
+    elseif tag.name == "mail" then
+      tag.index = 2
+    elseif tag.name == "web" then
+        tag.index = 1
+    else -- chat
+      tag.index = 4
+    end
+  end
 end
 
-function process_screen(systray)
+function process_screens(systray)
 
-	systray = systray or nil
+  systray = systray or nil
 
-	xrandr_table = get_xrandr_outputs()
+  xrandr_table = get_xrandr_outputs()
 
-	debug_print("Xrandr result: " .. my_utils.dump(xrandr_table), printmore)
+  debug_print("Xrandr result: " .. my_utils.dump(xrandr_table), printmore)
 
-	for number, name in pairs(xrandr_table) do
-		if number == "primary" then
-			-- that is the helper value, ignore
-			goto skip
-		end
+  for number, name in pairs(xrandr_table) do
+    if number == "primary" then
+      -- that is the helper value, ignore
+      goto skip
+    end
 
-		screen_obj = my_utils.find_screen_by_name(name)
-		debug_print("Got screen object: " .. my_utils.dump(screen_obj), printmore)
+    screen_obj = my_utils.find_screen_by_name(name)
+    debug_print("Got screen object: " .. my_utils.dump(screen_obj), printmore)
 
-		if xrandr_table["primary"] == name then
-			-- this is the "primary" screen so it should have the systray
-			systray:set_screen(screen_obj)
-			screen_organizer(screen_obj, true)
-			debug_print("Checking tags for: " .. name .. " (primary) ", printmore)
-			place_tags(screen_obj, true)
-		else
-			screen_organizer(screen_obj, false)
-			debug_print("Checking tags for: " .. name .. " (not primary) ", printmore)
-			place_tags(screen_obj, false)
-		end
-		::skip::
-	end
+    -- In case we have more than 2 screens, we will register first
+    -- non-primary screen as 2nd, others won't get tags.
+    second_screen_already_processed = false
+    if xrandr_table["primary"] == name then
+      -- this is the "primary" screen so it should have the systray
+      systray:set_screen(screen_obj)
+      screen_organizer(screen_obj, true)
+      debug_print("Checking tags for: " .. name .. " (primary) ", printmore)
+      place_tags(screen_obj, true)
+    else
+      screen_organizer(screen_obj, false, second_screen_already_processed)
+      if second_screen_already_processed then
+        debug_print("Extra screen found: " .. my_utils.dump(screen_obj), printmore)
+      else
+        debug_print("Checking tags for: " .. name .. " (not primary) ", printmore)
+        place_tags(screen_obj, false)
+        second_screen_already_processed = true
+      end
+    end
+    ::skip::
+  end
   -- define rules since we have filled the screen table
   dofile ("/home/gurkan/.config/awesome/my_modules/rc_rules.lua")
 
   clientkeys, globalkeys = set_keys_after_screen(clientkeys, globalkeys)
+  -- clientkeys, globalkeys = set_keys_after_screen_new(clientkeys, globalkeys)
   dofile ("/home/gurkan/.config/awesome/my_modules/rc_clientbuttons.lua")
   root.keys(globalkeys)
   set_rules(clientkeys)
-  font_hacks()
+  -- font_hacks()
 end
 
 -- {{{ Mouse bindings
@@ -832,24 +830,24 @@ globalkeys = gears.table.join(
   awful.key({              }, "XF86AudioPlay",         nil, function () handle_media("play-pause") end),
   awful.key({              }, "XF86AudioStop",         nil, function () handle_media("stop") end),
   awful.key({              }, "XF86AudioPrev",         nil, function ()
-																															handle_media("previous")
-																															spotify:check()
-																														end),
+                                                              handle_media("previous")
+                                                              spotify:check()
+                                                            end),
   awful.key({              }, "XF86AudioNext",         nil, function ()
-																															handle_media("next")
-																															spotify:check()
-																														end),
-	-- Smart plug toggle
+                                                              handle_media("next")
+                                                              spotify:check()
+                                                            end),
+  -- Smart plug toggle
   awful.key({              }, "XF86HomePage",          nil, function () awful.spawn(bulb_toggle) end),
   -- For laptop, which doesn't have next/prev buttons
   awful.key({ ctrl         }, "XF86AudioRaiseVolume",  nil, function ()
-																															handle_media("next")
-																															spotify:check()
-																														end),
+                                                              handle_media("next")
+                                                              spotify:check()
+                                                            end),
   awful.key({ ctrl         }, "XF86AudioLowerVolume",  nil, function ()
-																															handle_media("previous")
-																															spotify:check()
-																														end),
+                                                              handle_media("previous")
+                                                              spotify:check()
+                                                            end),
   -- Dropdown terminal: F12
   awful.key({              }, "F12",                   nil, function () my_dropdown:toggle() end),
   awful.key({              }, "Print",                 nil, function () awful.spawn("flameshot gui") end),
@@ -901,25 +899,25 @@ client.connect_signal("manage", function (c)
 end)
 
 client.connect_signal("property::minimized", function(c)
-	-- If a sticky window is minimized, ensure it's visible on taskbar
-	if c.sticky then
-		c.skip_taskbar = false
-	end
+  -- If a sticky window is minimized, ensure it's visible on taskbar
+  if c.sticky then
+    c.skip_taskbar = false
+  end
 end)
 client.connect_signal("focus", function(c)
-	-- If a sticky window is unminimized, remove from taskbar
-	if c.sticky and not c.minimized then
-		c.skip_taskbar = true
-	end
+  -- If a sticky window is unminimized, remove from taskbar
+  if c.sticky and not c.minimized then
+    c.skip_taskbar = true
+  end
 end)
 
 -- Screen handling
 screen.connect_signal("list", function()
   naughty.notify({text = "Reorganizing tags"})
-	process_screen(my_systray)
+  process_screens(my_systray)
 end)
 
-process_screen(my_systray)
+process_screens(my_systray)
 
 tag.connect_signal("request::screen", function(t)
   -- recover tags on a removed screen
@@ -932,10 +930,10 @@ client.connect_signal("mouse::enter", function (c)
     c.opacity = 0.9
     -- Run away from mouse, to the other side of the screen
     if c.x > (c.screen.geometry.x + c.screen.geometry.width - 600) then
-			c:relative_move(-(c.screen.geometry.width - c.width), 0, 0, 0)
-		else
-			c:relative_move((c.screen.geometry.width - c.width), 0, 0, 0)
-		end
+      c:relative_move(-(c.screen.geometry.width - c.width), 0, 0, 0)
+    else
+      c:relative_move((c.screen.geometry.width - c.width), 0, 0, 0)
+    end
   end
 end)
 
@@ -1069,7 +1067,7 @@ awful.tag.attached_connect_signal(s, "property::selected", function ()
 end)
 
 awesome.connect_signal("startup", function(s, state)
-  run_once("firefox")
+  run_once("sleep 3 && firefox", "firefox")
   -- only makes sense on this laptop
   if hostname == "innixos" or hostname == "innodellix" then
     run_once("slack -s")
