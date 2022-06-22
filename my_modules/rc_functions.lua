@@ -193,9 +193,9 @@ function run_once(program, grep_for, on_tag)
 			if exit_code ~= 0 then
 				naughty.notify { text = "starting " .. program .. " once" }
 				if on_tag ~= nil then
-					awful.spawn(program, {tag = on_tag})
+					awful.spawn.with_shell(program, {tag = on_tag})
 				else
-					awful.spawn(program)
+					awful.spawn.with_shell(program)
 				end
 			end
 		end
