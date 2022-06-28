@@ -11,7 +11,7 @@ function debug_print(text, needed)
       needed = true
   end
   if needed then
-    print('<<<<<<< ' .. text)
+    print('<<<<<<< ' .. tostring(text))
   end
 end
 
@@ -141,6 +141,26 @@ function switch_focus_without_mouse(c, dir)
   -- Keep the mouse position
   mouse.coords {x = mouselocation_x, y = mouselocation_y}
 end
+
+function switch_to_tag(tag_name)
+	debug_print('Switching to tag ' .. tag_name, printmore)
+	tag_obj = awful.tag.find_by_name(nil, tag_name)
+	tags_screen_obj = tag_obj.screen
+	awful.tag.viewnone(tags_screen_obj)
+	awful.tag.viewtoggle(tag_obj)
+end
+
+function move_focused_client_to_tag(tag_name)
+	tag_obj = awful.tag.find_by_name(nil, tag_name)
+	if client.focus then
+		my_client_obj = client.focus
+		debug_print('Moving focused window (' .. my_client_obj.name .. ') to tag ' .. tag_name, printmore)
+		my_client_obj:move_to_tag(tag_obj)
+		switch_to_tag(tag_name)
+		client.focus = my_client_obj
+	end
+end
+
 
 function hide_stickies()
   local cls = client.get()

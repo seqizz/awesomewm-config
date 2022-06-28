@@ -122,187 +122,18 @@ function set_keys_after_screen_new(clientkeys, globalkeys)
   )
   end
 
-  -- for global_tag_number = 1, 9 do
-    -- globalkeys = gears.table.join(globalkeys,
-                                  -- awful.key({win}, "#" .. global_tag_number + 9,
-                                            -- function()
-      -- local local_tag_number = global_tag_number
-      -- -- only makes sense if I have more than 1 screens
-      -- if screen:count() > 1 then
-        -- if my_utils.is_screen_primary_new(awful.screen.focused()) then
-          -- -- i am on primary
-          -- if global_tag_number
-            -- > my_utils.table_length(awful.screen.focused().tags) then
-            -- -- need to go to second screen, if exists
-            -- next_screen = awful.screen.focused():get_next_in_direction("right")
-            -- if next_screen then
-              -- -- subtract the tag count before focusing it
-              -- local_tag_number = global_tag_number - my_utils.table_length(awful.screen.focused().tags)
-              -- awful.screen.focus_relative(1)
-            -- end
-          -- end
-        -- else
-          -- -- i am on secondary
-          -- prev_screen = awful.screen.focused():get_next_in_direction("left")
-          -- if prev_screen then
-            -- if global_tag_number <= my_utils.table_length(prev_screen.tags) then
-              -- -- need to go to previous screen
-              -- awful.screen.focus_bydirection("left")
-            -- else
-              -- -- just subtract the tag count
-              -- local_tag_number = global_tag_number - my_utils.table_length(prev_screen.tags)
-            -- end
-          -- end
-        -- end
-      -- end
-      -- -- default stuff below
-      -- local screen = awful.screen.focused()
-      -- local tag = screen.tags[local_tag_number]
-      -- if tag then
-        -- tag:view_only()
-      -- end
-    -- end),
-    -- -- Move client to tag.
-    -- awful.key({win, "Shift"}, "#" .. global_tag_number + 9, function()
-      -- if client.focus then
-        -- local_tag_number = global_tag_number
-        -- screen_to_move = awful.screen.focused()
-        -- -- only makes sense if I have more than 1 screens
-        -- if screen:count() > 1 then
-          -- if my_utils.is_screen_primary(awful.screen.focused()) then
-            -- -- i am on primary
-            -- if global_tag_number
-              -- > my_utils.table_length(awful.screen.focused().tags) then
-              -- -- need to move to second screen, if exists
-              -- next_screen =
-                -- awful.screen.focused():get_next_in_direction("right")
-              -- if next_screen then
-                -- screen_to_move = next_screen
-                -- -- subtract the tag count
-                -- local_tag_number = global_tag_number
-                                     -- - my_utils.table_length(
-                                       -- awful.screen.focused().tags)
-              -- end
-            -- end
-          -- else
-            -- -- i am on secondary
-            -- prev_screen = awful.screen.focused():get_next_in_direction("left")
-            -- if prev_screen then
-              -- if global_tag_number <= my_utils.table_length(prev_screen.tags) then
-                -- -- need to go to previous screen
-                -- screen_to_move = prev_screen
-              -- else
-                -- -- just subtract the tag count
-                -- local_tag_number = global_tag_number
-                                     -- - my_utils.table_length(prev_screen.tags)
-              -- end
-            -- end
-          -- end
-        -- end
-        -- -- default stuff below
-        -- local tag = screen_to_move.tags[local_tag_number]
-        -- if tag then
-          -- client.focus:move_to_tag(tag)
-        -- end
-      -- end
-    -- end))
-  -- end
-
-  return clientkeys, globalkeys
-
-end
-function set_keys_after_screen(clientkeys, globalkeys)
-  if screen:count() > 1 then
-    clientkeys = gears.table.join(clientkeys,
-      awful.key({ win, "Shift" }, "Left",   function (c) c:move_to_screen(c.screen.index-1) end),
-      awful.key({ win, "Shift" }, "Right",  function (c) c:move_to_screen(c.screen.index+1) end)
-  )
-  end
-
-  for global_tag_number = 1, 9 do
-    globalkeys = gears.table.join(globalkeys,
-                                  awful.key({win}, "#" .. global_tag_number + 9,
-                                            function()
-      local local_tag_number = global_tag_number
-      -- only makes sense if I have more than 1 screens
-      if screen:count() > 1 then
-        if my_utils.is_screen_primary(awful.screen.focused()) then
-          -- i am on primary
-          if global_tag_number
-            > my_utils.table_length(awful.screen.focused().tags) then
-            -- need to go to second screen, if exists
-            next_screen = awful.screen.focused():get_next_in_direction("right")
-            if next_screen then
-              -- subtract the tag count before focusing it
-              local_tag_number = global_tag_number - my_utils.table_length(awful.screen.focused().tags)
-              awful.screen.focus_relative(1)
-            end
-          end
-        else
-          -- i am on secondary
-          prev_screen = awful.screen.focused():get_next_in_direction("left")
-          if prev_screen then
-            if global_tag_number <= my_utils.table_length(prev_screen.tags) then
-              -- need to go to previous screen
-              awful.screen.focus_bydirection("left")
-            else
-              -- just subtract the tag count
-              local_tag_number = global_tag_number - my_utils.table_length(prev_screen.tags)
-            end
-          end
-        end
-      end
-      -- default stuff below
-      local screen = awful.screen.focused()
-      local tag = screen.tags[local_tag_number]
-      if tag then
-        tag:view_only()
-      end
-    end), -- Move client to tag.
-    awful.key({win, "Shift"}, "#" .. global_tag_number + 9, function()
-      if client.focus then
-        local_tag_number = global_tag_number
-        screen_to_move = awful.screen.focused()
-        -- only makes sense if I have more than 1 screens
-        if screen:count() > 1 then
-          if my_utils.is_screen_primary(awful.screen.focused()) then
-            -- i am on primary
-            if global_tag_number
-              > my_utils.table_length(awful.screen.focused().tags) then
-              -- need to move to second screen, if exists
-              next_screen =
-                awful.screen.focused():get_next_in_direction("right")
-              if next_screen then
-                screen_to_move = next_screen
-                -- subtract the tag count
-                local_tag_number = global_tag_number
-                                     - my_utils.table_length(
-                                       awful.screen.focused().tags)
-              end
-            end
-          else
-            -- i am on secondary
-            prev_screen = awful.screen.focused():get_next_in_direction("left")
-            if prev_screen then
-              if global_tag_number <= my_utils.table_length(prev_screen.tags) then
-                -- need to go to previous screen
-                screen_to_move = prev_screen
-              else
-                -- just subtract the tag count
-                local_tag_number = global_tag_number
-                                     - my_utils.table_length(prev_screen.tags)
-              end
-            end
-          end
-        end
-        -- default stuff below
-        local tag = screen_to_move.tags[local_tag_number]
-        if tag then
-          client.focus:move_to_tag(tag)
-        end
-      end
-    end))
-  end
+	-- not sure why we're doing 10+ here 🤷
+	globalkeys = gears.table.join(
+		globalkeys,
+		awful.key({win}, "#10", function() switch_to_tag("web") end),
+		awful.key({win}, "#11", function() switch_to_tag("mail") end),
+		awful.key({win}, "#12", function() switch_to_tag("term") end),
+		awful.key({win}, "#13", function() switch_to_tag("chat") end),
+		awful.key({win, "Shift"}, "#10", function() move_focused_client_to_tag("web") end),
+		awful.key({win, "Shift"}, "#11", function() move_focused_client_to_tag("mail") end),
+		awful.key({win, "Shift"}, "#12", function() move_focused_client_to_tag("term") end),
+		awful.key({win, "Shift"}, "#13", function() move_focused_client_to_tag("chat") end)
+	)
 
   return clientkeys, globalkeys
 
@@ -323,7 +154,8 @@ win = "Mod4"
 alt = "Mod1"
 ctrl = "Control"
 
--- default layout table, keeping for reference, I only need 2 of these
+-- @Reference: default layout table
+-- I only need 2 of these though 😬 max, tile or bust.
 layouts = {
   -- awful.layout.suit.floating,
   awful.layout.suit.tile,
@@ -507,6 +339,7 @@ calendarwidget = lain.widget.cal({
   }
 })
 
+-- This is the only host with "rotatable" screen
 if hostname == "innodellix" then
   rotate_widget:buttons(awful.util.table.join(
     awful.button({}, 1, function() -- left click
@@ -661,7 +494,7 @@ local function screen_organizer(s, primary, is_extra)
   if screen:count() == 1 then
     wibar_height = dpi(23)
   else
-    wibar_height = dpi(25)
+		wibar_height = dpi(25)
   end
   s.mywibox = awful.wibar({
     position = "top",
@@ -798,8 +631,7 @@ function process_screens(systray)
   -- define rules since we have filled the screen table
   dofile ("/home/gurkan/.config/awesome/my_modules/rc_rules.lua")
 
-  clientkeys, globalkeys = set_keys_after_screen(clientkeys, globalkeys)
-  -- clientkeys, globalkeys = set_keys_after_screen_new(clientkeys, globalkeys)
+	clientkeys, globalkeys = set_keys_after_screen_new(clientkeys, globalkeys)
   dofile ("/home/gurkan/.config/awesome/my_modules/rc_clientbuttons.lua")
   root.keys(globalkeys)
   set_rules(clientkeys)

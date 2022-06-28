@@ -2,6 +2,7 @@ local awful = require("awful")
 
 local my_utils = {}
 
+-- @Reference, not used
 function my_utils.am_i_on_screen(screen_name)
     local answer = false
     for out,_ in pairs(awful.screen.focused().outputs) do
@@ -48,34 +49,36 @@ function my_utils.table_contains(table, element, check_key)
 end
 
 function my_utils.is_screen_primary_new(s)
-    local answer = false
+  local answer = false
 
-	xrandr_table = get_xrandr_outputs()
-    for screen_name, _ in pairs(s.outputs) do
-        if my_utils.table_contains(xrandr_table, screen_name) then
-            answer = true
-        end
+  xrandr_table = get_xrandr_outputs()
+  for screen_name, _ in pairs(s.outputs) do
+    if my_utils.table_contains(xrandr_table, "primary", true) then
+      if xrandr_table['primary'] == screen_name then
+        answer = true
+      end
     end
-    return answer
+  end
+  return answer
 end
 
 function my_utils.is_screen_primary(s)
-    local answer = false
+  local answer = false
 
-    known_primary_screens = {
-        "eDP1", -- laptop monitor (innodellix)
-        "eDP-1", -- laptop monitor (msi)
-        "DP3-2", -- main external monitor on dock
-        "DP-3-2", -- main external monitor on dock
-        "DP-1-2", -- single external monitor on dock
-    }
-    for screen_name, _ in pairs(s.outputs) do
-        if my_utils.table_contains(known_primary_screens, screen_name) then
-            answer = true
-        end
-        -- debug_print(screen_name .. " is primary? " .. tostring(answer), true)
-    end
-    return answer
+  known_primary_screens = {
+      "eDP1", -- laptop monitor (innodellix)
+      "eDP-1", -- laptop monitor (msi)
+      "DP3-2", -- main external monitor on dock
+      "DP-3-2", -- main external monitor on dock
+      "DP-1-2", -- single external monitor on dock
+  }
+  for screen_name, _ in pairs(s.outputs) do
+      if my_utils.table_contains(known_primary_screens, screen_name) then
+          answer = true
+      end
+      -- debug_print(screen_name .. " is primary? " .. tostring(answer), true)
+  end
+  return answer
 end
 
 local function file_exists(file)
@@ -94,13 +97,13 @@ function my_utils.read_lines_from(file)
 end
 
 function my_utils.table_removekey(inputtable, key)
-	local e
-	for i = 1, #inputtable do
-			if (inputtable[i] == key) then
-					e = i
-			end
-	end
-	if e then table.remove(inputtable, e) end
+  local e
+  for i = 1, #inputtable do
+      if (inputtable[i] == key) then
+          e = i
+      end
+  end
+  if e then table.remove(inputtable, e) end
 end
 
 function my_utils.table_length(inputtable)
@@ -186,3 +189,4 @@ function split_string(pString, pPattern)
 end
 
 return my_utils
+-- vim: set ts=2 sw=2 tw=0 et :
