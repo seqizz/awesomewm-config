@@ -728,6 +728,22 @@ client.connect_signal("manage", function (c)
     -- Prevent clients from being unreachable after screen count changes.
     awful.placement.no_offscreen(c)
   end
+	c:buttons(gears.table.join(c:buttons(),
+		awful.button({ win }, 4, function (c)
+      c:emit_signal("request::activate", "mouse_click", {raise = true})
+      mousegrabber.run(function (_mouse)
+        c.opacity = c.opacity + 0.1
+        return false
+      end, 'mouse')
+    end, nil),
+    awful.button({ win }, 5, function (c)
+      c:emit_signal("request::activate", "mouse_click", {raise = true})
+      mousegrabber.run(function (_mouse)
+        c.opacity = c.opacity - 0.1
+        return false
+      end, 'mouse')
+    end, nil)
+	))
 end)
 
 client.connect_signal("property::minimized", function(c)
@@ -793,9 +809,9 @@ client.connect_signal("request::titlebars", function(c)
       awful.mouse.client.move(c)
     end),
     awful.button({ }, 3, function()
-    c:emit_signal("request::activate", "titlebar", {raise = true})
-    awful.mouse.client.resize(c)
-  end)
+			c:emit_signal("request::activate", "titlebar", {raise = true})
+			awful.mouse.client.resize(c)
+		end)
   )
 
   awful.titlebar(c) : setup {
@@ -901,7 +917,7 @@ end)
 awesome.connect_signal("startup", function(s, state)
   run_once("sleep 3 && firefox", "firefox")
   -- only makes sense on this laptop
-  if hostname == "innixos" or hostname == "innodellix" then
+  if hostname == "innodellix" then
     run_once("slack -s")
     run_once("thunderbird")
   end
@@ -913,4 +929,4 @@ awesome.connect_signal("startup", function(s, state)
 end)
 
 load_last_active_tag()
--- vim: set ts=2 sw=2 sts=2 tw=0 noet :
+-- vim: set ts=2 sw=2 tw=0 noet :
