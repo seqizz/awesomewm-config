@@ -88,26 +88,6 @@ function set_rules(clientkeys)
       };
     },
 
-    -- Zoom's bullshit popovers
-    {
-      rule = {
-        class = "zoom"
-      },
-      except = {
-        name = "Zoom Meeting"
-      },
-      properties = {
-        focus = false,
-        draw_backdrop = false,
-        skip_decoration = true,
-        ontop = true,
-        sticky = true,
-        skip_taskbar = true,
-        floating = true,
-        callback = function(c) awful.placement.top_right(c, {honor_workarea=true}) end,
-      };
-    },
-
     {
       rule = {
         name = "Picture-in-Picture"
@@ -227,8 +207,11 @@ function set_rules(clientkeys)
           "TelegramDesktop",
           "Microsoft Teams - Preview",
           "discord",
-          "zoom"
+          ".zoom "
         }
+      },
+      name_any = {
+          "Zoom - Free Account"
       },
       properties = {
         tag    = awful.tag.find_by_name(nil, "chat"),
