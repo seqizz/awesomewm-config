@@ -63,7 +63,7 @@ function spotify:check()
         awful.spawn.easy_async(
           "bash -c \"playerctl -p spotify metadata | grep -w 'xesam:title' | sed 's/.*xesam:title\\s*//;s/$/ /'\"",
           function(stdout, stderr, reason, exit_code)
-            spotify:set(stdout:sub(1,50), is_playing)
+            spotify:set(stdout:sub(1,40), is_playing)
         end)
         self.forced_width = nil
       end

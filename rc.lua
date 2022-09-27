@@ -125,10 +125,10 @@ function set_keys_after_screen_new(clientkeys, globalkeys)
 	-- not sure why we're doing 10+ here 🤷
 	globalkeys = gears.table.join(
 		globalkeys,
-		awful.key({win}, "#10", function() switch_to_tag("web") end),
-		awful.key({win}, "#11", function() switch_to_tag("mail") end),
-		awful.key({win}, "#12", function() switch_to_tag("term") end),
-		awful.key({win}, "#13", function() switch_to_tag("chat") end),
+		awful.key({win}, "#10", function() switch_to_tag("web", printmore) end),
+		awful.key({win}, "#11", function() switch_to_tag("mail", printmore) end),
+		awful.key({win}, "#12", function() switch_to_tag("term", printmore) end),
+		awful.key({win}, "#13", function() switch_to_tag("chat", printmore) end),
 		awful.key({win, "Shift"}, "#10", function() move_focused_client_to_tag("web") end),
 		awful.key({win, "Shift"}, "#11", function() move_focused_client_to_tag("mail") end),
 		awful.key({win, "Shift"}, "#12", function() move_focused_client_to_tag("term") end),
@@ -492,7 +492,7 @@ local function screen_organizer(s, primary, is_extra)
 
   -- Create the wibox
   if screen:count() == 1 then
-    wibar_height = dpi(23)
+		wibar_height = dpi(23)
   else
 		wibar_height = dpi(25)
   end
@@ -770,7 +770,11 @@ process_screens(my_systray)
 tag.connect_signal("request::screen", function(t)
   -- recover tags on a removed screen
   naughty.notify({text = "Recovering tag: " .. t.name})
-  for s in screen do t.screen = s return end
+  for s in screen do
+		t.screen = s
+		my_dropdown.screen = s
+		return
+	end
 end)
 
 client.connect_signal("mouse::enter", function (c)
@@ -923,8 +927,10 @@ awesome.connect_signal("startup", function(s, state)
   end
   run_once("telegram-desktop")
   run_once("pasystray")
-  run_once("wezterm start --class mainqterm", "mainqterm", "term")
-  run_once("picom --experimental-backends")
+	run_once("wezterm start --class mainqterm", "mainqterm", "term")
+	-- run_once("wezterm connect default --class mainqterm", "mainqterm", "term")
+	-- one day wezterm will have tmux support 🤞
+  run_once("picom")
   run_once("alttab -w 1 -t 400x300 -frame cyan -i 100x100 -font xft:firacode-20")
 end)
 

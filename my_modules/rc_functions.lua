@@ -142,7 +142,7 @@ function switch_focus_without_mouse(c, dir)
   mouse.coords {x = mouselocation_x, y = mouselocation_y}
 end
 
-function switch_to_tag(tag_name)
+function switch_to_tag(tag_name, printmore)
 	debug_print('Switching to tag ' .. tag_name, printmore)
 	tag_obj = awful.tag.find_by_name(nil, tag_name)
 	tags_screen_obj = tag_obj.screen
