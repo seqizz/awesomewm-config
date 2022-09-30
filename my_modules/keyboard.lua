@@ -14,10 +14,10 @@ local keyboardwidget = wibox.widget {
 
 function keyboardwidget:set(state)
   if state == "tr" then
-    fg = "#268bd2"
+    fg = my_theme.fg_normal
     text = "TR"
   else
-    fg = "#cb4b16"
+    fg = my_theme.fg_normal_alt
     text = "WM"
   end
   markup_value = my_utils.create_markup{
@@ -36,13 +36,13 @@ function keyboardwidget:check()
     "workman-toggle query",
     {
       stdout = function (line)
-        local fg = "#6c71c4"
+        local fg = my_theme.fg_normal
 
         if line == "tr" then
-          fg = "#268bd2"
+          fg = my_theme.fg_normal
           text = "TR"
         elseif line == "workman-p-tr" then
-          fg = "#cb4b16"
+          fg = my_theme.fg_normal_alt
           text = "WM"
         else
           text = "??"

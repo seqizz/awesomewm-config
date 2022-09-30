@@ -12,11 +12,8 @@ local themes_path = gfs.get_themes_dir()
 
 local theme = {}
 
--- theme.font = "FiraCode Nerd Font Medium " .. dpi(5)
 theme.font = "FiraCode Nerd Font Medium 10"
--- theme.font_big = "FiraCode Nerd Font Medium " .. dpi(6)
 theme.font_big = "FiraCode Nerd Font Medium 12"
--- theme.font_small = "FiraCode Nerd Font Medium " .. dpi(4)
 theme.font_small = "FiraCode Nerd Font Medium 8"
 theme.emoji_font = "Twitter Color Emoji"
 
@@ -24,30 +21,30 @@ theme.maximized_hide_border = true
 theme.fullscreen_hide_border = true
 theme.master_width_factor = 0.6
 
-theme.bg_normal     = "#002b36"
-theme.bg_focus      = "#6c71c4"
+theme.bg_normal     = "#282828"
+theme.bg_focus      = "#504945"
 theme.bg_urgent     = "#dc322f"
--- theme.bg_minimize   = "#586e75"
 theme.bg_minimize   = theme.bg_normal
 theme.bg_systray    = theme.bg_normal
 
-theme.fg_normal     = "#eee8d5"
-theme.fg_focus      = "#ffffff"
-theme.fg_urgent     = "#ffffff"
-theme.fg_minimize   = "#ffffff"
-theme.bg_ntf        = "#6c92d4"
+theme.fg_normal       = "#d79921"
+theme.fg_normal_alt   = "#fabd2f"
+theme.fg_focus        = "#ffffff"
+theme.fg_urgent       = "#ffffff"
+theme.fg_minimize     = "#ffffff"
+theme.bg_notification = theme.bg_normal
 
 theme.useless_gap   = dpi(0)
 theme.border_width  = dpi(1)
 theme.border_marked = "#91231c"
-theme.border_focus  = "#268bd2"
+theme.border_focus  = "#d65d0e"
 theme.border_normal = "#252525"
 -- theme.separator     = theme.bg_focus
-theme.separator     = "#50538f"
+theme.separator     = theme.bg_focus
 
 theme.slider_bg            = "#e3e3e3"
-theme.slider_sound_fg      = "#beabff"
-theme.slider_brightness_fg = "#ff8c40"
+theme.slider_sound_fg      = theme.fg_normal
+theme.slider_brightness_fg = theme.fg_normal_alt
 theme.border_radius        = 2
 
 -- Notifications
@@ -60,7 +57,7 @@ local ntf_shape = function(cr, width, height)
    shape.partially_rounded_rect(cr, width, height, true, false, true, true, 18)
 end
 theme.notification_shape = ntf_shape
-theme.notification_bg = theme.bg_ntf
+theme.notification_bg = theme.bg_notification
 
 -- Generate taglist squares:
 local taglist_square_size = dpi(4)

@@ -265,11 +265,11 @@ local battery_widget = lain.widget.bat({
     full_notify = "off",
     settings = function()
       if bat_now.status == "Charging" then
-        battery_widget_color = "#268bd2"
+        battery_widget_color = beautiful.fg_normal
       elseif bat_now.status == "Full" then
         battery_widget_color = beautiful.bg_focus
       else
-        battery_widget_color = "#cb4b16"
+        battery_widget_color = beautiful.fg_normal_alt
       end
 
       markup_value = my_utils.create_markup{
@@ -931,7 +931,7 @@ awesome.connect_signal("startup", function(s, state)
 	-- run_once("wezterm connect default --class mainqterm", "mainqterm", "term")
 	-- one day wezterm will have tmux support 🤞
   run_once("picom")
-  run_once("alttab -w 1 -t 400x300 -frame cyan -i 100x100 -font xft:firacode-20")
+  run_once("alttab -w 1 -t 400x300 -frame \"" .. string.upper(beautiful.fg_normal) .. "\" -i 100x100 -font xft:firacode-20")
 end)
 
 load_last_active_tag()

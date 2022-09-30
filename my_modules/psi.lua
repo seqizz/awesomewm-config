@@ -17,16 +17,16 @@ function mypsi:check()
     "psitool-script",
     {
       stdout = function (line)
-        local fg = "#6c71c4"
+        local fg = my_theme.fg_normal
 
         if tonumber(line) > 100000 then
           fg = "#FF0000"
         elseif tonumber(line) > 50000 then
           fg = "#cb4b16"
         elseif tonumber(line) > 20000 then
-          fg = "#b58900"
+          fg = my_theme.fg_normal_alt
         elseif tonumber(line) > 5000 then
-          fg = "#268bd2"
+          fg = my_theme.fg_normal
         end
         markup_value = my_utils.create_markup{
           text="",
