@@ -125,10 +125,10 @@ function set_keys_after_screen_new(clientkeys, globalkeys)
 	-- not sure why we're doing 10+ here 🤷
 	globalkeys = gears.table.join(
 		globalkeys,
-		awful.key({win}, "#10", function() switch_to_tag("web", printmore) end),
-		awful.key({win}, "#11", function() switch_to_tag("mail", printmore) end),
-		awful.key({win}, "#12", function() switch_to_tag("term", printmore) end),
-		awful.key({win}, "#13", function() switch_to_tag("chat", printmore) end),
+		awful.key({win}, "#10", function() switch_to_tag_new("web", printmore) end),
+		awful.key({win}, "#11", function() switch_to_tag_new("mail", printmore) end),
+		awful.key({win}, "#12", function() switch_to_tag_new("term", printmore) end),
+		awful.key({win}, "#13", function() switch_to_tag_new("chat", printmore) end),
 		awful.key({win, "Shift"}, "#10", function() move_focused_client_to_tag("web") end),
 		awful.key({win, "Shift"}, "#11", function() move_focused_client_to_tag("mail") end),
 		awful.key({win, "Shift"}, "#12", function() move_focused_client_to_tag("term") end),
@@ -339,6 +339,29 @@ calendarwidget = lain.widget.cal({
   }
 })
 
+-- change tag names dynamically
+dynamic_tagging = function()
+    for s = 1, screen.count() do
+        -- get a list of all tags
+				local atags = screen[s].tags
+				for i, t in ipairs(atags) do
+						local clients_on_this_tag = 0
+						for i, c in ipairs(t:clients()) do
+								if not c.skip_taskbar then
+									clients_on_this_tag = clients_on_this_tag + 1
+								end
+						end
+						original_name = my_utils.get_first_word(t.name)
+						t.name = original_name .. " " .. string.rep("ॱ", clients_on_this_tag)
+				end
+    end
+end
+
+-- signal function to execute when a client disappears
+client.connect_signal("unmanage", function (c, startup)
+    dynamic_tagging()
+end)
+
 -- This is the only host with "rotatable" screen
 if hostname == "innodellix" then
   rotate_widget:buttons(awful.util.table.join(
@@ -416,7 +439,7 @@ local function screen_organizer(s, primary, is_extra)
     if screen:count() > 1 then
       taglist_width = dpi(250)
     else
-      taglist_width = dpi(300)
+      taglist_width = dpi(350)
     end
     s.mytaglist = awful.widget.taglist {
       screen  = s,
@@ -718,6 +741,7 @@ end
 
 -- Signal function to execute when a new client appears.
 client.connect_signal("manage", function (c)
+	dynamic_tagging()
   -- Set the windows at the slave,
   -- i.e. put it at the end of others instead of setting it master.
   if not awesome.startup then awful.client.setslave(c) end
@@ -922,8 +946,8 @@ awesome.connect_signal("startup", function(s, state)
   run_once("sleep 3 && firefox", "firefox")
   -- only makes sense on this laptop
   if hostname == "innodellix" then
-    run_once("slack -s")
-    run_once("thunderbird")
+    run_once("sleep 5 && slack -s", "slack")
+    run_once("sleep 8 && thunderbird", "thunderbird")
   end
   run_once("telegram-desktop")
   run_once("pasystray")

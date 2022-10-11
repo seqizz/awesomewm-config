@@ -112,6 +112,13 @@ function my_utils.table_length(inputtable)
   return count
 end
 
+function my_utils.get_first_word(s)
+  local words = {}
+  words[1], words[2] = s:match("(%w+)(%W+)")
+  if words[1] == nil then words[1] = s end
+  return words[1]
+end
+
 function my_utils.get_randomseed(b, m, r)
   urand = assert (io.open ('/dev/urandom', 'rb'))
   b = b or 4

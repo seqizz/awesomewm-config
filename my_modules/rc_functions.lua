@@ -150,6 +150,23 @@ function switch_to_tag(tag_name, printmore)
 	awful.tag.viewtoggle(tag_obj)
 end
 
+function switch_to_tag_new(tag_name, printmore)
+	debug_print('Switching to tag ' .. tag_name, printmore)
+    t = find_tag_by_first_word(tag_name)
+    tags_screen_obj = t.screen
+    awful.tag.viewnone(tags_screen_obj)
+    awful.tag.viewtoggle(t)
+end
+
+function find_tag_by_first_word(first_word, printmore)
+    local all_tags = root.tags()
+    for _, t in ipairs(all_tags) do
+        if first_word == my_utils.get_first_word(t.name) then
+            return t
+        end
+    end
+end
+
 function move_focused_client_to_tag(tag_name)
 	tag_obj = awful.tag.find_by_name(nil, tag_name)
 	if client.focus then
@@ -280,7 +297,7 @@ function save_current_tag()
     end
     local f = assert(io.open("/home/gurkan/.awesome-last-ws", "a+"))
     for _, tagobj in pairs(active_tags) do
-        f:write(tagobj.name, "\n")
+        f:write(my_utils.get_first_word(tagobj.name), "\n")
     end
     f:close()
 end
@@ -290,7 +307,8 @@ function load_last_active_tag()
     if next(tag_list) ~= nil then
         local previous_tags = {}
         for _, tag_name in pairs(tag_list) do
-            local t = awful.tag.find_by_name(nil, tag_name)
+            -- local t = awful.tag.find_by_name(nil, tag_name)
+            local t = find_tag_by_first_word(tag_name)
             table.insert(previous_tags, t)
         end
         awful.tag.viewnone()
