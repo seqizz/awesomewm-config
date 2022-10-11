@@ -265,7 +265,7 @@ local battery_widget = lain.widget.bat({
     full_notify = "off",
     settings = function()
       if bat_now.status == "Charging" then
-        battery_widget_color = beautiful.fg_normal
+        battery_widget_color = beautiful.fg_focus
       elseif bat_now.status == "Full" then
         battery_widget_color = beautiful.bg_focus
       else
