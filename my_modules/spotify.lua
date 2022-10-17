@@ -3,34 +3,44 @@ local wibox = require("wibox")
 local my_utils = require('my_modules/my_utils')
 local my_theme = require('my_modules/my_theme')
 local dpi = require('beautiful').xresources.apply_dpi
+local gears = require("gears")
 
-local spotify = wibox.widget {
+local spotifytext = wibox.widget {
   widget = wibox.widget.textbox,
   align = "center",
   valign = "center",
   font = my_theme.font,
 }
 
+local spotifyimage = wibox.widget {
+  resize = true,
+  widget = wibox.widget.imagebox,
+}
+
+local spotifyimage_lifted = wibox.container.margin(
+  spotifyimage,
+  nil, nil, nil, dpi(2) -- bottom margin to match visually
+)
+
+local spotifywidget = wibox.widget {
+  spotifyimage_lifted,
+  spotifytext,
+  layout  = wibox.layout.fixed.horizontal
+}
+
 -- set text of spotify widget
-function spotify:set(state, is_playing)
+function spotifywidget:set(state, is_playing)
     if is_playing then
-      logo = ""
+      spotifyimage:set_image(gears.color.recolor_image(my_theme.music_icon, my_theme.fg_normal))
     else
-      logo = ""
+      spotifyimage:set_image(gears.color.recolor_image(my_theme.music_icon_paused, my_theme.fg_normal))
     end
 
-    markup_value = my_utils.create_markup{
-        text=logo,
-        fg="#268bd2",
-        size="large",
-        rise="-2500",
-        font="Font Awesome"
-    }
-    self.markup = markup_value .. " " .. awful.util.escape(state)
+    spotifytext:set_markup_silently(" " .. awful.util.escape(state))
 end
 
 -- Raise spotify and make its tag visible
-function spotify:raise()
+function spotifywidget:raise()
   local cls = client.get()
   for _, c in ipairs(cls) do
     if c.name == "Spotify" then
@@ -45,13 +55,12 @@ function spotify:raise()
   end
 end
 
-function spotify:check()
+function spotifywidget:check()
   awful.spawn.with_line_callback(
     "bash -c 'sleep 1 && playerctl -p spotify status'",
     {
       stderr = function (line)
         if line == "No players found" then
-          self.markup = ''
           self.forced_width = dpi(0)
         end
       end,
@@ -63,7 +72,7 @@ function spotify:check()
         awful.spawn.easy_async(
           "bash -c \"playerctl -p spotify metadata | grep -w 'xesam:title' | sed 's/.*xesam:title\\s*//;s/$/ /'\"",
           function(stdout, stderr, reason, exit_code)
-            spotify:set(stdout:sub(1,40), is_playing)
+            spotifywidget:set(stdout:sub(1,40), is_playing)
         end)
         self.forced_width = nil
       end
@@ -71,6 +80,6 @@ function spotify:check()
   )
 end
 
-spotify:check()
+spotifywidget:check()
 
-return spotify
+return spotifywidget
