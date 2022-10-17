@@ -260,34 +260,54 @@ adapter_name = "BAT0"
 if my_utils.file_exists('/sys/class/power_supply/BAT1/status') then
   adapter_name = "BAT1"
 end
-local battery_widget = lain.widget.bat({
+batterytext = wibox.widget {
+	widget = wibox.widget.textbox,
+	font = beautiful.font,
+	markup = 'This <i>is</i> a <b>textbox</b>!!!',
+}
+battery_image_widget = wibox.widget {
+	image = beautiful.battery_icon_empty,
+	resize = true,
+	widget = wibox.widget.imagebox,
+}
+local battery_widget_text = lain.widget.bat({
     battery = adapter_name,
     full_notify = "off",
     settings = function()
       if bat_now.status == "Charging" then
-        battery_widget_color = beautiful.fg_focus
+        battery_widget_color = beautiful.fg_normal_alt
+				battery_image = beautiful.battery_icon_charging
       elseif bat_now.status == "Full" then
-        battery_widget_color = beautiful.bg_focus
+        battery_widget_color = beautiful.fg_normal
+				battery_image = beautiful.battery_icon_full
       else
         battery_widget_color = beautiful.fg_normal_alt
+				if bat_now.perc > 80 then
+					battery_image = beautiful.battery_icon_full
+				elseif bat_now.perc > 40 then
+					battery_image = beautiful.battery_icon_medium
+				elseif bat_now.perc > 20 then
+					battery_image = beautiful.battery_icon_low
+				else
+					battery_image = beautiful.battery_icon_empty
+				end
       end
 
-      markup_value = my_utils.create_markup{
-        text=" ",
-        fg=battery_widget_color,
-        size="x-large",
-        rise="-3000",
-        font="Ionicons"
-      }
-      local perc = bat_now.perc ~= "N/A" and markup_value .. bat_now.perc .. "%" or bat_now.perc
+			local perc = bat_now.perc ~= "N/A" and " " .. bat_now.perc .. "%" or bat_now.perc
 
-      widget:set_markup(lain.util.markup.fontfg(beautiful.font, beautiful.fg_normal, perc .. " "))
+			widget:set_markup(lain.util.markup.fontfg(beautiful.font, beautiful.fg_normal, perc .. " "))
+      battery_image_widget:set_image(gears.color.recolor_image(battery_image, battery_widget_color))
     end
 })
-battery_widget.widget:buttons(awful.util.table.join(
+battery_widget = wibox.widget {
+	battery_image_widget,
+	battery_widget_text,
+	layout  = wibox.layout.fixed.horizontal
+}
+battery_widget:buttons(awful.util.table.join(
   -- Update battery widget with click, if we're not patient enough
   awful.button({}, 1, function()
-    battery_widget:update()
+    battery_widget_text:update()
   end)
 ))
 

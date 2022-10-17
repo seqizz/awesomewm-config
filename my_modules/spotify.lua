@@ -14,7 +14,7 @@ local spotify = wibox.widget {
 -- set text of spotify widget
 function spotify:set(state, is_playing)
     if is_playing then
-      logo = ""
+      logo = ""
     else
       logo = ""
     end

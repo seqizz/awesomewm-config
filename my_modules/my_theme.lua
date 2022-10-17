@@ -47,6 +47,15 @@ theme.slider_sound_fg      = theme.fg_normal
 theme.slider_brightness_fg = theme.fg_normal_alt
 theme.border_radius        = 2
 
+-- relative paths, so fucking easy with lua..
+local base_dir = string.gsub(debug.getinfo(1).source, "^@(.+/)[^/]+$", "%1")
+theme.gauge_icon = base_dir .. 'assets/gauge.svg'
+theme.battery_icon_empty = base_dir .. 'assets/battery.svg'
+theme.battery_icon_charging = base_dir .. 'assets/battery-charging.svg'
+theme.battery_icon_full = base_dir .. 'assets/battery-full.svg'
+theme.battery_icon_medium = base_dir .. 'assets/battery-medium.svg'
+theme.battery_icon_low = base_dir .. 'assets/battery-low.svg'
+
 -- Notifications
 -- theme.notification_font = "Operator Mono Lig, Twitter Color Emoji"
 theme.notification_opacity = 0.9
