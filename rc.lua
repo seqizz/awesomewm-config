@@ -154,28 +154,6 @@ win = "Mod4"
 alt = "Mod1"
 ctrl = "Control"
 
--- @Reference: default layout table
--- I only need 2 of these though 😬 max, tile or bust.
-layouts = {
-  -- awful.layout.suit.floating,
-  awful.layout.suit.tile,
-  -- awful.layout.suit.tile.left,
-  -- awful.layout.suit.tile.bottom,
-  -- awful.layout.suit.tile.top,
-  -- awful.layout.suit.fair,
-  -- awful.layout.suit.fair.horizontal,
-  -- awful.layout.suit.spiral,
-  -- awful.layout.suit.spiral.dwindle,
-  awful.layout.suit.max
-  -- awful.layout.suit.max.fullscreen,
-  -- awful.layout.suit.magnifier,
-  -- awful.layout.suit.corner.nw,
-  -- awful.layout.suit.corner.ne,
-  -- awful.layout.suit.corner.sw,
-  -- awful.layout.suit.corner.se,
-}
-awful.layout.layouts = layouts
-
 -- dropdown terminal from lain
 my_dropdown = lain.util.quake({
   app = terminal,
@@ -772,22 +750,24 @@ client.connect_signal("manage", function (c)
     -- Prevent clients from being unreachable after screen count changes.
     awful.placement.no_offscreen(c)
   end
-	c:buttons(gears.table.join(c:buttons(),
-		awful.button({ win }, 4, function (c)
-      c:emit_signal("request::activate", "mouse_click", {raise = true})
-      mousegrabber.run(function (_mouse)
-        c.opacity = c.opacity + 0.1
-        return false
-      end, 'mouse')
-    end, nil),
-    awful.button({ win }, 5, function (c)
-      c:emit_signal("request::activate", "mouse_click", {raise = true})
-      mousegrabber.run(function (_mouse)
-        c.opacity = c.opacity - 0.1
-        return false
-      end, 'mouse')
-    end, nil)
-	))
+	-- TODO: doesn't work on awesome-git
+	-- c:buttons(gears.table.join(
+		-- c:buttons(),
+		-- awful.button({ win }, 4, function (c)
+      -- c:emit_signal("request::activate", "mouse_click", {raise = true})
+      -- mousegrabber.run(function (_mouse)
+        -- c.opacity = c.opacity + 0.1
+        -- return false
+      -- end, 'mouse')
+    -- end, nil),
+    -- awful.button({ win }, 5, function (c)
+      -- c:emit_signal("request::activate", "mouse_click", {raise = true})
+      -- mousegrabber.run(function (_mouse)
+        -- c.opacity = c.opacity - 0.1
+        -- return false
+      -- end, 'mouse')
+    -- end, nil)
+	-- ))
 end)
 
 client.connect_signal("property::minimized", function(c)
@@ -819,6 +799,14 @@ tag.connect_signal("request::screen", function(t)
 		my_dropdown.screen = s
 		return
 	end
+end)
+
+-- I only need 2 of these though 😬 max, tile or bust.
+tag.connect_signal("request::default_layouts", function()
+	awful.layout.append_default_layouts({
+		awful.layout.suit.tile,
+		awful.layout.suit.max,
+	})
 end)
 
 client.connect_signal("mouse::enter", function (c)
@@ -920,6 +908,29 @@ client.connect_signal("unfocus", function(c)
     my_dropdown.visible = not my_dropdown.visible
     my_dropdown:display()
   end
+end)
+
+-- Git version workaround, shit is not complete (e.g. slack does not switch to)
+-- alerting chat etc. but at least hovers the app itself
+-- https://github.com/awesomeWM/awesome/issues/3182 waiting for proper fix
+naughty.connect_signal("destroyed", function(n, reason)
+	if not n.clients then return end
+	if reason == require(
+		"naughty.constants"
+	).notification_closed_reason.dismissed_by_user then
+		local jumped = false
+		for _, c in ipairs(n.clients) do
+			c.urgent = true
+			if jumped then
+				c:activate{
+					context = "client.jumpto"
+				}
+			else
+				c:jump_to()
+				jumped = true
+			end
+		end
+	end
 end)
 
 -- Show OSD notification of current status on volume:change signal
