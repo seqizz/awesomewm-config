@@ -750,24 +750,24 @@ client.connect_signal("manage", function (c)
     -- Prevent clients from being unreachable after screen count changes.
     awful.placement.no_offscreen(c)
   end
-	-- TODO: doesn't work on awesome-git
-	-- c:buttons(gears.table.join(
-		-- c:buttons(),
-		-- awful.button({ win }, 4, function (c)
-      -- c:emit_signal("request::activate", "mouse_click", {raise = true})
-      -- mousegrabber.run(function (_mouse)
-        -- c.opacity = c.opacity + 0.1
-        -- return false
-      -- end, 'mouse')
-    -- end, nil),
-    -- awful.button({ win }, 5, function (c)
-      -- c:emit_signal("request::activate", "mouse_click", {raise = true})
-      -- mousegrabber.run(function (_mouse)
-        -- c.opacity = c.opacity - 0.1
-        -- return false
-      -- end, 'mouse')
-    -- end, nil)
-	-- ))
+	-- XXX: doesn't work on awesome-git
+	c:buttons(gears.table.join(
+		c:buttons(),
+		awful.button({ win }, 4, function (c)
+			c:emit_signal("request::activate", "mouse_click", {raise = true})
+			mousegrabber.run(function (_mouse)
+				c.opacity = c.opacity + 0.1
+				return false
+			end, 'mouse')
+		end, nil),
+		awful.button({ win }, 5, function (c)
+			c:emit_signal("request::activate", "mouse_click", {raise = true})
+			mousegrabber.run(function (_mouse)
+				c.opacity = c.opacity - 0.1
+				return false
+			end, 'mouse')
+		end, nil)
+	))
 end)
 
 client.connect_signal("property::minimized", function(c)
@@ -913,25 +913,25 @@ end)
 -- Git version workaround, shit is not complete (e.g. slack does not switch to)
 -- alerting chat etc. but at least hovers the app itself
 -- https://github.com/awesomeWM/awesome/issues/3182 waiting for proper fix
-naughty.connect_signal("destroyed", function(n, reason)
-	if not n.clients then return end
-	if reason == require(
-		"naughty.constants"
-	).notification_closed_reason.dismissed_by_user then
-		local jumped = false
-		for _, c in ipairs(n.clients) do
-			c.urgent = true
-			if jumped then
-				c:activate{
-					context = "client.jumpto"
-				}
-			else
-				c:jump_to()
-				jumped = true
-			end
-		end
-	end
-end)
+-- naughty.connect_signal("destroyed", function(n, reason)
+	-- if not n.clients then return end
+	-- if reason == require(
+		-- "naughty.constants"
+	-- ).notification_closed_reason.dismissed_by_user then
+		-- local jumped = false
+		-- for _, c in ipairs(n.clients) do
+			-- c.urgent = true
+			-- if jumped then
+				-- c:activate{
+					-- context = "client.jumpto"
+				-- }
+			-- else
+				-- c:jump_to()
+				-- jumped = true
+			-- end
+		-- end
+	-- end
+-- end)
 
 -- Show OSD notification of current status on volume:change signal
 awesome.connect_signal("volume::change", function()
