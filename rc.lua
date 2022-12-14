@@ -22,7 +22,7 @@ hostname = io.popen("uname -n"):read()
 
 -- debug stuff
 -- local inspect = require 'inspect'
-local printmore = false
+local printmore = true
 
 -- my theme
 beautiful.init("/home/gurkan/.config/awesome/my_modules/my_theme.lua")
@@ -42,12 +42,8 @@ dofile ("/home/gurkan/.config/awesome/my_modules/rc_sliderstuff.lua")
 -- stuff including usernames etc
 dofile ("/home/gurkan/.config/awesome/my_modules/rc_secret.lua")
 
-docked = false
-xrandr_table = get_xrandr_outputs()
--- TODO: Fix for all environments
-if screen:count() == 2 and not my_utils.table_contains(xrandr_table, "eDP-1", false) then
-  docked = true
-end
+-- @Reference: disable notification system
+-- package.loaded["naughty.dbus"] = {}
 
 clientkeys = gears.table.join(
   -- Increase/decrease windows sizes on tiled layout: Win + asdf
@@ -113,6 +109,8 @@ clientkeys = gears.table.join(
   awful.key({ win                }, "Escape", function (c) hide_stickies() end)
 )
 
+my_systray = wibox.widget.systray()
+
 function set_keys_after_screen_new(clientkeys, globalkeys)
   if screen:count() > 1 then
     -- Shortcut for moving window between screens
@@ -148,7 +146,6 @@ greenclip_cmd = "rofi -dpi " .. dpi(80) .. " -modi 'clipboard:greenclip print' -
 rofi_cmd = "rofi -dpi " .. dpi(80) .. " -show run"
 rofi_emoji_cmd = "rofi -dpi " .. dpi(80) .. " -show emoji -modi emoji"
 proxified_chromium_cmd = 'chromium-browser --incognito --proxy-server="socks://127.0.0.1:8080" --host-resolver-rules="MAP * ~NOTFOUND, EXCLUDE 127.0.0.1"'
-gather_town_cmd = 'chromium-browser --app="https://gather.town/app/7Rxu9DG6dVHm2qDR/sysadmin-tiny" --noerrdialogs --disable-translate --no-first-run --fast --fast-start --disable-infobars --class="gathertown"  --user-data-dir=/devel/.tmp_gather_profile'
 
 win = "Mod4"
 alt = "Mod1"
@@ -230,9 +227,6 @@ separator_reverse = wibox.widget {
     gears.shape.powerline(cr, width, height, (height / 2) * (-1))
   end
 }
-
--- widgets I need
-my_systray = wibox.widget.systray()
 
 adapter_name = "BAT0"
 if my_utils.file_exists('/sys/class/power_supply/BAT1/status') then
@@ -419,28 +413,35 @@ spotify_timer = gears.timer {
 }
 
 local function screen_organizer(s, primary, is_extra)
-  -- Wallpaper -- one for each screen
-  set_wallpaper(s)
+
+	debug_print("Now organizing screen: " .. s["name"], printmore)
+
+	-- Wallpaper -- one for each screen
+  set_wallpaper(s["object"])
 
   -- Create an imagebox widget which will contain an icon indicating which layout we're using.
   -- We need one layoutbox per screen.
-  s.mylayoutbox = awful.widget.layoutbox(s)
-  s.mylayoutbox:buttons(gears.table.join(
+  s["object"].mylayoutbox = awful.widget.layoutbox(s["object"])
+  s["object"].mylayoutbox:buttons(gears.table.join(
     awful.button({ }, 1, function () awful.layout.inc( 1) end),
     awful.button({ }, 3, function () awful.layout.inc(-1) end),
     awful.button({ }, 4, function () awful.layout.inc( 1) end),
     awful.button({ }, 5, function () awful.layout.inc(-1) end)
   ))
 
+	-- some convenience stuff
+	if screen:count() > 1 then
+		taglist_width = dpi(250)
+		wibar_height = dpi(25)
+	else
+		taglist_width = dpi(350)
+		wibar_height = dpi(23)
+	end
+
   if not is_extra then
     -- Create a taglist widget
-    if screen:count() > 1 then
-      taglist_width = dpi(250)
-    else
-      taglist_width = dpi(350)
-    end
-    s.mytaglist = awful.widget.taglist {
-      screen  = s,
+    s["object"].mytaglist = awful.widget.taglist {
+      screen  = s["object"],
       filter  = awful.widget.taglist.filter.all,
       style   = {
           shape = gears.shape.powerline
@@ -476,8 +477,8 @@ local function screen_organizer(s, primary, is_extra)
     }
 
     -- Create a tasklist widget
-    s.mytasklist = awful.widget.tasklist {
-      screen  = s,
+    s["object"].mytasklist = awful.widget.tasklist {
+      screen  = s["object"],
       filter  = awful.widget.tasklist.filter.currenttags,
       style   = {
           shape = gears.shape.powerline
@@ -512,16 +513,11 @@ local function screen_organizer(s, primary, is_extra)
   end
 
   -- Create the wibox
-  if screen:count() == 1 then
-		wibar_height = dpi(23)
-  else
-		wibar_height = dpi(25)
-  end
-  s.mywibox = awful.wibar({
-    position = "top",
-    screen = s,
-    height = wibar_height
-  })
+	s["object"].mywibox = awful.wibar({
+		position = "top",
+		screen = s["object"],
+		height = wibar_height
+	})
 
   systray_right_widgets = {
     layout = wibox.layout.fixed.horizontal
@@ -545,12 +541,13 @@ local function screen_organizer(s, primary, is_extra)
   end
   table.insert(systray_right_widgets, capslock)
   table.insert(systray_right_widgets, mytextclock)
-  table.insert(systray_right_widgets, s.mylayoutbox)
+  table.insert(systray_right_widgets, s["object"].mylayoutbox)
 
   -- Add widgets to the wibox
   if is_extra then
-    -- Doesn't get much stuff on this screen
-    s.mywibox:setup {
+    -- Doesn't get much stuff on this screen by default
+		-- Only if we move some shit to it
+    s["object"].mywibox:setup {
       layout = wibox.layout.align.horizontal,
       { -- Left widgets
         layout = wibox.layout.align.horizontal,
@@ -560,14 +557,14 @@ local function screen_organizer(s, primary, is_extra)
     }
   else
     -- Normal setup, tag and taskslists
-    s.mywibox:setup {
+    s["object"].mywibox:setup {
       layout = wibox.layout.align.horizontal,
       { -- Left widgets
         layout = wibox.layout.align.horizontal,
-        s.mytaglist,
+        s["object"].mytaglist,
         separator,
       },
-      s.mytasklist, -- Middle widget
+      s["object"].mytasklist, -- Middle widget
       systray_right_widgets
     }
   end
@@ -615,39 +612,30 @@ function process_screens(systray)
 
   systray = systray or nil
 
-  xrandr_table = get_xrandr_outputs()
+	screens_table = get_screens()
 
-  debug_print("Xrandr result: " .. my_utils.dump(xrandr_table), printmore)
+  debug_print("Screens result: " .. my_utils.dump(screens_table), printmore)
 
-  for number, name in pairs(xrandr_table) do
-    if number == "primary" then
-      -- that is the helper value, ignore
-      goto skip
-    end
-
-    screen_obj = my_utils.find_screen_by_name(name)
-    debug_print("Got screen object: " .. my_utils.dump(screen_obj), printmore)
-
+  second_screen_already_processed = false
+  for name, properties in pairs(screens_table) do
     -- In case we have more than 2 screens, we will register first
     -- non-primary screen as 2nd, others won't get tags.
-    second_screen_already_processed = false
-    if xrandr_table["primary"] == name then
+    if properties["primary"] then
       -- this is the "primary" screen so it should have the systray
-      systray:set_screen(screen_obj)
-      screen_organizer(screen_obj, true)
+      systray:set_screen(properties["object"])
+      screen_organizer(properties, true, false, false)
       debug_print("Checking tags for: " .. name .. " (primary) ", printmore)
-      place_tags(screen_obj, true)
+      place_tags(properties["object"], true)
     else
-      screen_organizer(screen_obj, false, second_screen_already_processed)
+      screen_organizer(properties, false, second_screen_already_processed)
       if second_screen_already_processed then
-        debug_print("Extra screen found: " .. my_utils.dump(screen_obj), printmore)
+        debug_print("Extra screen found: " .. my_utils.dump(properties["object"]), printmore)
       else
         debug_print("Checking tags for: " .. name .. " (not primary) ", printmore)
-        place_tags(screen_obj, false)
+        place_tags(properties["object"], false)
         second_screen_already_processed = true
       end
     end
-    ::skip::
   end
   -- define rules since we have filled the screen table
   dofile ("/home/gurkan/.config/awesome/my_modules/rc_rules.lua")
@@ -656,7 +644,6 @@ function process_screens(systray)
   dofile ("/home/gurkan/.config/awesome/my_modules/rc_clientbuttons.lua")
   root.keys(globalkeys)
   set_rules(clientkeys)
-  -- font_hacks()
 end
 
 -- {{{ Mouse bindings
@@ -732,8 +719,7 @@ globalkeys = gears.table.join(
 if hostname == "innixos" or hostname == "innodellix" then
   gears.table.merge(globalkeys, gears.table.join(
     awful.key({ win          }, "v",                          function () awful.spawn("innovpn-toggle aw") end),
-    awful.key({ win, "Shift" }, "v",                          function () awful.spawn("innovpn-toggle af") end),
-    awful.key({ win          }, "g",                          function () awful.spawn(gather_town_cmd) end)
+    awful.key({ win, "Shift" }, "v",                          function () awful.spawn("innovpn-toggle af") end)
   ))
 end
 
@@ -785,10 +771,20 @@ end)
 
 -- Screen handling
 screen.connect_signal("list", function()
-  naughty.notify({text = "Reorganizing tags"})
-  process_screens(my_systray)
+	debug_print("List signal received", true)
+	if my_utils.file_exists('/home/gurkan/.awesome_screen_setup_lock') then
+		debug_print("There is already another lock waiting, skipping this screen change", true)
+	else
+		os.execute('touch /home/gurkan/.awesome_screen_setup_lock')
+		debug_print("Sleeping for 3 secs", true)
+		os.execute('sleep 3')
+		process_screens(my_systray)
+		os.execute('rm /home/gurkan/.awesome_screen_setup_lock')
+	end
 end)
 
+--cleanup
+os.execute('rm -f /home/gurkan/.awesome_screen_setup_lock')
 process_screens(my_systray)
 
 tag.connect_signal("request::screen", function(t)

@@ -178,7 +178,6 @@ function move_focused_client_to_tag(tag_name)
 	end
 end
 
-
 function hide_stickies()
   local cls = client.get()
   local stickies = {}
@@ -239,33 +238,33 @@ function run_once(program, grep_for, on_tag)
 	)
 end
 
--- experimental fs-level locking for internal ops
-function lock(action)
-	if action == "is_locked" then
-		if os.execute("ls /tmp/.awesome_lock >/dev/null 2>&1") then
-			return true
-		else
-			return false
-		end
-	end
-
-	if action == "lock" then
-		if os.execute("mkdir /tmp/.awesome_lock >/dev/null 2>&1") then
-			return true
-		else
-			return false
-		end
-	end
-
-	if action == "unlock" then
-		if os.execute("rmdir /tmp/.awesome_lock >/dev/null 2>&1") then
-			return true
-		else
-			return false
-		end
-	end
-
-end
+-- @Reference experimental fs-level locking for internal ops
+-- function lock(action)
+-- 	if action == "is_locked" then
+-- 		if os.execute("ls /tmp/.awesome_lock >/dev/null 2>&1") then
+-- 			return true
+-- 		else
+-- 			return false
+-- 		end
+-- 	end
+--
+-- 	if action == "lock" then
+-- 		if os.execute("mkdir /tmp/.awesome_lock >/dev/null 2>&1") then
+-- 			return true
+-- 		else
+-- 			return false
+-- 		end
+-- 	end
+--
+-- 	if action == "unlock" then
+-- 		if os.execute("rmdir /tmp/.awesome_lock >/dev/null 2>&1") then
+-- 			return true
+-- 		else
+-- 			return false
+-- 		end
+-- 	end
+--
+-- end
 
 function set_wallpaper(s)
   -- choose random wallpaper
@@ -316,173 +315,77 @@ function load_last_active_tag()
     end
 end
 
-local function parse_transformations(text, assume_normal)
-  local rot = { normal = (assume_normal or false), left = false, right = false, inverted = false}
-  local refl = { x = false, y = false, normal = (assume_normal or false) }
-  for word in text:gmatch("(%w+)") do
-    for k, _v in pairs(rot) do
-      if k == word then rot[k] = true end
-    end
-    for k, _v in pairs(refl) do
-      if k == word:lower() then refl[k] = true end
+function string:firstword()
+    -- matches the first word and returns it, or it returns nil
+    return self:match("^([%w\\-]+)");
+end
+
+function string:resolutions()
+    -- returns resolutions (x and y) from xrandr output line
+    local needed_word = self:match("[^%s]+ [^%s]+ [^%s]+ ([^%s]+)")
+    return needed_word:match("(%d+)x(%d+)")
+end
+
+function find_screen_by_name(name)
+  for s in screen do
+    for screen_name, _ in pairs(s.outputs) do
+      if screen_name == name then
+        return s
+      end
     end
   end
-  return { rotations = rot, reflections = refl }
 end
 
-function string:firstword()
-    return self:match("^([%w\\-]+)"); -- matches the first word and returns it, or it returns nil
-end
-
-function get_xrandr_outputs()
+function get_screens()
 	local output_tbl = {}
 	local xrandr = io.popen("xrandr -q --current | grep -E ' connected (primary )?[0-9]'")
 
 	if xrandr then
         for line in xrandr:lines() do
-            output_tbl[#output_tbl + 1] = line:firstword()
-            if string.match(line, " primary ") then
-                output_tbl['primary'] = line:firstword()
+            name = line:firstword()
+            screen_obj = my_utils.find_screen_by_name(name)
+            if screen_obj == nil then
+                goto skipanother
             end
+            width, height = line:resolutions()
+            output_tbl[name] = {}
+            primary = false
+            if string.match(line, " primary ") then
+                primary = true
+            end
+            output_tbl[name]["name"] = name -- oh well..
+            output_tbl[name]["primary"] = primary
+            output_tbl[name]["width"] = width
+            output_tbl[name]["height"] = height
+            output_tbl[name]["object"] = screen_obj
+            ::skipanother::
         end
         xrandr:close()
 	end
 
+    -- now check if there is any fake screens needed to be added
+    -- if the screen is too wide, we will create a fake screen and add it to the table
+    for name, properties in pairs(output_tbl) do
+        if properties["object"] == nil then
+            goto skip
+        end
+        local geo = properties["object"].geometry
+        if ( geo.width / geo.height) > 2 then
+            local new_width = math.ceil(geo.width/2)
+            local new_width2 = geo.width - new_width
+            properties["object"]:fake_resize(geo.x + new_width, geo.y, new_width, geo.height)
+            fake_obj = screen.fake_add(geo.x, geo.y, new_width2, geo.height)
+            fake_screen_name = name .. "_sub_" .. my_utils.random_string(2)
+            output_tbl[fake_screen_name] = {}
+            output_tbl[fake_screen_name]["is_fake"] = true
+            output_tbl[fake_screen_name]["name"] = fake_screen_name
+            output_tbl[fake_screen_name]["parent"] = output_tbl[name]
+            output_tbl[fake_screen_name]["object"] = fake_obj
+            output_tbl[fake_screen_name]["primary"] = false
+        end
+        ::skip::
+    end
+
 	return output_tbl
 end
 
-function xrandr_info(fp)
-  local info = { screens = {}, outputs = {} }
-  local current_output
-  local last_property
-  local pats = {
-    ['^Screen (%d+): minimum (%d+) x (%d+), current (%d+) x (%d+), maximum (%d+) x (%d+)$'] = function(matches)
-      -- X screens. Usually just one, when used with Xinerama
-      info.screens[tonumber(matches[1])] = {
-        minimum = { tonumber(matches[2]), tonumber(matches[3]) },
-        resolution = { tonumber(matches[4]), tonumber(matches[5]) },
-        maximum = { tonumber(matches[6]), tonumber(matches[7]) }
-      }
-    end,
-    ['^([-%a%d]+) connected ([%S]-)%s*(%d+)x(%d+)+(%d+)+(%d+)%s*(.-)%(([%a%s]+)%) (%d+)mm x (%d+)mm$'] = function(matches)
-      -- Match connected and active outputs
-      current_output = {
-        name = matches[1],
-
-        resolution = { tonumber(matches[3]), tonumber(matches[4]) },
-        offset = { tonumber(matches[5]), tonumber(matches[6]) },
-        transformations = parse_transformations(matches[7]),
-        available_transformations = parse_transformations(matches[8], false),
-        physical_size = { tonumber(matches[9]), tonumber(matches[10]) },
-        connected = true,
-        on = true,
-        primary = (matches[2] == 'primary'),
-        modes = {},
-        properties = {},
-        edid = ''
-      }
-      info.outputs[matches[1]] = current_output
-    end,
-    ['^([-%a%d]+) connected %(([%a%s]+)%)$'] = function(matches)
-      -- DVI-1 connected (normal left inverted right x axis y axis)
-      -- Match outputs that are connected but disabled
-      current_output = {
-        name = matches[1],
-        available_transformations = parse_transformations(matches[2], false),
-        transformations = parse_transformations(''),
-        modes = {},
-        connected = true,
-        on = false,
-        properties = {},
-        edid = ''
-      }
-      info.outputs[matches[1]] = current_output
-    end,
-    ['^([-%a%d]+) disconnected .*%(([%a%s]+)%)$'] = function(matches)
-      -- Match disconnected outputs
-      current_output = {
-        available_transformations = parse_transformations(matches[2], false),
-        connected = false, on = false,
-        properties = {},
-        edid = ''
-      }
-      info.outputs[matches[1]] = current_output
-    end,
-    ['^%s%s%s(%d+)x(%d+)%s+(.+)$'] = function(matches)
-      -- Match modelines. Only care about resolution and refresh.
-      local w = tonumber(matches[1])
-      local h = tonumber(matches[2])
-      for refresh, symbols in matches[3]:gmatch('([%d.]+)(..)') do
-        local mode = { w, h, math.floor(tonumber(refresh)) }
-        local modes = current_output.modes
-        modes[#modes + 1] = mode
-        if symbols:find('%*') then
-          current_output.current_mode = mode
-        end
-        if symbols:find('%+') then
-          current_output.default_mode = mode
-        end
-      end
-    end,
-    ['^\t(.+):%s+(.+)%s+$'] = function(matches)
-      -- Match properties, which are rather freeform
-      last_property = matches[1]
-      local properties = current_output.properties
-      properties[last_property] = { value = matches[2] }
-    end,
-    ['^\t\tsupported:%s+(.+)$'] = function(matches)
-      -- Match supported property values, freeform but comma separated
-      if last_property ~= nil then
-        local prop = current_output.properties[last_property]
-        local supported = { }
-        for word in matches[1]:gmatch('([^,]+),?%s?') do
-          supported[#supported + 1] = word
-        end
-        prop.supported = supported
-      end
-    end,
-    ['^\t\t(' .. string.rep('[0-9a-f]', 32) .. ')$'] = function(matches)
-      -- Match EDID block
-      current_output.edid = current_output.edid .. matches[1]
-    end,
-    ['^\t\trange:%s+%((%d+), (%d+)%)$'] = function(matches)
-      -- Match ranged property values, e.g. brightness
-      if last_property ~= nil then
-        local prop = current_output.properties[last_property]
-        local range = { tonumber(matches[1]), tonumber(matches[2]) }
-        prop.range = range
-      end
-    end
-  }
-
-  fp = fp or io.popen('xrandr --query --prop', 'r')
-  for line in fp:lines() do
-    for pat, func in pairs(pats) do
-      local res
-      res = {line:find(pat)}
-      if #res > 0 then
-        table.remove(res, 1)
-        table.remove(res, 1)
-        func(res)
-        break
-      end
-    end
-  end
-  return info
-end
-
-function font_hacks()
-  -- some magic for terminal font size
-  if screen:count() > 1 then
-    awful.spawn('sed -i --follow-symlinks "s/size: .*/size: 13.0/" /home/gurkan/.config/alacritty/alacritty.yml')
-    awful.spawn('sed -i --follow-symlinks "s/    font_size = .*/    font_size = 16.0,/" /home/gurkan/.wezterm.lua')
-  else
-    xrandr_table = get_xrandr_outputs()
-    if my_utils.table_contains(xrandr_table, "DP-1-2", false) then
-      awful.spawn('sed -i --follow-symlinks "s/    font_size = .*/    font_size = 13.0,/" /home/gurkan/.wezterm.lua')
-    else
-      awful.spawn('sed -i --follow-symlinks "s/size: .*/size: 10.0/" /home/gurkan/.config/alacritty/alacritty.yml')
-      awful.spawn('sed -i --follow-symlinks "s/    font_size = .*/    font_size = 17.5,/" /home/gurkan/.wezterm.lua')
-    end
-  end
-end

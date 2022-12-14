@@ -48,39 +48,6 @@ function my_utils.table_contains(table, element, check_key)
   return false
 end
 
-function my_utils.is_screen_primary_new(s)
-  local answer = false
-
-  xrandr_table = get_xrandr_outputs()
-  for screen_name, _ in pairs(s.outputs) do
-    if my_utils.table_contains(xrandr_table, "primary", true) then
-      if xrandr_table['primary'] == screen_name then
-        answer = true
-      end
-    end
-  end
-  return answer
-end
-
-function my_utils.is_screen_primary(s)
-  local answer = false
-
-  known_primary_screens = {
-      "eDP1", -- laptop monitor (innodellix)
-      "eDP-1", -- laptop monitor (msi)
-      "DP3-2", -- main external monitor on dock
-      "DP-3-2", -- main external monitor on dock
-      "DP-1-2", -- single external monitor on dock
-  }
-  for screen_name, _ in pairs(s.outputs) do
-      if my_utils.table_contains(known_primary_screens, screen_name) then
-          answer = true
-      end
-      -- debug_print(screen_name .. " is primary? " .. tostring(answer), true)
-  end
-  return answer
-end
-
 local function file_exists(file)
   local f = io.open(file, "rb")
   if f then f:close() end
@@ -168,6 +135,9 @@ end
 
 function my_utils.find_screen_by_name(name)
   for s in screen do
+    if my_utils.table_length(s.outputs) == 0 and name == "fake_screen" then
+        return s
+    end
     for screen_name, _ in pairs(s.outputs) do
       if screen_name == name then
         return s
@@ -176,7 +146,7 @@ function my_utils.find_screen_by_name(name)
   end
 end
 
-function split_string(pString, pPattern)
+function my_utils.split_string(pString, pPattern)
    local Table = {n = 0}
    local fpat = "(.-)" .. pPattern
    local last_end = 1
@@ -193,6 +163,18 @@ function split_string(pString, pPattern)
       table.insert(Table, cap)
    end
    return Table
+end
+
+local charset = {}  do -- [0-9a-zA-Z]
+    for c = 48, 57  do table.insert(charset, string.char(c)) end
+    for c = 65, 90  do table.insert(charset, string.char(c)) end
+    for c = 97, 122 do table.insert(charset, string.char(c)) end
+end
+
+function my_utils.random_string(length)
+    if not length or length <= 0 then return '' end
+    math.randomseed(os.clock()^5)
+    return my_utils.random_string(length - 1) .. charset[math.random(1, #charset)]
 end
 
 return my_utils
