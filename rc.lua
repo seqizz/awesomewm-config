@@ -22,7 +22,7 @@ hostname = io.popen("uname -n"):read()
 
 -- debug stuff
 -- local inspect = require 'inspect'
-local printmore = true
+local printmore = false
 
 -- my theme
 beautiful.init("/home/gurkan/.config/awesome/my_modules/my_theme.lua")
@@ -608,11 +608,9 @@ function place_tags(screen_obj, primary)
   end
 end
 
-function process_screens(systray)
+function process_screens(systray, screens_table)
 
   systray = systray or nil
-
-	screens_table = get_screens()
 
   debug_print("Screens result: " .. my_utils.dump(screens_table), printmore)
 
@@ -702,8 +700,8 @@ globalkeys = gears.table.join(
   awful.key({ ctrl, alt    }, "p",                          function () notifytest() end),
   awful.key({ win          }, "f",                          function () awful.spawn(browser) end),
   awful.key({ win          }, "l",                          function () awful.spawn("sudo slock") end),
-  awful.key({ win          }, "k",                          function () keyboard_widget:toggle() end),
-  awful.key({ win          }, "e",                          function () keyboard_widget:toggle() end),
+  -- awful.key({ win          }, "k",                          function () keyboard_widget:toggle() end),
+  -- awful.key({ win          }, "e",                          function () keyboard_widget:toggle() end),
   -- If something goes wrong with grobi
   awful.key({ win          }, "m",                          function () awful.spawn("grobi apply mobile") end),
   -- Cycle between available layouts
@@ -772,20 +770,24 @@ end)
 -- Screen handling
 screen.connect_signal("list", function()
 	debug_print("List signal received", true)
-	if my_utils.file_exists('/home/gurkan/.awesome_screen_setup_lock') then
+	-- if my_utils.file_exists('/home/gurkan/.awesome_screen_setup_lock') then
+	if my_utils.file_age('/home/gurkan/.awesome_screen_setup_lock') < 5 then
 		debug_print("There is already another lock waiting, skipping this screen change", true)
 	else
 		os.execute('touch /home/gurkan/.awesome_screen_setup_lock')
 		debug_print("Sleeping for 3 secs", true)
 		os.execute('sleep 3')
-		process_screens(my_systray)
-		os.execute('rm /home/gurkan/.awesome_screen_setup_lock')
+		screens_table = get_screens()
+		process_screens(my_systray, screens_table)
+		-- os.execute('rm /home/gurkan/.awesome_screen_setup_lock')
 	end
 end)
 
 --cleanup
-os.execute('rm -f /home/gurkan/.awesome_screen_setup_lock')
-process_screens(my_systray)
+-- os.execute('rm -f /home/gurkan/.awesome_screen_setup_lock')
+os.execute('touch /home/gurkan/.awesome_screen_setup_lock')
+screens_table = get_screens()
+process_screens(my_systray, screens_table)
 
 tag.connect_signal("request::screen", function(t)
   -- recover tags on a removed screen
@@ -880,6 +882,20 @@ tag.connect_signal("property::layout", function(t)
     c:raise()
   end
 end)
+
+last_focused_screen = nil
+
+client.connect_signal("focus", function(c)
+	if last_focused_screen ~= c.screen then
+		if last_focused_screen == nil then
+			enlarge_screen(c.screen, screens_table, true)
+		else
+			enlarge_screen(c.screen, screens_table, false)
+		end
+		last_focused_screen = c.screen
+	end
+end)
+-- client.connect("property::screen", function(c) if client.focus == c then print("the current client changed!", c) end end
 
 client.connect_signal("property::size", function(c)
   -- workaround for exiting fullscreen on floating windows

@@ -266,6 +266,47 @@ end
 --
 -- end
 
+function get_child_of(s, screens_table)
+    for name, properties in pairs(screens_table) do
+        if properties["object"] == s then
+            goto skipthis
+        end
+        if properties["parent"] == nil then
+            goto skipthis
+        end
+        if properties["parent"]["object"] == s then
+            return properties["object"]
+        end
+        ::skipthis::
+    end
+    return nil
+end
+
+function enlarge_screen(s, screens_table, initial)
+    if initial then
+        diff = 150
+    else
+        diff = 300
+    end
+    for name, properties in pairs(screens_table) do
+        if properties["object"] == s then
+            -- I found my screen
+            if properties["is_fake"] then
+                local geo = s.geometry
+                local parent_geo = properties["parent"]["object"].geometry
+                s:fake_resize(geo.x, geo.y, geo.width + diff, geo.height)
+                properties["parent"]["object"]:fake_resize(parent_geo.x + diff, parent_geo.y, parent_geo.width - diff, parent_geo.height)
+            else
+                local geo = s.geometry
+                child = get_child_of(s, screens_table)
+                local fake_geo = child.geometry
+                s:fake_resize(geo.x - diff, geo.y, geo.width + diff, geo.height)
+                child:fake_resize(fake_geo.x, fake_geo.y, fake_geo.width - diff, fake_geo.height)
+            end
+        end
+    end
+end
+
 function set_wallpaper(s)
   -- choose random wallpaper
   awful.spawn.easy_async(
@@ -358,6 +399,7 @@ function get_screens()
             output_tbl[name]["width"] = width
             output_tbl[name]["height"] = height
             output_tbl[name]["object"] = screen_obj
+            output_tbl[name]["parent"] = nil
             ::skipanother::
         end
         xrandr:close()

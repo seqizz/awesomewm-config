@@ -48,14 +48,15 @@ function my_utils.table_contains(table, element, check_key)
   return false
 end
 
-local function file_exists(file)
-  local f = io.open(file, "rb")
-  if f then f:close() end
-  return f ~= nil
+function my_utils.file_age(file)
+  -- get seconds from file's last modification time
+  local f = io.popen("stat -c %Y " .. file)
+  local file_age = f:read()
+  return os.difftime(os.time(), file_age)
 end
 
 function my_utils.read_lines_from(file)
-  if not file_exists(file) then return {} end
+  if not my_utils.file_exists(file) then return {} end
   lines = {}
   for line in io.lines(file) do
     lines[#lines + 1] = line
