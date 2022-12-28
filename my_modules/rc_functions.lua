@@ -282,16 +282,18 @@ function get_child_of(s, screens_table)
     return nil
 end
 
-function enlarge_screen(s, screens_table, initial)
-    if initial then
-        diff = 150
+function resize_screen(s, screens_table, shrink)
+    if shrink then
+        diff = -dpi(50)
     else
-        diff = 300
+        diff = dpi(50)
     end
     for name, properties in pairs(screens_table) do
         if properties["object"] == s then
             -- I found my screen
             if properties["is_fake"] then
+                -- this is a fake screen which has a sibling (parent)
+                -- whatever you do here, do the reverse to the parent
                 local geo = s.geometry
                 local parent_geo = properties["parent"]["object"].geometry
                 s:fake_resize(geo.x, geo.y, geo.width + diff, geo.height)
@@ -299,9 +301,16 @@ function enlarge_screen(s, screens_table, initial)
             else
                 local geo = s.geometry
                 child = get_child_of(s, screens_table)
+                if child == nil then
+                    -- this screen has no fake screen under it, noop
+                    goto nochange
+                end
+                -- this is a screen which has a fake screen sibling
+                -- whatever you do here, do the reverse to the parent
                 local fake_geo = child.geometry
                 s:fake_resize(geo.x - diff, geo.y, geo.width + diff, geo.height)
                 child:fake_resize(fake_geo.x, fake_geo.y, fake_geo.width - diff, fake_geo.height)
+                ::nochange::
             end
         end
     end

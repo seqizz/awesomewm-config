@@ -106,7 +106,9 @@ clientkeys = gears.table.join(
   -- Sticky toggle for window: Ctrl + Alt + Shift + s
   awful.key({ ctrl, alt, "Shift" }, "s",      function (c) sticky_toggle(c) end),
   -- Hide stickies to the bottom-right corner (toggle) : Win + Esc
-  awful.key({ win                }, "Escape", function (c) hide_stickies() end)
+  awful.key({ win                }, "Escape", function (c) hide_stickies() end),
+  awful.key({                    }, "F7",     nil, function (c) resize_screen(c.screen, screens_table, false) end),
+  awful.key({                    }, "F8",     nil, function (c) resize_screen(c.screen, screens_table, true) end)
 )
 
 my_systray = wibox.widget.systray()
@@ -516,7 +518,7 @@ local function screen_organizer(s, primary, is_extra)
 	s["object"].mywibox = awful.wibar({
 		position = "top",
 		screen = s["object"],
-		height = wibar_height
+		height = wibar_height,
 	})
 
   systray_right_widgets = {
@@ -882,20 +884,6 @@ tag.connect_signal("property::layout", function(t)
     c:raise()
   end
 end)
-
-last_focused_screen = nil
-
-client.connect_signal("focus", function(c)
-	if last_focused_screen ~= c.screen then
-		if last_focused_screen == nil then
-			enlarge_screen(c.screen, screens_table, true)
-		else
-			enlarge_screen(c.screen, screens_table, false)
-		end
-		last_focused_screen = c.screen
-	end
-end)
--- client.connect("property::screen", function(c) if client.focus == c then print("the current client changed!", c) end end
 
 client.connect_signal("property::size", function(c)
   -- workaround for exiting fullscreen on floating windows
