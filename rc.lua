@@ -112,6 +112,7 @@ clientkeys = gears.table.join(
 )
 
 my_systray = wibox.widget.systray()
+my_systray:set_base_size(dpi(24))
 
 function set_keys_after_screen_new(clientkeys, globalkeys)
   if screen:count() > 1 then
@@ -698,6 +699,7 @@ globalkeys = gears.table.join(
   awful.key({ win          }, "p",                          function () awful.spawn("rofi-pass") end),
   awful.key({ ctrl, alt    }, "t",                          function () awful.spawn(terminal) end),
   awful.key({ win          }, "c",                          function () awful.spawn("chromium-browser") end),
+  awful.key({ win          }, "u",                          function () awful.spawn("/home/gurkan/clicky") end),
   -- awful.key({ ctrl, alt    }, "p",                          function () reset_pulse() end),
   awful.key({ ctrl, alt    }, "p",                          function () notifytest() end),
   awful.key({ win          }, "f",                          function () awful.spawn(browser) end),
@@ -980,7 +982,7 @@ awesome.connect_signal("startup", function(s, state)
     run_once("sleep 5 && slack -s", "slack")
     run_once("sleep 8 && thunderbird", "thunderbird")
   end
-  run_once("telegram-desktop")
+  run_once("XDG_CURRENT_DESKTOP=gnome telegram-desktop", "telegram")
   run_once("pasystray")
 	run_once("wezterm start --class mainqterm", "mainqterm", "term")
 	-- run_once("wezterm connect default --class mainqterm", "mainqterm", "term")
