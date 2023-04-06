@@ -11,36 +11,47 @@ vb_slider = awful.popup {
   {
     max_value        = 100,
     value            = 33,
-    forced_height    = dpi(4),
+    forced_height    = dpi(15),
     forced_width     = dpi(250),
-    --border_width     = 0,
-    border_color     = beautiful.border_normal, -- .. " 00",
-    background_color = beautiful.slider_bg,
-    color            = beautiful.slider_bg,
-    bar_shape        = helpers.rrect(beautiful.border_radius),
+    background_color = beautiful.slider_bg .. "50",
+    shape            = gears.shape.rounded_bar,
+    border_width     = 0,
     widget           = wibox.widget.progressbar,
   },
   visible   = false,
+  bg        = "#00000000", -- fully transparent
   ontop     = true,
   shape     = helpers.rrect(beautiful.border_radius),
-  placement = awful.placement.centered,
+  placement = function(c) awful.placement.bottom_right(c, {
+    honor_workarea = true,
+    margins        = {
+      bottom = dpi(200),
+      right  = dpi(200)
+    }
+  }) end,
 }
 
-vb_textinfo= awful.popup {
-  widget =
-  {
-    forced_height    = dpi(20),
-    forced_width     = dpi(150),
-    border_color     = beautiful.border_normal, -- .. " 00",
-    background_color = beautiful.slider_bg,
-    color            = beautiful.slider_bg,
-    bar_shape        = helpers.rrect(beautiful.border_radius),
-    widget           = wibox.widget.textbox,
+vb_textinfo = awful.popup {
+  widget = {
+    font         = beautiful.font_name .. dpi(12),
+    align        = 'center',
+    border_color = beautiful.border_normal, -- .. " 00",
+    color        = beautiful.slider_bg,
+    bar_shape    = helpers.rrect(beautiful.border_radius),
+    widget       = wibox.widget.textbox,
+    -- TODO: Add margins to the text
   },
   visible   = false,
+  bg        = beautiful.bg_notification.. "60",
   ontop     = true,
-  shape     = helpers.rrect(beautiful.border_radius),
-  placement = awful.placement.centered,
+  shape     = helpers.rrect(10),
+  placement = function(c) awful.placement.bottom_right(c, {
+    honor_workarea = true,
+    margins        = {
+      bottom = dpi(200),
+      right  = dpi(200)
+    }
+  }) end,
 }
 
 slider_timer = gears.timer({
@@ -48,6 +59,7 @@ slider_timer = gears.timer({
 	callback = function()
 		vb_slider.visible = false
 		vb_textinfo.visible = false
+        testpop.visible = false
 	end
 })
 
@@ -55,31 +67,31 @@ triggerwibox = function(action)
   vb_slider.screen = awful.screen.focused()
   vb_textinfo.screen = awful.screen.focused()
   if action == 'volume' then
-    vb_slider.widget.color = beautiful.slider_sound_fg
+    vb_slider.widget.color = beautiful.slider_sound_fg .. "AA"
     vb_textinfo.visible = false
     vb_slider.visible = true
   elseif action == 'brightness' then
-    vb_slider.widget.color = beautiful.slider_brightness_fg
+    vb_slider.widget.color = beautiful.slider_brightness_fg .. "AA"
     vb_textinfo.visible = false
     vb_slider.visible = true
   elseif action == 'mute' then
-    vb_textinfo.widget.markup = '  🔇 Mute Toggle'
+    vb_textinfo.widget.markup = '  🔇 \n <i>Mute Toggle</i>'
     vb_slider.visible = false
     vb_textinfo.visible = true
   elseif string.match(action, 'Stopped') then
-    vb_textinfo.widget.markup = '⬛ Stopped'
+    vb_textinfo.widget.markup = '⬛ <i>Stopped</i>'
     vb_slider.visible = false
     vb_textinfo.visible = true
   elseif string.match(action, 'Playing') then
-    vb_textinfo.widget.markup = '▶️ Playing'
+    vb_textinfo.widget.markup = '▶️ <i>Playing</i>'
     vb_slider.visible = false
     vb_textinfo.visible = true
   elseif string.match(action, 'Paused') then
-    vb_textinfo.widget.markup = '⏸️ Paused'
+    vb_textinfo.widget.markup = '⏸️ <i>Paused</i>'
     vb_slider.visible = false
     vb_textinfo.visible = true
   elseif action == 'micmute' then
-    vb_textinfo.widget.markup = '🎙️🔇 Mic Mute Toggle'
+    vb_textinfo.widget.markup = '🎙️🔇 \n <i>Mic Mute Toggle</i>'
     vb_slider.visible = false
     vb_textinfo.visible = true
   end

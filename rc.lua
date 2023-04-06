@@ -471,7 +471,7 @@ local function screen_organizer(s, primary, is_extra)
               },
               left  = 24,
               right = 12,
-              widget = wibox.container.margin
+              widget = wibox.container.margin,
           },
           id     = 'background_role',
           widget = wibox.container.background,

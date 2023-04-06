@@ -12,9 +12,10 @@ local themes_path = gfs.get_themes_dir()
 
 local theme = {}
 
-theme.font = "FiraCode Nerd Font Medium 10"
-theme.font_big = "FiraCode Nerd Font Medium 12"
-theme.font_small = "FiraCode Nerd Font Medium 8"
+theme.font_name = "FiraCode Nerd Font Medium"
+theme.font = theme.font_name .. " 10"
+theme.font_big = theme.font_name .. " 12"
+theme.font_small = theme.font_name .. " 8"
 theme.emoji_font = "Twitter Color Emoji"
 
 theme.maximized_hide_border = true
@@ -26,6 +27,8 @@ theme.bg_focus      = "#504945"
 theme.bg_urgent     = "#dc322f"
 theme.bg_minimize   = theme.bg_normal
 theme.bg_systray    = theme.bg_normal
+
+theme.nord_mid      = "#81a1c1"
 
 theme.fg_normal       = "#d79921"
 theme.fg_normal_alt   = "#fabd2f"
@@ -44,7 +47,7 @@ theme.separator     = theme.bg_focus
 
 theme.slider_bg            = "#e3e3e3"
 theme.slider_sound_fg      = theme.fg_normal
-theme.slider_brightness_fg = theme.fg_normal_alt
+theme.slider_brightness_fg = theme.nord_mid
 theme.border_radius        = 2
 
 -- relative paths, so fucking easy with lua..
