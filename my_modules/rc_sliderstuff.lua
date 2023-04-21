@@ -59,7 +59,6 @@ slider_timer = gears.timer({
 	callback = function()
 		vb_slider.visible = false
 		vb_textinfo.visible = false
-        testpop.visible = false
 	end
 })
 
