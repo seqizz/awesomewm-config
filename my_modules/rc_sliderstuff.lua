@@ -74,7 +74,7 @@ triggerwibox = function(action)
     vb_textinfo.visible = false
     vb_slider.visible = true
   elseif action == 'mute' then
-    vb_textinfo.widget.markup = '  🔇 \n <i>Mute Toggle</i>'
+    vb_textinfo.widget.markup = '  🔇 \n <i>Sound muted</i>'
     vb_slider.visible = false
     vb_textinfo.visible = true
   elseif string.match(action, 'Stopped') then

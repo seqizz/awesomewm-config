@@ -707,7 +707,7 @@ globalkeys = gears.table.join(
   -- awful.key({ win          }, "k",                          function () keyboard_widget:toggle() end),
   -- awful.key({ win          }, "e",                          function () keyboard_widget:toggle() end),
   -- If something goes wrong with grobi
-  awful.key({ win          }, "m",                          function () awful.spawn("grobi apply mobile") end),
+  awful.key({ win          }, "m",                          function () awful.spawn("autorandr single") end),
   -- Cycle between available layouts
   awful.key({ win          }, "space",                      function () awful.layout.inc(1) end),
   awful.key({ win          }, "x",                          function () awful.spawn("pcmanfm-qt") end),
@@ -941,9 +941,13 @@ awesome.connect_signal("volume::change", function()
   awful.spawn.easy_async(
     "pamixer --get-mute",
     function(stdout, stderr, reason, exit_code)
-    if exit_code == 0 then
-      return
-    else
+		-- f*king whitespaces
+		stdout = stdout:gsub("%s+", "")
+    if stdout == 'true' then
+			-- muted, only show state
+        triggerwibox('mute')
+			return
+		else
       helpers.async("pamixer --get-volume", function(out)
         vb_slider.widget.value = tonumber(out)
         triggerwibox('volume')
