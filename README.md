@@ -33,5 +33,7 @@ Highlights:
 TODO: Add list of all shortcuts
 
 
-![screenshot](./screenshot.jpg)
+![screenshot single screen](./screenshot.jpg)
+  
+![screenshot double screens](./screenshot2.jpg)
 
