@@ -48,11 +48,14 @@ function my_utils.table_contains(table, element, check_key)
   return false
 end
 
-function my_utils.file_age(file)
+function my_utils.file_age(file, printmore)
   -- get seconds from file's last modification time
   local f = io.popen("stat -c %Y " .. file)
   local file_age = f:read()
-  return os.difftime(os.time(), file_age)
+  local myval = os.difftime(os.time(), file_age)
+  debug_print("file_age: " .. myval .. " seconds", printmore)
+  f:close()
+  return myval
 end
 
 function my_utils.read_lines_from(file)
@@ -81,10 +84,11 @@ function my_utils.table_length(inputtable)
 end
 
 function my_utils.get_first_word(s)
-  local words = {}
-  words[1], words[2] = s:match("(%w+)(%W+)")
-  if words[1] == nil then words[1] = s end
-  return words[1]
+  local spaces_removed = s:match("(%S+)")
+  local under_removed = spaces_removed:match("([^_]+)")
+  -- words[1], words[2] = s:match("(%w+)(%W+)")
+  -- if under_removed == nil then under_removed = s end
+  return under_removed
 end
 
 function my_utils.get_randomseed(b, m, r)

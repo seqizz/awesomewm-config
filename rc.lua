@@ -20,8 +20,7 @@ local edid = require('my_modules/edid')
 local dpi = require('beautiful').xresources.apply_dpi
 hostname = io.popen("uname -n"):read()
 
--- debug stuff
--- local inspect = require 'inspect'
+-- debug stuff if needed
 local printmore = false
 
 -- my theme
@@ -126,10 +125,10 @@ function set_keys_after_screen_new(clientkeys, globalkeys)
 	-- not sure why we're doing 10+ here 🤷
 	globalkeys = gears.table.join(
 		globalkeys,
-		awful.key({win}, "#10", function() switch_to_tag_new("web", printmore) end),
-		awful.key({win}, "#11", function() switch_to_tag_new("mail", printmore) end),
-		awful.key({win}, "#12", function() switch_to_tag_new("term", printmore) end),
-		awful.key({win}, "#13", function() switch_to_tag_new("chat", printmore) end),
+		awful.key({win}, "#10", function() switch_to_tag("web", printmore) end),
+		awful.key({win}, "#11", function() switch_to_tag("mail", printmore) end),
+		awful.key({win}, "#12", function() switch_to_tag("term", printmore) end),
+		awful.key({win}, "#13", function() switch_to_tag("chat", printmore) end),
 		awful.key({win, "Shift"}, "#10", function() move_focused_client_to_tag("web") end),
 		awful.key({win, "Shift"}, "#11", function() move_focused_client_to_tag("mail") end),
 		awful.key({win, "Shift"}, "#12", function() move_focused_client_to_tag("term") end),
@@ -573,26 +572,37 @@ local function screen_organizer(s, primary, is_extra)
   end
 end
 
-function place_tags(screen_obj, primary)
-  if screen:count() == 1 then
+function place_tags(properties, primary, screens_table)
+  if my_utils.table_length(screens_table) == 1 then
     -- Only 1 screen here, no need for drama
     for _, tag in pairs(root.tags()) do
-      if tag.screen ~= screen_obj then
-        tag.screen = screen_obj
+			table.insert(screens_table[properties["name"]]["tags"], tag)
+      if tag.screen ~= properties["object"] then
+        tag.screen = properties["object"]
       end
     end
+
   else
     for _, tag in pairs(root.tags()) do
-      if primary == false and ( tag.name == "web" or tag.name == "mail") then
-        if tag.screen ~= screen_obj then
-          debug_print("Re-assigning " .. tag.name, printmore)
-          tag.screen = screen_obj
+			local first_word = my_utils.get_first_word(tag.name)
+      if primary == false and ( first_word == "web" or first_word == "mail") then
+        if tag.screen ~= properties["object"] then
+          debug_print("Re-assigning " .. first_word, printmore)
+          tag.screen = properties["object"]
+					table.insert(screens_table[properties["name"]]["tags"], tag)
+				else
+					debug_print(first_word .. " is already on correct screen", printmore)
+					table.insert(screens_table[properties["name"]]["tags"], tag)
         end
-      elseif primary == true and ( tag.name == "term" or tag.name == "chat") then
-        if tag.screen ~= screen_obj then
-          debug_print("Re-assigning " .. tag.name, printmore)
-          tag.screen = screen_obj
-        end
+      elseif primary == true and ( first_word == "term" or first_word == "chat") then
+        if tag.screen ~= properties["object"] then
+          debug_print("Re-assigning " .. first_word, printmore)
+          tag.screen = properties["object"]
+					table.insert(screens_table[properties["name"]]["tags"], tag)
+				else
+					debug_print(first_word .. " is already on correct screen", printmore)
+					table.insert(screens_table[properties["name"]]["tags"], tag)
+				end
       end
     end
   end
@@ -615,7 +625,7 @@ function process_screens(systray, screens_table)
 
   systray = systray or nil
 
-  debug_print("Screens result: " .. my_utils.dump(screens_table), printmore)
+  debug_print("Processing screens result: " .. my_utils.dump(screens_table), printmore)
 
   second_screen_already_processed = false
   for name, properties in pairs(screens_table) do
@@ -626,14 +636,14 @@ function process_screens(systray, screens_table)
       systray:set_screen(properties["object"])
       screen_organizer(properties, true, false, false)
       debug_print("Checking tags for: " .. name .. " (primary) ", printmore)
-      place_tags(properties["object"], true)
+      place_tags(properties, true, screens_table)
     else
       screen_organizer(properties, false, second_screen_already_processed)
       if second_screen_already_processed then
         debug_print("Extra screen found: " .. my_utils.dump(properties["object"]), printmore)
       else
         debug_print("Checking tags for: " .. name .. " (not primary) ", printmore)
-        place_tags(properties["object"], false)
+        place_tags(properties, false, screens_table)
         second_screen_already_processed = true
       end
     end
@@ -774,21 +784,17 @@ end)
 -- Screen handling
 screen.connect_signal("list", function()
 	debug_print("List signal received", true)
-	-- if my_utils.file_exists('/home/gurkan/.awesome_screen_setup_lock') then
-	if my_utils.file_age('/home/gurkan/.awesome_screen_setup_lock') < 5 then
+	if my_utils.file_age('/home/gurkan/.awesome_screen_setup_lock', true) < 4 then
 		debug_print("There is already another lock waiting, skipping this screen change", true)
 	else
 		os.execute('touch /home/gurkan/.awesome_screen_setup_lock')
-		debug_print("Sleeping for 3 secs", true)
-		os.execute('sleep 3')
+		debug_print("Sleeping for 2 secs", true)
+		os.execute('sleep 2')
 		screens_table = get_screens()
 		process_screens(my_systray, screens_table)
-		-- os.execute('rm /home/gurkan/.awesome_screen_setup_lock')
 	end
 end)
 
---cleanup
--- os.execute('rm -f /home/gurkan/.awesome_screen_setup_lock')
 os.execute('touch /home/gurkan/.awesome_screen_setup_lock')
 screens_table = get_screens()
 process_screens(my_systray, screens_table)
@@ -835,7 +841,7 @@ end)
 
 awesome.connect_signal("exit", function (c)
   -- We are about to exit / restart awesome, save our last used tag
-  save_current_tag()
+  save_current_tags(screens_table)
 end)
 
 -- Add a titlebar if titlebars_enabled is set to true in the rules.
@@ -995,5 +1001,6 @@ awesome.connect_signal("startup", function(s, state)
   run_once("alttab -w 1 -t 400x300 -frame \"" .. string.upper(beautiful.fg_normal) .. "\" -i 100x100 -font xft:firacode-20")
 end)
 
-load_last_active_tag()
+debug_print("Last state of the screens table is: \n" .. my_utils.dump(screens_table), printmore)
+load_last_active_tags(screens_table, printmore)
 -- vim: set ts=2 sw=2 tw=0 noet :

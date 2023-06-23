@@ -143,16 +143,8 @@ function switch_focus_without_mouse(c, dir)
 end
 
 function switch_to_tag(tag_name, printmore)
-	debug_print('Switching to tag ' .. tag_name, printmore)
-	tag_obj = awful.tag.find_by_name(nil, tag_name)
-	tags_screen_obj = tag_obj.screen
-	awful.tag.viewnone(tags_screen_obj)
-	awful.tag.viewtoggle(tag_obj)
-end
-
-function switch_to_tag_new(tag_name, printmore)
-	debug_print('Switching to tag ' .. tag_name, printmore)
-    t = find_tag_by_first_word(tag_name)
+	debug_print('switch_to_tag: Switching to tag ' .. tag_name, printmore)
+    t = find_tag_by_first_word(tag_name, printmore)
     tags_screen_obj = t.screen
     awful.tag.viewnone(tags_screen_obj)
     awful.tag.viewtoggle(t)
@@ -167,13 +159,26 @@ function find_tag_by_first_word(first_word, printmore)
     end
 end
 
+function find_screen_of_tag(screens_table, tag_obj, printmore)
+    for name, properties in pairs(screens_table) do
+        for _, t in ipairs(properties.tags) do
+            if t == tag_obj then
+                debug_print("find_screen_of_tag: Found " .. name .. " for tag " .. tag_obj.name, printmore)
+                return properties["object"]
+            else
+                debug_print("find_screen_of_tag: " .. tag_obj.name .. " not in screen " .. name, printmore)
+            end
+        end
+    end
+end
+
 function move_focused_client_to_tag(tag_name)
 	tag_obj = awful.tag.find_by_name(nil, tag_name)
 	if client.focus then
 		my_client_obj = client.focus
 		debug_print('Moving focused window (' .. my_client_obj.name .. ') to tag ' .. tag_name, printmore)
 		my_client_obj:move_to_tag(tag_obj)
-		switch_to_tag(tag_name)
+		switch_to_tag(tag_name, printmore)
 		client.focus = my_client_obj
 	end
 end
@@ -336,32 +341,39 @@ function set_wallpaper(s)
     end)
 end
 
-function save_current_tag()
-    active_tags = {}
-    for s in screen do
-        os.remove("/home/gurkan/.awesome-last-ws")
-        for _, tagobj in pairs(s.selected_tags) do
-            table.insert(active_tags, tagobj)
+function save_current_tags(screens_table)
+    for name, feat in pairs(screens_table) do
+        active_tags = {}
+        local filename = "/home/gurkan/.awesome-last-tagsave-" .. name
+        os.remove(filename)
+        for _, tagobj in pairs(feat["object"].selected_tags) do
+            if my_utils.table_contains(feat["tags"], tagobj) then
+                table.insert(active_tags, my_utils.get_first_word(tagobj.name))
+            end
         end
+        local f = assert(io.open(filename, "w"))
+        for _, tagname in pairs(active_tags) do
+            f:write(tagname, "\n")
+        end
+        f:close()
     end
-    local f = assert(io.open("/home/gurkan/.awesome-last-ws", "a+"))
-    for _, tagobj in pairs(active_tags) do
-        f:write(my_utils.get_first_word(tagobj.name), "\n")
-    end
-    f:close()
 end
 
-function load_last_active_tag()
-    tag_list = my_utils.read_lines_from("/home/gurkan/.awesome-last-ws")
-    if next(tag_list) ~= nil then
-        local previous_tags = {}
-        for _, tag_name in pairs(tag_list) do
-            -- local t = awful.tag.find_by_name(nil, tag_name)
-            local t = find_tag_by_first_word(tag_name)
-            table.insert(previous_tags, t)
+function load_last_active_tags(screens_table, printmore)
+    for name, feat in pairs(screens_table) do
+        local filename = "/home/gurkan/.awesome-last-tagsave-" .. name
+        tag_list = my_utils.read_lines_from(filename)
+        if next(tag_list) ~= nil then
+            local previous_tags = {}
+            for _, tag_name in pairs(tag_list) do
+                local t = find_tag_by_first_word(tag_name, printmore)
+                table.insert(previous_tags, t)
+            end
+            local _, firsttag = next(previous_tags)
+            local screen_name = find_screen_of_tag(screens_table, firsttag, printmore)
+            awful.tag.viewnone(screen_name)
+            awful.tag.viewmore(previous_tags, screen_name)
         end
-        awful.tag.viewnone()
-        awful.tag.viewmore(previous_tags)
     end
 end
 
@@ -372,8 +384,7 @@ end
 
 function string:resolutions()
     -- returns resolutions (x and y) from xrandr output line
-    local needed_word = self:match("[^%s]+ [^%s]+ [^%s]+ ([^%s]+)")
-    return needed_word:match("(%d+)x(%d+)")
+    return self:match("(%d+)x(%d+)")
 end
 
 function find_screen_by_name(name)
@@ -392,23 +403,25 @@ function get_screens()
 
 	if xrandr then
         for line in xrandr:lines() do
-            name = line:firstword()
-            screen_obj = my_utils.find_screen_by_name(name)
+            -- if no physical screen is found, skip this line
+            screen_obj = my_utils.find_screen_by_name(line:firstword())
             if screen_obj == nil then
                 goto skipanother
             end
             width, height = line:resolutions()
+            name = line:firstword() .. "_" .. width .. "x" .. height
             output_tbl[name] = {}
             primary = false
             if string.match(line, " primary ") then
                 primary = true
             end
-            output_tbl[name]["name"] = name -- oh well..
+            output_tbl[name]["name"] = name
             output_tbl[name]["primary"] = primary
             output_tbl[name]["width"] = width
             output_tbl[name]["height"] = height
             output_tbl[name]["object"] = screen_obj
             output_tbl[name]["parent"] = nil
+            output_tbl[name]["tags"] = {}
             ::skipanother::
         end
         xrandr:close()
@@ -426,17 +439,17 @@ function get_screens()
             local new_width2 = geo.width - new_width
             properties["object"]:fake_resize(geo.x + new_width, geo.y, new_width, geo.height)
             fake_obj = screen.fake_add(geo.x, geo.y, new_width2, geo.height)
-            fake_screen_name = name .. "_sub_" .. my_utils.random_string(2)
+            fake_screen_name = name .. "_sub_" .. tostring(new_width2) .. "x" .. tostring(geo.height)
             output_tbl[fake_screen_name] = {}
             output_tbl[fake_screen_name]["is_fake"] = true
             output_tbl[fake_screen_name]["name"] = fake_screen_name
             output_tbl[fake_screen_name]["parent"] = output_tbl[name]
             output_tbl[fake_screen_name]["object"] = fake_obj
             output_tbl[fake_screen_name]["primary"] = false
+            output_tbl[fake_screen_name]["tags"] = {}
         end
         ::skip::
     end
-
 	return output_tbl
 end
 
