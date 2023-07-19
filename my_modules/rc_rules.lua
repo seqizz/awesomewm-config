@@ -73,6 +73,22 @@ function set_rules(clientkeys)
     },
 
     {
+      rule_any = {
+        name = {
+            "Media viewer",
+        },
+        class = {
+            "telegram-desktop",
+        },
+      },
+      properties = {
+        skip_decoration = true,
+        ontop = true,
+        floating = true,
+      };
+    },
+
+    {
       rule = {
         name = "Microsoft Teams Notification"
       },

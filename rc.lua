@@ -709,7 +709,7 @@ globalkeys = gears.table.join(
   awful.key({ win          }, "p",                          function () awful.spawn("rofi-pass") end),
   awful.key({ ctrl, alt    }, "t",                          function () awful.spawn(terminal) end),
   awful.key({ win          }, "c",                          function () awful.spawn("chromium-browser") end),
-  awful.key({ win          }, "u",                          function () awful.spawn("/home/gurkan/clicky") end),
+  -- awful.key({ win          }, "u",                          function () awful.spawn("/home/gurkan/clicky") end),
   -- awful.key({ ctrl, alt    }, "p",                          function () reset_pulse() end),
   awful.key({ ctrl, alt    }, "p",                          function () notifytest() end),
   awful.key({ win          }, "f",                          function () awful.spawn(browser) end),
@@ -730,8 +730,8 @@ globalkeys = gears.table.join(
 )
 if hostname == "innixos" or hostname == "innodellix" then
   gears.table.merge(globalkeys, gears.table.join(
-    awful.key({ win          }, "v",                          function () awful.spawn("innovpn-toggle aw") end),
-    awful.key({ win, "Shift" }, "v",                          function () awful.spawn("innovpn-toggle af") end)
+    awful.key({ win          }, "v",                          function () awful.spawn("innovpn-toggle 'Innogames VPN (aw)'") end),
+    awful.key({ win, "Shift" }, "v",                          function () awful.spawn("innovpn-toggle 'Innogames VPN (af)'") end)
   ))
 end
 
