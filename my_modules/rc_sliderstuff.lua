@@ -23,43 +23,51 @@ vb_slider = awful.popup {
   ontop     = true,
   shape     = helpers.rrect(beautiful.border_radius),
   placement = function(c) awful.placement.bottom_right(c, {
-    honor_workarea = true,
     margins        = {
       bottom = dpi(200),
-      right  = dpi(200)
+      right  = dpi(50)
     }
   }) end,
+  -- @Reference: In case I want on the screen
+  -- placement = function(c) awful.placement.bottom_right(c, {
+  --   honor_workarea = true,
+  --   margins        = {
+  --     bottom = dpi(200),
+  --     right  = dpi(200)
+  --   }
+  -- }) end,
 }
 
 vb_textinfo = awful.popup {
   widget = {
-    font         = beautiful.font_name .. dpi(12),
-    align        = 'center',
-    border_color = beautiful.border_normal, -- .. " 00",
-    color        = beautiful.slider_bg,
-    bar_shape    = helpers.rrect(beautiful.border_radius),
-    widget       = wibox.widget.textbox,
+    font          = beautiful.font_name .. dpi(12),
+    align         = 'center',
+    border_color  = beautiful.border_normal, -- .. " 00",
+    color         = beautiful.slider_bg,
+    bar_shape     = helpers.rrect(beautiful.border_radius),
+    widget        = wibox.widget.textbox,
+    forced_height = dpi(20),
+    forced_width  = dpi(250),
     -- TODO: Add margins to the text
   },
   visible   = false,
   bg        = beautiful.bg_notification.. "60",
   ontop     = true,
-  shape     = helpers.rrect(10),
+  shape     = helpers.rrect(beautiful.border_radius),
   placement = function(c) awful.placement.bottom_right(c, {
-    honor_workarea = true,
     margins        = {
-      bottom = dpi(200),
-      right  = dpi(200)
+      botom = dpi(200),
+      right = dpi(50)
     }
   }) end,
 }
 
 slider_timer = gears.timer({
-	timeout = 1.2,
-	callback = function()
-		vb_slider.visible = false
-		vb_textinfo.visible = false
-	end
+  timeout = 1.2,
+  callback = function()
+    vb_slider.visible = false
+    vb_textinfo.visible = false
+  end
 })
 
 triggerwibox = function(action)
@@ -74,7 +82,7 @@ triggerwibox = function(action)
     vb_textinfo.visible = false
     vb_slider.visible = true
   elseif action == 'mute' then
-    vb_textinfo.widget.markup = '  🔇 \n <i>Sound muted</i>'
+    vb_textinfo.widget.markup = '  🔇 <i>Sound muted</i>'
     vb_slider.visible = false
     vb_textinfo.visible = true
   elseif string.match(action, 'Stopped') then
@@ -90,7 +98,7 @@ triggerwibox = function(action)
     vb_slider.visible = false
     vb_textinfo.visible = true
   elseif action == 'micmute' then
-    vb_textinfo.widget.markup = '🎙️🔇 \n <i>Mic Mute Toggle</i>'
+    vb_textinfo.widget.markup = '🎙️🔇 <i>Mic Mute Toggle</i>'
     vb_slider.visible = false
     vb_textinfo.visible = true
   end
@@ -116,44 +124,44 @@ function reset_pulse()
 end
 
 function get_screen_of_focused()
-	-- check if any client is focused
-	local c = client.focus
-	if c then
-			-- found focus, return its screen
-			return c.screen
-	end
+  -- check if any client is focused
+  local c = client.focus
+  if c then
+    -- found focus, return its screen
+    return c.screen
+  end
 end
 
 function unminimize_client()
-	local c = awful.client.restore()
-	-- Focus restored client
-	if c then
-		c:emit_signal(
-			"request::activate", "key.unminimize", {raise = true}
-		)
-	end
+  local c = awful.client.restore()
+  -- Focus restored client
+  if c then
+    c:emit_signal(
+    "request::activate", "key.unminimize", {raise = true}
+    )
+  end
 end
 
 function set_brightness(val)
-	helpers.async("sudo brightnessctl -q s " .. val, function()
-		awesome.emit_signal("brightness:change")
-	end)
+  helpers.async("sudo brightnessctl -q s " .. val, function()
+    awesome.emit_signal("brightness:change")
+  end)
 end
 
 function set_volume(action)
-	helpers.async("pamixer -" .. action .. " 5", function(out)
-		awesome.emit_signal("volume::change")
-	end)
+  helpers.async("pamixer -" .. action .. " 5", function(out)
+    awesome.emit_signal("volume::change")
+  end)
 end
 
 function audio_mute()
   helpers.async("pamixer -t", function(out)
-		awesome.emit_signal("volume::change")
+    awesome.emit_signal("volume::change")
     triggerwibox('mute')
   end)
 end
 
 function mic_mute()
-		awful.spawn("pulseaudio-toggle-hack")
-		triggerwibox('micmute')
+  awful.spawn("pulseaudio-toggle-hack")
+  triggerwibox('micmute')
 end
