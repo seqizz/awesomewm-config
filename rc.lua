@@ -419,7 +419,7 @@ local function screen_organizer(s, primary, is_extra)
 	debug_print("Now organizing screen: " .. s["name"], printmore)
 
 	-- Wallpaper -- one for each screen
-  set_wallpaper(s["object"])
+  -- set_wallpaper(s["object"])
 
   -- Create an imagebox widget which will contain an icon indicating which layout we're using.
   -- We need one layoutbox per screen.
@@ -749,23 +749,23 @@ client.connect_signal("manage", function (c)
     awful.placement.no_offscreen(c)
   end
 	-- XXX: doesn't work on awesome-git
-	c:buttons(gears.table.join(
-		c:buttons(),
-		awful.button({ win }, 4, function (c)
-			c:emit_signal("request::activate", "mouse_click", {raise = true})
-			mousegrabber.run(function (_mouse)
-				c.opacity = c.opacity + 0.1
-				return false
-			end, 'mouse')
-		end, nil),
-		awful.button({ win }, 5, function (c)
-			c:emit_signal("request::activate", "mouse_click", {raise = true})
-			mousegrabber.run(function (_mouse)
-				c.opacity = c.opacity - 0.1
-				return false
-			end, 'mouse')
-		end, nil)
-	))
+	-- c:buttons(gears.table.join(
+	-- 	c:buttons(),
+	-- 	awful.button({ win }, 4, function (c)
+	-- 		c:emit_signal("request::activate", "mouse_click", {raise = true})
+	-- 		mousegrabber.run(function (_mouse)
+	-- 			c.opacity = c.opacity + 0.1
+	-- 			return false
+	-- 		end, 'mouse')
+	-- 	end, nil),
+	-- 	awful.button({ win }, 5, function (c)
+	-- 		c:emit_signal("request::activate", "mouse_click", {raise = true})
+	-- 		mousegrabber.run(function (_mouse)
+	-- 			c.opacity = c.opacity - 0.1
+	-- 			return false
+	-- 		end, 'mouse')
+	-- 	end, nil)
+	-- ))
 end)
 
 client.connect_signal("property::minimized", function(c)
@@ -811,10 +811,14 @@ end)
 
 -- I only need 2 of these though 😬 max, tile or bust.
 tag.connect_signal("request::default_layouts", function()
-	awful.layout.append_default_layouts({
-		awful.layout.suit.tile,
-		awful.layout.suit.max,
-	})
+  -- awful.layout.append_default_layouts({
+  --   awful.layout.suit.tile,
+  --   awful.layout.suit.max,
+  -- }) # Not working on awesome-git
+  awful.layout.layouts = {
+    awful.layout.suit.tile,
+    awful.layout.suit.max,
+  }
 end)
 
 client.connect_signal("mouse::enter", function (c)
@@ -921,25 +925,32 @@ end)
 -- Git version workaround, shit is not complete (e.g. slack does not switch to)
 -- alerting chat etc. but at least hovers the app itself
 -- https://github.com/awesomeWM/awesome/issues/3182 waiting for proper fix
--- naughty.connect_signal("destroyed", function(n, reason)
-	-- if not n.clients then return end
-	-- if reason == require(
-		-- "naughty.constants"
-	-- ).notification_closed_reason.dismissed_by_user then
-		-- local jumped = false
-		-- for _, c in ipairs(n.clients) do
-			-- c.urgent = true
-			-- if jumped then
-				-- c:activate{
-					-- context = "client.jumpto"
-				-- }
-			-- else
-				-- c:jump_to()
-				-- jumped = true
-			-- end
-		-- end
-	-- end
--- end)
+naughty.connect_signal("destroyed", function(n, reason)
+  -- debug_print(my_utils.dump(n))
+  if not n.clients then
+    return
+  end
+  if reason == require("naughty.constants").notification_closed_reason.dismissed_by_user then
+  -- If we clicked on a notification, we get a new urgent client to jump to
+    client.connect_signal("property::urgent", function(c)
+    -- We don't use notification_client because it's not reliable (Ex: If we have two different instances of chrome)
+    -- cf: https://awesomewm.org/apidoc/core_components/naughty.notification.html#clients
+    -- So we just check if the client name of our notification is the same as the last urgent client
+    -- and jump to this one.
+    for _, notification_client in ipairs(n.clients) do
+      if not c.name or not c.notification_client then
+        -- Means we can't compare anyway
+        goto noclientname
+      end
+      if c.name == notification_client.name then
+        c:jump_to()
+        break
+      end
+      ::noclientname::
+    end
+    end)
+  end
+end)
 
 -- Show OSD notification of current status on volume:change signal
 awesome.connect_signal("volume::change", function()
@@ -1001,6 +1012,11 @@ awesome.connect_signal("startup", function(s, state)
   run_once("alttab -w 1 -t 400x300 -frame \"" .. string.upper(beautiful.fg_normal) .. "\" -i 100x100 -font xft:firacode-20")
 end)
 
+set_wallpapers(screens_table)
+-- screen.connect_signal("request::wallpaper", function()
+    -- screen is the global screen module. It is also a list of all screens.
+-- end)
+
 debug_print("Last state of the screens table is: \n" .. my_utils.dump(screens_table), printmore)
 load_last_active_tags(screens_table, printmore)
--- vim: set ts=2 sw=2 tw=0 noet :
+-- vim: set ts=2 sw=2 tw=0 :

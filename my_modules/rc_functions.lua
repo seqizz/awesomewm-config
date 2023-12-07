@@ -1,4 +1,5 @@
 local awful = require("awful")
+local wibox = require("wibox")
 local gears = require("gears")
 local beautiful = require("beautiful")
 local naughty = require("naughty")
@@ -111,6 +112,7 @@ function move_or_expand(c, action, direction)
     end
   else
     -- Not a floating one, sooo.. let's start moving tiling factors.
+    -- XXX: Consider action here, we might want to swap windows instead of moving them
     if direction == "right" then
       awful.tag.incmwfact(0.02)
     elseif direction == "left" then
@@ -303,6 +305,10 @@ function resize_screen(s, screens_table, shrink)
                 local parent_geo = properties["parent"]["object"].geometry
                 s:fake_resize(geo.x, geo.y, geo.width + diff, geo.height)
                 properties["parent"]["object"]:fake_resize(parent_geo.x + diff, parent_geo.y, parent_geo.width - diff, parent_geo.height)
+                -- now we need to refresh/repaint the wallpaper
+                -- not using awful lib yet, see set_wallpapers function
+                -- awful.wallpaper:repaint()
+                set_wallpapers(screens_table)
             else
                 local geo = s.geometry
                 child = get_child_of(s, screens_table)
@@ -314,14 +320,18 @@ function resize_screen(s, screens_table, shrink)
                 -- whatever you do here, do the reverse to the parent
                 local fake_geo = child.geometry
                 s:fake_resize(geo.x - diff, geo.y, geo.width + diff, geo.height)
-                child:fake_resize(fake_geo.x, fake_geo.y, fake_geo.width - diff, fake_geo.height)
+                child:fake_resize(fake_geo.x,fake_geo.y, fake_geo.width - diff, fake_geo.height)
+                -- now we need to refresh/repaint the wallpaper
+                -- not using awful lib yet, see set_wallpapers function
+                -- awful.wallpaper:repaint()
+                set_wallpapers(screens_table)
                 ::nochange::
             end
         end
     end
 end
 
-function set_wallpaper(s)
+function set_wallpapers(screens_table)
   -- choose random wallpaper
   awful.spawn.easy_async(
     "find /home/gurkan/syncfolder/wallpaper -not -path 'phone*' -type f",
@@ -334,7 +344,27 @@ function set_wallpaper(s)
         -- lua is the shittiest language ever
         -- you need to set seed again, or the "random" will always return same
         math.randomseed(my_utils.get_randomseed())
-        gears.wallpaper.maximized(wallpapers[math.random(#wallpapers)], s)
+        for name, feat in pairs(screens_table) do
+          gears.wallpaper.maximized(wallpapers[math.random(#wallpapers)], feat["object"])
+        end
+        -- supposedly gears.wallpaper is deprecated, but it's the only one that works. Leaving below one for later.
+        -- for name, feat in pairs(screens_table) do
+        --   debug_print("Setting wallpaper for screen " .. name)
+        --   awful.wallpaper {
+        --     screen = feat["object"],
+        --     widget = {
+        --       {
+        --         image  = wallpapers[math.random(#wallpapers)],
+        --         resize = true,
+        --         widget = wibox.widget.imagebox,
+        --       },
+        --       valign = "center",
+        --       halign = "center",
+        --       tiled  = false,
+        --       widget = wibox.container.maximized,
+        --     }
+        --   }
+        -- end
       else
         naughty.notify({text = "Wallpaper assign error: " .. stderr})
       end
