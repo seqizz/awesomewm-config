@@ -238,7 +238,8 @@ function set_rules(clientkeys)
         class = {
           "Daily",
           "Mail",
-          "thunderbird"
+          "thunderbird",
+          "betterbird"
           -- "Soffice" -- << Really? Hidden class for open files, FUCK LIBREOFFICE
         }
       },

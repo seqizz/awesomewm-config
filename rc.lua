@@ -999,10 +999,11 @@ end)
 awesome.connect_signal("startup", function(s, state)
   run_once("sleep 3 && firefox", "firefox")
   -- only makes sense on this laptop
-  if hostname == "innodellix" then
+  -- if hostname == "innodellix" then
     run_once("sleep 5 && slack -s", "slack")
-    run_once("sleep 8 && thunderbird", "thunderbird")
-  end
+    run_once("sleep 8 && thunderbird", "rbird")
+  -- end
+  -- run_once("XDG_CURRENT_DESKTOP=gnome QT_SCALE_FACTOR=1.3 telegram-desktop", "telegram")
   run_once("XDG_CURRENT_DESKTOP=gnome telegram-desktop", "telegram")
   run_once("pasystray")
 	run_once("wezterm start --class mainqterm", "mainqterm", "term")
