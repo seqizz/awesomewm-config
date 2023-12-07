@@ -335,20 +335,20 @@ calendarwidget = lain.widget.cal({
 
 -- change tag names dynamically
 dynamic_tagging = function()
-    for s = 1, screen.count() do
-        -- get a list of all tags
-				local atags = screen[s].tags
-				for i, t in ipairs(atags) do
-						local clients_on_this_tag = 0
-						for i, c in ipairs(t:clients()) do
-								if not c.skip_taskbar then
-									clients_on_this_tag = clients_on_this_tag + 1
-								end
-						end
-						original_name = my_utils.get_first_word(t.name)
-						t.name = original_name .. " " .. string.rep("ॱ", clients_on_this_tag)
-				end
+  for s = 1, screen.count() do
+    -- get a list of all tags
+    local atags = screen[s].tags
+    for i, t in ipairs(atags) do
+      local clients_on_this_tag = 0
+      for i, c in ipairs(t:clients()) do
+        if not c.skip_taskbar then
+          clients_on_this_tag = clients_on_this_tag + 1
+        end
+      end
+      original_name = my_utils.get_first_word(t.name)
+      t.name = original_name .. " " .. string.rep("ॱ", clients_on_this_tag)
     end
+  end
 end
 
 -- signal function to execute when a client disappears

@@ -11,7 +11,7 @@ vb_slider = awful.popup {
   {
     max_value        = 100,
     value            = 33,
-    forced_height    = dpi(15),
+    forced_height    = dpi(20),
     forced_width     = dpi(250),
     background_color = beautiful.slider_bg .. "50",
     shape            = gears.shape.rounded_bar,

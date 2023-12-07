@@ -458,18 +458,28 @@ function get_screens()
 	end
 
     -- now check if there is any fake screens needed to be added
-    -- if the screen is too wide, we will create a fake screen and add it to the table
+    -- if the screen is too wide (or pixel count is too high, e.g. 4K), we will create a fake screen and add it to the table
     for name, properties in pairs(output_tbl) do
-        if properties["object"] == nil then
+        if properties["is_fake"] then
             goto skip
         end
         local geo = properties["object"].geometry
-        if ( geo.width / geo.height) > 2 then
-            local new_width = math.ceil(geo.width/2)
-            local new_width2 = geo.width - new_width
-            properties["object"]:fake_resize(geo.x + new_width, geo.y, new_width, geo.height)
-            fake_obj = screen.fake_add(geo.x, geo.y, new_width2, geo.height)
-            fake_screen_name = name .. "_sub_" .. tostring(new_width2) .. "x" .. tostring(geo.height)
+        if (( geo.width / geo.height) > 2) or geo.width > 3000 then
+            fake_width = math.ceil(geo.width/2)
+            new_width = math.ceil(geo.width/2)
+            new_width2 = geo.width - new_width
+            if not (( geo.width / geo.height) > 2) then
+                -- this is not a wide screen, let's give more to the left side (web/mail)
+                -- new_width = geo.width - 1000
+                -- new_width2 = 1000
+                fake_width = math.ceil(geo.width*0.60)
+            end
+            -- properties["object"]:fake_resize(geo.x + new_width, geo.y, new_width, geo.height)
+            -- fake_obj = screen.fake_add(geo.x, geo.y, new_width2, geo.height)
+            properties["object"]:fake_resize(geo.x + fake_width, geo.y, (geo.width - fake_width), geo.height)
+            fake_obj = screen.fake_add(geo.x, geo.y, fake_width, geo.height)
+            -- fake_screen_name = name .. "_sub_" .. tostring(new_width2) .. "x" .. tostring(geo.height)
+            fake_screen_name = name .. "_sub_" .. tostring(fake_width) .. "x" .. tostring(geo.height)
             output_tbl[fake_screen_name] = {}
             output_tbl[fake_screen_name]["is_fake"] = true
             output_tbl[fake_screen_name]["name"] = fake_screen_name
