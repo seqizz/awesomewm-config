@@ -148,6 +148,7 @@ greenclip_cmd = "rofi -dpi " .. dpi(80) .. " -modi 'clipboard:greenclip print' -
 rofi_cmd = "rofi -dpi " .. dpi(80) .. " -show run"
 rofi_emoji_cmd = "rofi -dpi " .. dpi(80) .. " -show emoji -modi emoji"
 rofi_calc_cmd = "rofi -dpi " .. dpi(80) .. " -show calc -modi calc"
+rofi_subsuper = "rofi -dpi " .. dpi(80) .. " -show fb -modes 'fb:rofi-subsuper'"
 proxified_chromium_cmd = 'chromium-browser --incognito --proxy-server="socks://127.0.0.1:8080" --host-resolver-rules="MAP * ~NOTFOUND, EXCLUDE 127.0.0.1"'
 
 win = "Mod4"
@@ -707,6 +708,7 @@ globalkeys = gears.table.join(
   awful.key({ ctrl         }, "space",                      function () awful.spawn(rofi_cmd) end),
   awful.key({              }, "F9",                    nil, function () awful.spawn(rofi_emoji_cmd) end),
   awful.key({ ctrl         }, "F9",                    nil, function () awful.spawn(rofi_calc_cmd) end),
+  awful.key({ "Shift"      }, "F9",                    nil, function () awful.spawn(rofi_subsuper) end),
   awful.key({ ctrl, alt    }, "c",                          function () awful.spawn(greenclip_cmd) end),
   awful.key({ win          }, "p",                          function () awful.spawn("rofi-pass") end),
   awful.key({ ctrl, alt    }, "t",                          function () awful.spawn(terminal) end),
