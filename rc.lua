@@ -14,7 +14,7 @@ local spotify = require("my_modules/spotify")
 local psi_widget = require("my_modules/psi")
 local rotate_widget = require("my_modules/rotatescreen")
 local touch_widget = require("my_modules/touchscreen")
-local keyboard_widget = require("my_modules/keyboard")
+-- local keyboard_widget = require("my_modules/keyboard")
 local helpers = require("my_modules/geo_helpers")
 local edid = require('my_modules/edid')
 local dpi = require('beautiful').xresources.apply_dpi
@@ -45,69 +45,69 @@ dofile ("/home/gurkan/.config/awesome/my_modules/rc_secret.lua")
 -- package.loaded["naughty.dbus"] = {}
 
 clientkeys = gears.table.join(
-  -- Increase/decrease windows sizes on tiled layout: Win + asdf
-  awful.key({ win                }, "d",      function ()  awful.tag.incmwfact( 0.01)  end),
-  awful.key({ win                }, "a",      function ()  awful.tag.incmwfact(-0.01)  end),
-  awful.key({ win                }, "s",      function ()  awful.client.incwfact( 0.01)  end),
-  awful.key({ win                }, "w",      function ()  awful.client.incwfact(-0.01)  end),
-  -- Quit window: Win + q
-  awful.key({ win                }, "q",      function (c) c:kill() end),
-  -- Swap master windows: Win + enter
-  awful.key({ win                }, "Return", function (c) c:swap(awful.client.getmaster()) end),
-  -- Movement and focus:
-  -- Win                + Arrows -> Swap focus between windows
-  -- Win        + Shift + Arrows -> Move windows to that direction
-  -- Win + Ctrl         + Arrows -> Expand windows to that direction
-  -- Win + Ctrl + Shift + Arrows -> Shrink windows from that direction
-  awful.key({ ctrl, win          }, "Right",  function (c) move_or_expand(c, "expand", "right") end),
-  awful.key({ win, "Shift"       }, "Left",   function (c) move_or_expand(c, "move", "left") end),
-  awful.key({ ctrl, win, "Shift" }, "Left",   function (c) move_or_expand(c, "shrink", "left") end),
-  awful.key({ ctrl, win          }, "Left",   function (c) move_or_expand(c, "expand", "left") end),
-  awful.key({ ctrl, win, "Shift" }, "Right",  function (c) move_or_expand(c, "shrink", "right") end),
-  awful.key({ win, "Shift"       }, "Right",  function (c) move_or_expand(c, "move", "right") end),
-  awful.key({ ctrl, win          }, "Down",   function (c) move_or_expand(c, "expand", "down") end),
-  awful.key({ ctrl, win, "Shift" }, "Up",     function (c) move_or_expand(c, "shrink", "up") end),
-  awful.key({ ctrl, win          }, "Up",     function (c) move_or_expand(c, "expand", "up") end),
-  awful.key({ win, "Shift"       }, "Down",   function (c) move_or_expand(c, "move", "down") end),
-  awful.key({ win, "Shift"       }, "Up",     function (c) move_or_expand(c, "move", "up") end),
-  awful.key({ ctrl, win, "Shift" }, "Down",   function (c) move_or_expand(c, "shrink", "down") end),
-  awful.key({ win                }, "Right",  function (c) switch_focus_without_mouse(c, "right") end),
-  awful.key({ win                }, "Left",   function (c) switch_focus_without_mouse(c, "left") end),
-  awful.key({ win                }, "Down",   function (c)
-                                                          if c.sticky then
-                                                            -- in case it's on top
-                                                            awful.client.focus.history.previous()
-                                                          else
-                                                            awful.client.focus.bydirection("down")
-                                                          end
-                                              end),
-  awful.key({ win                }, "Up",     function (c)
-                                                          local cls = client.get()
-                                                          local stickies = {}
-                                                          -- Get all the stickies
-                                                          for _, c in ipairs(cls) do
-                                                            if c.sticky then
-                                                              table.insert(stickies, c)
-                                                            end
-                                                          end
-                                                          if my_utils.table_length(stickies) == 0 then
-                                                            awful.client.focus.bydirection("up")
-                                                          else
-                                                            awful.client.focus.history.previous()
-                                                          end
-                                              end),
-  -- Minimize window: Win + z
-  awful.key({ win                }, "z",      function (c) c.minimized = true end),
-  -- Suspend the window's app with SIGSTOP: Ctrl + Alt + s
-  awful.key({ ctrl, alt          }, "s",      function (c) suspend_toggle(c) end),
-  -- Shrink window and make it sticky & on top (e.g. conference call): Ctrl + Alt + w
-  awful.key({ ctrl, alt          }, "w",      function (c) float_toggle(c) end),
-  -- Sticky toggle for window: Ctrl + Alt + Shift + s
-  awful.key({ ctrl, alt, "Shift" }, "s",      function (c) sticky_toggle(c) end),
-  -- Hide stickies to the bottom-right corner (toggle) : Win + Esc
-  awful.key({ win                }, "Escape", function (c) hide_stickies() end),
-  awful.key({                    }, "F7",     nil, function (c) resize_screen(c.screen, screens_table, false) end),
-  awful.key({                    }, "F8",     nil, function (c) resize_screen(c.screen, screens_table, true) end)
+-- Increase/decrease windows sizes on tiled layout: Win + asdf
+awful.key({ win                }, "d",      function ()  awful.tag.incmwfact( 0.01)  end),
+awful.key({ win                }, "a",      function ()  awful.tag.incmwfact(-0.01)  end),
+awful.key({ win                }, "s",      function ()  awful.client.incwfact( 0.01)  end),
+awful.key({ win                }, "w",      function ()  awful.client.incwfact(-0.01)  end),
+-- Quit window: Win + q
+awful.key({ win                }, "q",      function (c) c:kill() end),
+-- Swap master windows: Win + enter
+awful.key({ win                }, "Return", function (c) c:swap(awful.client.getmaster()) end),
+-- Movement and focus:
+-- Win                + Arrows -> Swap focus between windows
+-- Win        + Shift + Arrows -> Move windows to that direction
+-- Win + Ctrl         + Arrows -> Expand windows to that direction
+-- Win + Ctrl + Shift + Arrows -> Shrink windows from that direction
+awful.key({ ctrl, win          }, "Right",  function (c) move_or_expand(c, "expand", "right") end),
+awful.key({ win, "Shift"       }, "Left",   function (c) move_or_expand(c, "move", "left") end),
+awful.key({ ctrl, win, "Shift" }, "Left",   function (c) move_or_expand(c, "shrink", "left") end),
+awful.key({ ctrl, win          }, "Left",   function (c) move_or_expand(c, "expand", "left") end),
+awful.key({ ctrl, win, "Shift" }, "Right",  function (c) move_or_expand(c, "shrink", "right") end),
+awful.key({ win, "Shift"       }, "Right",  function (c) move_or_expand(c, "move", "right") end),
+awful.key({ ctrl, win          }, "Down",   function (c) move_or_expand(c, "expand", "down") end),
+awful.key({ ctrl, win, "Shift" }, "Up",     function (c) move_or_expand(c, "shrink", "up") end),
+awful.key({ ctrl, win          }, "Up",     function (c) move_or_expand(c, "expand", "up") end),
+awful.key({ win, "Shift"       }, "Down",   function (c) move_or_expand(c, "move", "down") end),
+awful.key({ win, "Shift"       }, "Up",     function (c) move_or_expand(c, "move", "up") end),
+awful.key({ ctrl, win, "Shift" }, "Down",   function (c) move_or_expand(c, "shrink", "down") end),
+awful.key({ win                }, "Right",  function (c) switch_focus_without_mouse(c, "right") end),
+awful.key({ win                }, "Left",   function (c) switch_focus_without_mouse(c, "left") end),
+awful.key({ win                }, "Down",   function (c)
+  if c.sticky then
+    -- in case it's on top
+    awful.client.focus.history.previous()
+  else
+    awful.client.focus.bydirection("down")
+  end
+end),
+awful.key({ win                }, "Up",     function (c)
+  local cls = client.get()
+  local stickies = {}
+  -- Get all the stickies
+  for _, c in ipairs(cls) do
+    if c.sticky then
+      table.insert(stickies, c)
+    end
+  end
+  if my_utils.table_length(stickies) == 0 then
+    awful.client.focus.bydirection("up")
+  else
+    awful.client.focus.history.previous()
+  end
+end),
+-- Minimize window: Win + z
+awful.key({ win                }, "z",      function (c) c.minimized = true end),
+-- Suspend the window's app with SIGSTOP: Ctrl + Alt + s
+awful.key({ ctrl, alt          }, "s",      function (c) suspend_toggle(c) end),
+-- Shrink window and make it sticky & on top (e.g. conference call): Ctrl + Alt + w
+awful.key({ ctrl, alt          }, "w",      function (c) float_toggle(c) end),
+-- Sticky toggle for window: Ctrl + Alt + Shift + s
+awful.key({ ctrl, alt, "Shift" }, "s",      function (c) sticky_toggle(c) end),
+-- Hide stickies to the bottom-right corner (toggle) : Win + Esc
+awful.key({ win                }, "Escape", function (c) hide_stickies() end),
+awful.key({ win                }, "F7",     nil, function (c) resize_screen(c.screen, screens_table, false) end),
+awful.key({ win                }, "F8",     nil, function (c) resize_screen(c.screen, screens_table, true) end)
 )
 
 my_systray = wibox.widget.systray()
@@ -117,23 +117,23 @@ function set_keys_after_screen_new(clientkeys, globalkeys)
   if screen:count() > 1 then
     -- Shortcut for moving window between screens
     clientkeys = gears.table.join(clientkeys,
-      awful.key({ win, "Shift" }, "Left",   function (c) c:move_to_screen(c.screen.index-1) end),
-      awful.key({ win, "Shift" }, "Right",  function (c) c:move_to_screen(c.screen.index+1) end)
-  )
+    awful.key({ win, "Shift" }, "Left",   function (c) c:move_to_screen(c.screen.index-1) end),
+    awful.key({ win, "Shift" }, "Right",  function (c) c:move_to_screen(c.screen.index+1) end)
+    )
   end
 
-	-- not sure why we're doing 10+ here 🤷
-	globalkeys = gears.table.join(
-		globalkeys,
-		awful.key({win}, "#10", function() switch_to_tag("web", printmore) end),
-		awful.key({win}, "#11", function() switch_to_tag("mail", printmore) end),
-		awful.key({win}, "#12", function() switch_to_tag("term", printmore) end),
-		awful.key({win}, "#13", function() switch_to_tag("chat", printmore) end),
-		awful.key({win, "Shift"}, "#10", function() move_focused_client_to_tag("web") end),
-		awful.key({win, "Shift"}, "#11", function() move_focused_client_to_tag("mail") end),
-		awful.key({win, "Shift"}, "#12", function() move_focused_client_to_tag("term") end),
-		awful.key({win, "Shift"}, "#13", function() move_focused_client_to_tag("chat") end)
-	)
+  -- not sure why we're doing 10+ here 🤷
+  globalkeys = gears.table.join(
+  globalkeys,
+  awful.key({win}, "#10", function() switch_to_tag("web", printmore) end),
+  awful.key({win}, "#11", function() switch_to_tag("mail", printmore) end),
+  awful.key({win}, "#12", function() switch_to_tag("term", printmore) end),
+  awful.key({win}, "#13", function() switch_to_tag("chat", printmore) end),
+  awful.key({win, "Shift"}, "#10", function() move_focused_client_to_tag("web") end),
+  awful.key({win, "Shift"}, "#11", function() move_focused_client_to_tag("mail") end),
+  awful.key({win, "Shift"}, "#12", function() move_focused_client_to_tag("term") end),
+  awful.key({win, "Shift"}, "#13", function() move_focused_client_to_tag("chat") end)
+  )
 
   return clientkeys, globalkeys
 
@@ -167,42 +167,42 @@ my_dropdown = lain.util.quake({
 
 -- Create a wibox for each screen and add it
 local taglist_buttons = gears.table.join(
-  awful.button({ }, 1, function(t) t:view_only() end),
-  awful.button({ win }, 1, function(t)
-    if client.focus then
-      client.focus:move_to_tag(t)
-    end
-  end),
-  awful.button({ }, 3, awful.tag.viewtoggle),
-  awful.button({ win }, 3, function(t)
+awful.button({ }, 1, function(t) t:view_only() end),
+awful.button({ win }, 1, function(t)
+  if client.focus then
+    client.focus:move_to_tag(t)
+  end
+end),
+awful.button({ }, 3, awful.tag.viewtoggle),
+awful.button({ win }, 3, function(t)
   if client.focus then
     client.focus:toggle_tag(t)
   end
 end),
-  awful.button({ }, 4, function(t) awful.tag.viewprev(t.screen) end),
-  awful.button({ }, 5, function(t) awful.tag.viewnext(t.screen) end)
+awful.button({ }, 4, function(t) awful.tag.viewprev(t.screen) end),
+awful.button({ }, 5, function(t) awful.tag.viewnext(t.screen) end)
 )
 
 local tasklist_buttons = gears.table.join(
-  awful.button({ }, 1, function (c)
-    if c == client.focus then
-      c.minimized = true
-    else
-      c:emit_signal(
-        "request::activate",
-        "tasklist",
-        {raise = true}
-      )
-    end
-  end),
-  awful.button({ }, 2, function (c)
-    c:kill()
-  end),
-  awful.button({ }, 4, function ()
-    awful.client.focus.byidx(1)
-  end),
-  awful.button({ }, 5, function ()
-    awful.client.focus.byidx(-1)
+awful.button({ }, 1, function (c)
+  if c == client.focus then
+    c.minimized = true
+  else
+    c:emit_signal(
+    "request::activate",
+    "tasklist",
+    {raise = true}
+    )
+  end
+end),
+awful.button({ }, 2, function (c)
+  c:kill()
+end),
+awful.button({ }, 4, function ()
+  awful.client.focus.byidx(1)
+end),
+awful.button({ }, 5, function ()
+  awful.client.focus.byidx(-1)
 end)
 )
 
@@ -237,43 +237,50 @@ if my_utils.file_exists('/sys/class/power_supply/BAT1/status') then
   adapter_name = "BAT1"
 end
 batterytext = wibox.widget {
-	widget = wibox.widget.textbox,
-	font = beautiful.font,
-	markup = 'This <i>is</i> a <b>textbox</b>!!!',
+  widget = wibox.widget.textbox,
+  font = beautiful.font,
+  markup = 'This <i>is</i> a <b>textbox</b>!!!',
 }
 battery_image_widget = wibox.widget {
-	image = beautiful.battery_icon_empty,
-	resize = true,
-	widget = wibox.widget.imagebox,
+  image = beautiful.battery_icon_empty,
+  resize = true,
+  widget = wibox.widget.imagebox,
 }
 local battery_widget_text = lain.widget.bat({
-    battery = adapter_name,
-    full_notify = "off",
-    settings = function()
-      if bat_now.status == "Charging" then
-        battery_widget_color = beautiful.fg_normal_alt
-				battery_image = beautiful.battery_icon_charging
-      elseif bat_now.status == "Full" then
-        battery_widget_color = beautiful.fg_normal
-				battery_image = beautiful.battery_icon_full
+  battery = adapter_name,
+  full_notify = "off",
+  settings = function()
+    if bat_now.status == "Charging" then
+      battery_widget_color = beautiful.fg_normal_alt
+      battery_image = beautiful.battery_icon_charging
+    elseif bat_now.status == "Full" then
+      perc = ""
+      battery_widget_color = beautiful.fg_normal
+      battery_image = beautiful.battery_icon_full
+    else
+      battery_widget_color = beautiful.fg_normal_alt
+      if bat_now.perc > 80 then
+        battery_image = beautiful.battery_icon_full
+      elseif bat_now.perc > 40 then
+        battery_image = beautiful.battery_icon_medium
+      elseif bat_now.perc > 20 then
+        battery_image = beautiful.battery_icon_low
       else
-        battery_widget_color = beautiful.fg_normal_alt
-				if bat_now.perc > 80 then
-					battery_image = beautiful.battery_icon_full
-				elseif bat_now.perc > 40 then
-					battery_image = beautiful.battery_icon_medium
-				elseif bat_now.perc > 20 then
-					battery_image = beautiful.battery_icon_low
-				else
-					battery_image = beautiful.battery_icon_empty
-				end
+        battery_image = beautiful.battery_icon_empty
       end
-
-			local perc = bat_now.perc ~= "N/A" and " " .. bat_now.perc .. "%" or bat_now.perc
-
-			widget:set_markup(lain.util.markup.fontfg(beautiful.font, beautiful.fg_normal, perc .. " "))
-      battery_image_widget:set_image(gears.color.recolor_image(battery_image, battery_widget_color))
     end
+
+    if bat_now.perc > 90 then
+      perc = ""
+    elseif bat_now.perc == "N/A" then
+      perc = ""
+    else
+      perc = bat_now.perc .. "%"
+    end
+
+    widget:set_markup(lain.util.markup.fontfg(beautiful.font, beautiful.fg_normal, perc .. " "))
+    battery_image_widget:set_image(gears.color.recolor_image(battery_image, battery_widget_color))
+  end
 })
 battery_widget = wibox.widget {
 	battery_image_widget,
@@ -376,11 +383,11 @@ capslock:buttons(awful.util.table.join(
       capslock:toggle()
   end)
 ))
-keyboard_widget:buttons(awful.util.table.join(
-  awful.button({}, 1, function() -- left click
-      keyboard_widget:toggle()
-  end)
-))
+-- keyboard_widget:buttons(awful.util.table.join(
+--   awful.button({}, 1, function() -- left click
+--       keyboard_widget:toggle()
+--   end)
+-- ))
 spotify:buttons(awful.util.table.join(
   awful.button({}, 1, function() -- left click
     handle_media("play-pause")
@@ -533,8 +540,8 @@ local function screen_organizer(s, primary, is_extra)
       table.insert(systray_right_widgets, touch_widget)
       table.insert(systray_right_widgets, rotate_widget)
     end
-    table.insert(systray_right_widgets, separator_reverse)
-    table.insert(systray_right_widgets, keyboard_widget)
+    -- table.insert(systray_right_widgets, separator_reverse)
+    -- table.insert(systray_right_widgets, keyboard_widget)
     table.insert(systray_right_widgets, separator_reverse)
     table.insert(systray_right_widgets, battery_widget)
     table.insert(systray_right_widgets, separator_reverse)

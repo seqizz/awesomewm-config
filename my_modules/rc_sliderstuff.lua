@@ -162,6 +162,7 @@ function audio_mute()
 end
 
 function mic_mute()
-  awful.spawn("pulseaudio-toggle-hack")
-  triggerwibox('micmute')
+  helpers.async("pamixer --default-source -t", function(out)
+    triggerwibox('micmute')
+  end)
 end

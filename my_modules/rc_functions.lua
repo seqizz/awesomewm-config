@@ -7,6 +7,8 @@ local my_utils = require('my_modules/my_utils')
 local xresources = require("beautiful.xresources")
 local dpi = xresources.apply_dpi
 
+tagsave_folder = "/home/gurkan/.awesome-tagsaves"
+
 function debug_print(text, needed)
   if needed == nil then
       needed = true
@@ -371,27 +373,34 @@ function set_wallpapers(screens_table)
     end)
 end
 
+local function createFolder(folder)
+  local p = io.popen('mkdir -p ' .. folder)
+  p:close()
+end
+
 function save_current_tags(screens_table)
-    for name, feat in pairs(screens_table) do
-        active_tags = {}
-        local filename = "/home/gurkan/.awesome-last-tagsave-" .. name
-        os.remove(filename)
-        for _, tagobj in pairs(feat["object"].selected_tags) do
-            if my_utils.table_contains(feat["tags"], tagobj) then
-                table.insert(active_tags, my_utils.get_first_word(tagobj.name))
-            end
+  -- Ensure that the folder exists
+  createFolder(tagsave_folder)
+  for name, feat in pairs(screens_table) do
+    active_tags = {}
+    local filename = tagsave_folder .. "/tagsave-" .. name
+    os.remove(filename)
+    for _, tagobj in pairs(feat["object"].selected_tags) do
+        if my_utils.table_contains(feat["tags"], tagobj) then
+            table.insert(active_tags, my_utils.get_first_word(tagobj.name))
         end
-        local f = assert(io.open(filename, "w"))
-        for _, tagname in pairs(active_tags) do
-            f:write(tagname, "\n")
-        end
-        f:close()
     end
+    local f = assert(io.open(filename, "w"))
+    for _, tagname in pairs(active_tags) do
+        f:write(tagname, "\n")
+    end
+    f:close()
+  end
 end
 
 function load_last_active_tags(screens_table, printmore)
     for name, feat in pairs(screens_table) do
-        local filename = "/home/gurkan/.awesome-last-tagsave-" .. name
+        local filename = tagsave_folder .. "/tagsave-" .. name
         tag_list = my_utils.read_lines_from(filename)
         if next(tag_list) ~= nil then
             local previous_tags = {}
