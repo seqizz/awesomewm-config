@@ -140,20 +140,23 @@ function set_keys_after_screen_new(clientkeys, globalkeys)
 end
 
 -- some aliases
-terminal = "wezterm start"
-browser = "firefox"
-editor = os.getenv("EDITOR") or "nvim"
-editor_cmd = terminal .. " -e " .. editor
-greenclip_cmd = "rofi -dpi " .. dpi(80) .. " -modi 'clipboard:greenclip print' -show clipboard -run-command '{cmd}' "
-rofi_cmd = "rofi -dpi " .. dpi(80) .. " -show run"
-rofi_emoji_cmd = "rofi -dpi " .. dpi(80) .. " -show emoji -modi emoji"
-rofi_calc_cmd = "rofi -dpi " .. dpi(80) .. " -show calc -modi calc"
-rofi_subsuper = "rofi -dpi " .. dpi(80) .. " -show fb -modes 'fb:rofi-subsuper'"
-proxified_chromium_cmd = 'chromium-browser --incognito --proxy-server="socks://127.0.0.1:8080" --host-resolver-rules="MAP * ~NOTFOUND, EXCLUDE 127.0.0.1"'
+terminal = 'wezterm start'
+browser = 'firefox'
+editor = os.getenv('EDITOR') or 'nvim'
+editor_cmd = terminal .. ' -e ' .. editor
+greenclip_cmd = 'rofi -dpi '
+  .. dpi(80)
+  .. ' -modi \'clipboard:greenclip print\' -show clipboard -run-command \'{cmd}\' '
+rofi_cmd = 'rofi -dpi ' .. dpi(80) .. ' -show run'
+rofi_emoji_cmd = 'rofi -dpi ' .. dpi(80) .. ' -show emoji -modi emoji'
+rofi_calc_cmd = 'rofi -dpi ' .. dpi(80) .. ' -show calc -modi calc'
+rofi_subsuper = 'rofi -dpi ' .. dpi(80) .. ' -show fb -modes \'fb:rofi-subsuper\''
+proxified_chromium_cmd =
+  'chromium-browser --incognito --proxy-server="socks://127.0.0.1:8080" --host-resolver-rules="MAP * ~NOTFOUND, EXCLUDE 127.0.0.1"'
 
-win = "Mod4"
-alt = "Mod1"
-ctrl = "Control"
+win = 'Mod4'
+alt = 'Mod1'
+ctrl = 'Control'
 
 -- dropdown terminal from lain
 my_dropdown = lain.util.quake({
@@ -162,7 +165,7 @@ my_dropdown = lain.util.quake({
   name = 'myshittydropdown',
   height = 0.5,
   followtag = true,
-  visible = false
+  visible = false,
 })
 
 -- Create a wibox for each screen and add it
@@ -236,11 +239,6 @@ adapter_name = "BAT0"
 if my_utils.file_exists('/sys/class/power_supply/BAT1/status') then
   adapter_name = "BAT1"
 end
-batterytext = wibox.widget {
-  widget = wibox.widget.textbox,
-  font = beautiful.font,
-  markup = 'This <i>is</i> a <b>textbox</b>!!!',
-}
 battery_image_widget = wibox.widget {
   image = beautiful.battery_icon_empty,
   resize = true,
@@ -248,13 +246,13 @@ battery_image_widget = wibox.widget {
 }
 local battery_widget_text = lain.widget.bat({
   battery = adapter_name,
-  full_notify = "off",
+  full_notify = 'off',
   settings = function()
-    if bat_now.status == "Charging" then
+    if bat_now.status == 'Charging' then
       battery_widget_color = beautiful.fg_normal_alt
       battery_image = beautiful.battery_icon_charging
-    elseif bat_now.status == "Full" then
-      perc = ""
+    elseif bat_now.status == 'Full' then
+      perc = ''
       battery_widget_color = beautiful.fg_normal
       battery_image = beautiful.battery_icon_full
     else
@@ -271,27 +269,25 @@ local battery_widget_text = lain.widget.bat({
     end
 
     if bat_now.perc > 90 then
-      perc = ""
-    elseif bat_now.perc == "N/A" then
-      perc = ""
+      perc = ''
+    elseif bat_now.perc == 'N/A' then
+      perc = ''
     else
-      perc = bat_now.perc .. "%"
+      perc = bat_now.perc .. '%'
     end
 
-    widget:set_markup(lain.util.markup.fontfg(beautiful.font, beautiful.fg_normal, perc .. " "))
+    widget:set_markup(lain.util.markup.fontfg(beautiful.font, beautiful.fg_normal, perc .. ' '))
     battery_image_widget:set_image(gears.color.recolor_image(battery_image, battery_widget_color))
-  end
+  end,
 })
-battery_widget = wibox.widget {
-	battery_image_widget,
-	battery_widget_text,
-	layout  = wibox.layout.fixed.horizontal
-}
+battery_widget = wibox.widget({
+  battery_image_widget,
+  battery_widget_text,
+  layout = wibox.layout.fixed.horizontal,
+})
 battery_widget:buttons(awful.util.table.join(
   -- Update battery widget with click, if we're not patient enough
-  awful.button({}, 1, function()
-    battery_widget_text:update()
-  end)
+  awful.button({}, 1, function() battery_widget_text:update() end)
 ))
 
 -- @Reference
@@ -355,34 +351,26 @@ dynamic_tagging = function()
         end
       end
       original_name = my_utils.get_first_word(t.name)
-      t.name = original_name .. " " .. string.rep("ॱ", clients_on_this_tag)
+      t.name = original_name .. ' ' .. string.rep('ॱ', clients_on_this_tag)
     end
   end
 end
 
 -- signal function to execute when a client disappears
-client.connect_signal("unmanage", function (c, startup)
-    dynamic_tagging()
-end)
+client.connect_signal('unmanage', function(c, startup) dynamic_tagging() end)
 
 -- This is the only host with "rotatable" screen
-if hostname == "innodellix" then
-  rotate_widget:buttons(awful.util.table.join(
-    awful.button({}, 1, function() -- left click
-        rotate_widget:toggle()
-    end)
-  ))
-  touch_widget:buttons(awful.util.table.join(
-    awful.button({}, 1, function() -- left click
-        touch_widget:toggle()
-    end)
-  ))
+if hostname == 'innodellix' then
+  rotate_widget:buttons(awful.util.table.join(awful.button({}, 1, function() -- left click
+    rotate_widget:toggle()
+  end)))
+  touch_widget:buttons(awful.util.table.join(awful.button({}, 1, function() -- left click
+    touch_widget:toggle()
+  end)))
 end
-capslock:buttons(awful.util.table.join(
-  awful.button({}, 1, function() -- left click
-      capslock:toggle()
-  end)
-))
+capslock:buttons(awful.util.table.join(awful.button({}, 1, function() -- left click
+  capslock:toggle()
+end)))
 -- keyboard_widget:buttons(awful.util.table.join(
 --   awful.button({}, 1, function() -- left click
 --       keyboard_widget:toggle()
@@ -390,153 +378,151 @@ capslock:buttons(awful.util.table.join(
 -- ))
 spotify:buttons(awful.util.table.join(
   awful.button({}, 1, function() -- left click
-    handle_media("play-pause")
+    handle_media('play-pause')
     spotify:check()
   end),
   awful.button({}, 3, function() -- right click
     spotify:raise()
   end),
   awful.button({}, 4, function() -- scroll up
-    handle_media("previous")
+    handle_media('previous')
     spotify:check()
   end),
   awful.button({}, 5, function() -- scroll down
-    handle_media("next")
+    handle_media('next')
     spotify:check()
   end)
 ))
 
-psi_timer = gears.timer {
+psi_timer = gears.timer({
   timeout = 15,
   autostart = true,
-  callback = function()
-    psi_widget:check()
-  end
-}
+  callback = function() psi_widget:check() end,
+})
 
-spotify_timer = gears.timer {
+spotify_timer = gears.timer({
   timeout = 15,
   autostart = true,
   call_now = true,
-  callback = function()
-    spotify:check()
-  end
-}
+  callback = function() spotify:check() end,
+})
 
 local function screen_organizer(s, primary, is_extra)
 
-	debug_print("Now organizing screen: " .. s["name"], printmore)
+  debug_print('Now organizing screen: ' .. s['name'], printmore)
 
-	-- Wallpaper -- one for each screen
+  -- Wallpaper -- one for each screen
   -- set_wallpaper(s["object"])
 
   -- Create an imagebox widget which will contain an icon indicating which layout we're using.
   -- We need one layoutbox per screen.
-  s["object"].mylayoutbox = awful.widget.layoutbox(s["object"])
-  s["object"].mylayoutbox:buttons(gears.table.join(
-    awful.button({ }, 1, function () awful.layout.inc( 1) end),
-    awful.button({ }, 3, function () awful.layout.inc(-1) end),
-    awful.button({ }, 4, function () awful.layout.inc( 1) end),
-    awful.button({ }, 5, function () awful.layout.inc(-1) end)
-  ))
+  s['object'].mylayoutbox = awful.widget.layoutbox(s['object'])
+  s['object'].mylayoutbox:buttons(
+    gears.table.join(
+      awful.button({}, 1, function() awful.layout.inc(1) end),
+      awful.button({}, 3, function() awful.layout.inc(-1) end),
+      awful.button({}, 4, function() awful.layout.inc(1) end),
+      awful.button({}, 5, function() awful.layout.inc(-1) end)
+    )
+  )
 
-	-- some convenience stuff
-	if screen:count() > 1 then
-		taglist_width = dpi(250)
-		wibar_height = dpi(25)
-	else
-		taglist_width = dpi(350)
-		wibar_height = dpi(23)
-	end
+  -- some convenience stuff
+  if screen:count() > 1 then
+    taglist_width = dpi(250)
+    wibar_height = dpi(25)
+  else
+    taglist_width = dpi(350)
+    wibar_height = dpi(23)
+  end
 
   if not is_extra then
     -- Create a taglist widget
-    s["object"].mytaglist = awful.widget.taglist {
-      screen  = s["object"],
-      filter  = awful.widget.taglist.filter.all,
-      style   = {
-          shape = gears.shape.powerline
+    s['object'].mytaglist = awful.widget.taglist({
+      screen = s['object'],
+      filter = awful.widget.taglist.filter.all,
+      style = {
+        shape = gears.shape.powerline,
       },
-      layout   = {
-          spacing = -15,
-          spacing_widget = {
-              color  = beautiful.bg_normal,
-              shape  = gears.shape.powerline,
-              widget = wibox.widget.separator,
-          },
-          layout  = wibox.layout.flex.horizontal,
-          forced_width = taglist_width
-          -- max_widget_width = taglist_width /50
+      layout = {
+        spacing = -15,
+        spacing_widget = {
+          color = beautiful.bg_normal,
+          shape = gears.shape.powerline,
+          widget = wibox.widget.separator,
+        },
+        layout = wibox.layout.flex.horizontal,
+        forced_width = taglist_width,
+        -- max_widget_width = taglist_width /50
       },
       widget_template = {
+        {
           {
-              {
-                  {
-                      id     = 'text_role',
-                      widget = wibox.widget.textbox,
-                  },
-                  layout = wibox.layout.flex.horizontal,
-              },
-              left  = 24,
-              right = 12,
-              widget = wibox.container.margin,
+            {
+              id = 'text_role',
+              widget = wibox.widget.textbox,
+            },
+            layout = wibox.layout.flex.horizontal,
           },
-          id     = 'background_role',
-          widget = wibox.container.background,
+          left = 24,
+          right = 12,
+          widget = wibox.container.margin,
+        },
+        id = 'background_role',
+        widget = wibox.container.background,
       },
-      buttons = taglist_buttons
-    }
+      buttons = taglist_buttons,
+    })
 
     -- Create a tasklist widget
-    s["object"].mytasklist = awful.widget.tasklist {
-      screen  = s["object"],
-      filter  = awful.widget.tasklist.filter.currenttags,
-      style   = {
-          shape = gears.shape.powerline
+    s['object'].mytasklist = awful.widget.tasklist({
+      screen = s['object'],
+      filter = awful.widget.tasklist.filter.currenttags,
+      style = {
+        shape = gears.shape.powerline,
       },
-      layout   = {
-          spacing = -15,
-          spacing_widget = {
-              color  = beautiful.bg_normal,
-              shape  = gears.shape.powerline,
-              widget = wibox.widget.separator,
-          },
-          layout  = wibox.layout.flex.horizontal
+      layout = {
+        spacing = -15,
+        spacing_widget = {
+          color = beautiful.bg_normal,
+          shape = gears.shape.powerline,
+          widget = wibox.widget.separator,
+        },
+        layout = wibox.layout.flex.horizontal,
       },
       widget_template = {
+        {
           {
-              {
-                  {
-                      id     = 'text_role',
-                      widget = wibox.widget.textbox,
-                  },
-                  layout = wibox.layout.flex.horizontal,
-              },
-              left  = 18,
-              right = 18,
-              widget = wibox.container.margin
+            {
+              id = 'text_role',
+              widget = wibox.widget.textbox,
+            },
+            layout = wibox.layout.flex.horizontal,
           },
-          id     = 'background_role',
-          widget = wibox.container.background,
+          left = 18,
+          right = 18,
+          widget = wibox.container.margin,
+        },
+        id = 'background_role',
+        widget = wibox.container.background,
       },
-      buttons = tasklist_buttons
-    }
+      buttons = tasklist_buttons,
+    })
   end
 
   -- Create the wibox
-	s["object"].mywibox = awful.wibar({
-		position = "top",
-		screen = s["object"],
-		height = wibar_height,
-	})
+  s['object'].mywibox = awful.wibar({
+    position = 'top',
+    screen = s['object'],
+    height = wibar_height,
+  })
 
   systray_right_widgets = {
-    layout = wibox.layout.fixed.horizontal
+    layout = wibox.layout.fixed.horizontal,
   }
 
   table.insert(systray_right_widgets, separator_empty)
   if primary then
-    if screen:count() == 1 and hostname == "innodellix" then
+    if screen:count() == 1 and hostname == 'innodellix' then
       table.insert(systray_right_widgets, touch_widget)
       table.insert(systray_right_widgets, rotate_widget)
     end
@@ -552,32 +538,32 @@ local function screen_organizer(s, primary, is_extra)
   end
   table.insert(systray_right_widgets, capslock)
   table.insert(systray_right_widgets, mytextclock)
-  table.insert(systray_right_widgets, s["object"].mylayoutbox)
+  table.insert(systray_right_widgets, s['object'].mylayoutbox)
 
   -- Add widgets to the wibox
   if is_extra then
     -- Doesn't get much stuff on this screen by default
-		-- Only if we move some shit to it
-    s["object"].mywibox:setup {
+    -- Only if we move some shit to it
+    s['object'].mywibox:setup({
       layout = wibox.layout.align.horizontal,
       { -- Left widgets
         layout = wibox.layout.align.horizontal,
         separator,
       },
-      systray_right_widgets
-    }
+      systray_right_widgets,
+    })
   else
     -- Normal setup, tag and taskslists
-    s["object"].mywibox:setup {
+    s['object'].mywibox:setup({
       layout = wibox.layout.align.horizontal,
       { -- Left widgets
         layout = wibox.layout.align.horizontal,
-        s["object"].mytaglist,
+        s['object'].mytaglist,
         separator,
       },
-      s["object"].mytasklist, -- Middle widget
-      systray_right_widgets
-    }
+      s['object'].mytasklist, -- Middle widget
+      systray_right_widgets,
+    })
   end
 end
 
@@ -585,45 +571,44 @@ function place_tags(properties, primary, screens_table)
   if my_utils.table_length(screens_table) == 1 then
     -- Only 1 screen here, no need for drama
     for _, tag in pairs(root.tags()) do
-			table.insert(screens_table[properties["name"]]["tags"], tag)
-      if tag.screen ~= properties["object"] then
-        tag.screen = properties["object"]
+      table.insert(screens_table[properties['name']]['tags'], tag)
+      if tag.screen ~= properties['object'] then
+        tag.screen = properties['object']
       end
     end
-
   else
     for _, tag in pairs(root.tags()) do
-			local first_word = my_utils.get_first_word(tag.name)
-      if primary == false and ( first_word == "web" or first_word == "mail") then
-        if tag.screen ~= properties["object"] then
-          debug_print("Re-assigning " .. first_word, printmore)
-          tag.screen = properties["object"]
-					table.insert(screens_table[properties["name"]]["tags"], tag)
-				else
-					debug_print(first_word .. " is already on correct screen", printmore)
-					table.insert(screens_table[properties["name"]]["tags"], tag)
+      local first_word = my_utils.get_first_word(tag.name)
+      if primary == false and (first_word == 'web' or first_word == 'mail') then
+        if tag.screen ~= properties['object'] then
+          debug_print('Re-assigning ' .. first_word, printmore)
+          tag.screen = properties['object']
+          table.insert(screens_table[properties['name']]['tags'], tag)
+        else
+          debug_print(first_word .. ' is already on correct screen', printmore)
+          table.insert(screens_table[properties['name']]['tags'], tag)
         end
-      elseif primary == true and ( first_word == "term" or first_word == "chat") then
-        if tag.screen ~= properties["object"] then
-          debug_print("Re-assigning " .. first_word, printmore)
-          tag.screen = properties["object"]
-					table.insert(screens_table[properties["name"]]["tags"], tag)
-				else
-					debug_print(first_word .. " is already on correct screen", printmore)
-					table.insert(screens_table[properties["name"]]["tags"], tag)
-				end
+      elseif primary == true and (first_word == 'term' or first_word == 'chat') then
+        if tag.screen ~= properties['object'] then
+          debug_print('Re-assigning ' .. first_word, printmore)
+          tag.screen = properties['object']
+          table.insert(screens_table[properties['name']]['tags'], tag)
+        else
+          debug_print(first_word .. ' is already on correct screen', printmore)
+          table.insert(screens_table[properties['name']]['tags'], tag)
+        end
       end
     end
   end
 
   -- ordering shit
   for _, tag in pairs(root.tags()) do
-    if tag.name == "term" then
+    if tag.name == 'term' then
       tag.index = 3
-    elseif tag.name == "mail" then
+    elseif tag.name == 'mail' then
       tag.index = 2
-    elseif tag.name == "web" then
-        tag.index = 1
+    elseif tag.name == 'web' then
+      tag.index = 1
     else -- chat
       tag.index = 4
     end
@@ -634,24 +619,24 @@ function process_screens(systray, screens_table)
 
   systray = systray or nil
 
-  debug_print("Processing screens result: " .. my_utils.dump(screens_table), printmore)
+  debug_print('Processing screens result: ' .. my_utils.dump(screens_table), printmore)
 
   second_screen_already_processed = false
   for name, properties in pairs(screens_table) do
     -- In case we have more than 2 screens, we will register first
     -- non-primary screen as 2nd, others won't get tags.
-    if properties["primary"] then
+    if properties['primary'] then
       -- this is the "primary" screen so it should have the systray
-      systray:set_screen(properties["object"])
+      systray:set_screen(properties['object'])
       screen_organizer(properties, true, false, false)
-      debug_print("Checking tags for: " .. name .. " (primary) ", printmore)
+      debug_print('Checking tags for: ' .. name .. ' (primary) ', printmore)
       place_tags(properties, true, screens_table)
     else
       screen_organizer(properties, false, second_screen_already_processed)
       if second_screen_already_processed then
-        debug_print("Extra screen found: " .. my_utils.dump(properties["object"]), printmore)
+        debug_print('Extra screen found: ' .. my_utils.dump(properties['object']), printmore)
       else
-        debug_print("Checking tags for: " .. name .. " (not primary) ", printmore)
+        debug_print('Checking tags for: ' .. name .. ' (not primary) ', printmore)
         place_tags(properties, false, screens_table)
         second_screen_already_processed = true
       end
@@ -779,13 +764,13 @@ client.connect_signal("manage", function (c)
 	-- ))
 end)
 
-client.connect_signal("property::minimized", function(c)
+client.connect_signal('property::minimized', function(c)
   -- If a sticky window is minimized, ensure it's visible on taskbar
   if c.sticky then
     c.skip_taskbar = false
   end
 end)
-client.connect_signal("focus", function(c)
+client.connect_signal('focus', function(c)
   -- If a sticky window is unminimized, remove from taskbar
   if c.sticky and not c.minimized then
     c.skip_taskbar = true
@@ -793,35 +778,35 @@ client.connect_signal("focus", function(c)
 end)
 
 -- Screen handling
-screen.connect_signal("list", function()
-	debug_print("List signal received", true)
-	if my_utils.file_age('/home/gurkan/.awesome_screen_setup_lock', true) < 4 then
-		debug_print("There is already another lock waiting, skipping this screen change", true)
-	else
-		os.execute('touch /home/gurkan/.awesome_screen_setup_lock')
-		debug_print("Sleeping for 2 secs", true)
-		os.execute('sleep 2')
-		screens_table = get_screens()
-		process_screens(my_systray, screens_table)
-	end
+screen.connect_signal('list', function()
+  debug_print('List signal received', true)
+  if my_utils.file_age('/home/gurkan/.awesome_screen_setup_lock', true) < 4 then
+    debug_print('There is already another lock waiting, skipping this screen change', true)
+  else
+    os.execute('touch /home/gurkan/.awesome_screen_setup_lock')
+    debug_print('Sleeping for 2 secs', true)
+    os.execute('sleep 2')
+    screens_table = get_screens()
+    process_screens(my_systray, screens_table)
+  end
 end)
 
 os.execute('touch /home/gurkan/.awesome_screen_setup_lock')
 screens_table = get_screens()
 process_screens(my_systray, screens_table)
 
-tag.connect_signal("request::screen", function(t)
+tag.connect_signal('request::screen', function(t)
   -- recover tags on a removed screen
-  naughty.notify({text = "Recovering tag: " .. t.name})
+  naughty.notify({ text = 'Recovering tag: ' .. t.name })
   for s in screen do
-		t.screen = s
-		my_dropdown.screen = s
-		return
-	end
+    t.screen = s
+    my_dropdown.screen = s
+    return
+  end
 end)
 
 -- I only need 2 of these though 😬 max, tile or bust.
-tag.connect_signal("request::default_layouts", function()
+tag.connect_signal('request::default_layouts', function()
   -- awful.layout.append_default_layouts({
   --   awful.layout.suit.tile,
   --   awful.layout.suit.max,
@@ -832,7 +817,7 @@ tag.connect_signal("request::default_layouts", function()
   }
 end)
 
-client.connect_signal("mouse::enter", function (c)
+client.connect_signal('mouse::enter', function(c)
   if c.ontop and c.sticky and c.skip_taskbar and c.marked then
     c.opacity = 0.9
     -- Run away from mouse, to the other side of the screen
@@ -847,82 +832,82 @@ end)
 -- @Reference: Reflect click to the client below
 -- Still can't "undo" click on the original client, but fun to play
 -- client.connect_signal("button::press", function (c)
-  -- if c.ontop and c.sticky and c.skip_taskbar and c.marked then
-    -- next_client = awful.client.next (1, c, true)
-    -- helpers.async("xdotool click --window " .. next_client.window .. " 1", function(out)
-    -- end)
-  -- end
+-- if c.ontop and c.sticky and c.skip_taskbar and c.marked then
+-- next_client = awful.client.next (1, c, true)
+-- helpers.async("xdotool click --window " .. next_client.window .. " 1", function(out)
+-- end)
+-- end
 -- end)
 
-awesome.connect_signal("exit", function (c)
+awesome.connect_signal('exit', function(c)
   -- We are about to exit / restart awesome, save our last used tag
   save_current_tags(screens_table)
 end)
 
 -- Add a titlebar if titlebars_enabled is set to true in the rules.
-client.connect_signal("request::titlebars", function(c)
+client.connect_signal('request::titlebars', function(c)
   -- buttons for the titlebar
   local buttons = gears.table.join(
-    awful.button({ }, 1, function()
-      c:emit_signal("request::activate", "titlebar", {raise = true})
+    awful.button({}, 1, function()
+      c:emit_signal('request::activate', 'titlebar', { raise = true })
       awful.mouse.client.move(c)
     end),
-    awful.button({ }, 3, function()
-			c:emit_signal("request::activate", "titlebar", {raise = true})
-			awful.mouse.client.resize(c)
-		end)
+    awful.button({}, 3, function()
+      c:emit_signal('request::activate', 'titlebar', { raise = true })
+      awful.mouse.client.resize(c)
+    end)
   )
 
-  awful.titlebar(c) : setup {
+  awful.titlebar(c):setup({
     { -- Left
       awful.titlebar.widget.iconwidget(c),
       buttons = buttons,
-      layout  = wibox.layout.fixed.horizontal
+      layout = wibox.layout.fixed.horizontal,
     },
     { -- Middle
       { -- Title
-        align  = "center",
-        widget = awful.titlebar.widget.titlewidget(c)
+        align = 'center',
+        widget = awful.titlebar.widget.titlewidget(c),
       },
       buttons = buttons,
-      layout  = wibox.layout.flex.horizontal
+      layout = wibox.layout.flex.horizontal,
     },
     { -- Right
-      awful.titlebar.widget.floatingbutton (c),
+      awful.titlebar.widget.floatingbutton(c),
       awful.titlebar.widget.maximizedbutton(c),
-      awful.titlebar.widget.stickybutton   (c),
-      awful.titlebar.widget.ontopbutton  (c),
-      awful.titlebar.widget.closebutton  (c),
-      layout = wibox.layout.fixed.horizontal()
+      awful.titlebar.widget.stickybutton(c),
+      awful.titlebar.widget.ontopbutton(c),
+      awful.titlebar.widget.closebutton(c),
+      layout = wibox.layout.fixed.horizontal(),
     },
-    layout = wibox.layout.align.horizontal
-  }
+    layout = wibox.layout.align.horizontal,
+  })
 end)
 
-tag.connect_signal("property::layout", function(t)
+tag.connect_signal('property::layout', function(t)
   -- make the focused window master on layout change
   local c = client.focus
-  if c and awful.layout.get(t.screen).name == "max" then
+  if c and awful.layout.get(t.screen).name == 'max' then
     awful.client.setmaster(c)
     c:raise()
   end
 end)
 
-client.connect_signal("property::size", function(c)
+client.connect_signal('property::size', function(c)
   -- workaround for exiting fullscreen on floating windows
   -- some params do not stay as they should, so we enforce them
   if c.floating and c.skip_taskbar and not c.fullscreen then
-    c.sticky=true
-    c.ontop=true
+    c.sticky = true
+    c.ontop = true
   end
 end)
 
-client.connect_signal("focus", function(c)
+client.connect_signal('focus', function(c)
   -- border setup
   c.border_color = beautiful.border_focus
 end)
 
-client.connect_signal("unfocus", function(c)
+client.connect_signal('unfocus', function(c)
   -- border setup
   c.border_color = beautiful.border_normal
 
@@ -936,47 +921,45 @@ end)
 -- Git version workaround, shit is not complete (e.g. slack does not switch to)
 -- alerting chat etc. but at least hovers the app itself
 -- https://github.com/awesomeWM/awesome/issues/3182 waiting for proper fix
-naughty.connect_signal("destroyed", function(n, reason)
+naughty.connect_signal('destroyed', function(n, reason)
   -- debug_print(my_utils.dump(n))
   if not n.clients then
     return
   end
-  if reason == require("naughty.constants").notification_closed_reason.dismissed_by_user then
-  -- If we clicked on a notification, we get a new urgent client to jump to
-    client.connect_signal("property::urgent", function(c)
-    -- We don't use notification_client because it's not reliable (Ex: If we have two different instances of chrome)
-    -- cf: https://awesomewm.org/apidoc/core_components/naughty.notification.html#clients
-    -- So we just check if the client name of our notification is the same as the last urgent client
-    -- and jump to this one.
-    for _, notification_client in ipairs(n.clients) do
-      if not c.name or not c.notification_client then
-        -- Means we can't compare anyway
-        goto noclientname
+  if reason == require('naughty.constants').notification_closed_reason.dismissed_by_user then
+    -- If we clicked on a notification, we get a new urgent client to jump to
+    client.connect_signal('property::urgent', function(c)
+      -- We don't use notification_client because it's not reliable (Ex: If we have two different instances of chrome)
+      -- cf: https://awesomewm.org/apidoc/core_components/naughty.notification.html#clients
+      -- So we just check if the client name of our notification is the same as the last urgent client
+      -- and jump to this one.
+      for _, notification_client in ipairs(n.clients) do
+        if not c.name or not c.notification_client then
+          -- Means we can't compare anyway
+          goto noclientname
+        end
+        if c.name == notification_client.name then
+          c:jump_to()
+          break
+        end
+        ::noclientname::
       end
-      if c.name == notification_client.name then
-        c:jump_to()
-        break
-      end
-      ::noclientname::
-    end
     end)
   end
 end)
 
 -- Show OSD notification of current status on volume:change signal
-awesome.connect_signal("volume::change", function()
+awesome.connect_signal('volume::change', function()
   -- check if it's muted first
-  awful.spawn.easy_async(
-    "pamixer --get-mute",
-    function(stdout, stderr, reason, exit_code)
-		-- f*king whitespaces
-		stdout = stdout:gsub("%s+", "")
+  awful.spawn.easy_async('pamixer --get-mute', function(stdout, stderr, reason, exit_code)
+    -- f*king whitespaces
+    stdout = stdout:gsub('%s+', '')
     if stdout == 'true' then
-			-- muted, only show state
-        triggerwibox('mute')
-			return
-		else
-      helpers.async("pamixer --get-volume", function(out)
+      -- muted, only show state
+      triggerwibox('mute')
+      return
+    else
+      helpers.async('pamixer --get-volume', function(out)
         vb_slider.widget.value = tonumber(out)
         triggerwibox('volume')
       end)
@@ -985,9 +968,9 @@ awesome.connect_signal("volume::change", function()
 end)
 
 -- Show OSD notification of current brightness on brightness:change signal
-awesome.connect_signal("brightness:change", function()
-  awful.spawn.easy_async("brightnessctl -q get", function(current)
-    awful.spawn.easy_async("brightnessctl -q max", function(max)
+awesome.connect_signal('brightness:change', function()
+  awful.spawn.easy_async('brightnessctl -q get', function(current)
+    awful.spawn.easy_async('brightnessctl -q max', function(max)
       vb_slider.widget.value = 100 * tonumber(current) / tonumber(max)
       triggerwibox('brightness')
     end)
@@ -995,10 +978,8 @@ awesome.connect_signal("brightness:change", function()
 end)
 
 -- When switching to a tag with urgent clients, raise them.
-awful.tag.attached_connect_signal(s, "property::selected", function ()
-  local urgent_clients = function (c)
-    return awful.rules.match(c, { urgent = true })
-  end
+awful.tag.attached_connect_signal(s, 'property::selected', function()
+  local urgent_clients = function(c) return awful.rules.match(c, { urgent = true }) end
   for c in awful.client.iterate(urgent_clients) do
     if c.first_tag == mouse.screen.selected_tag then
       client.focus = c
@@ -1007,20 +988,24 @@ awful.tag.attached_connect_signal(s, "property::selected", function ()
   end
 end)
 
-awesome.connect_signal("startup", function(s, state)
-  run_once("sleep 3 && firefox", "firefox")
+awesome.connect_signal('startup', function(s, state)
+  run_once('sleep 3 && firefox', 'firefox')
   -- only makes sense on this laptop
-  if hostname == "innodellix" then
-    run_once("sleep 5 && slack -s", "slack")
-    run_once("sleep 8 && thunderbird", "rbird")
+  if hostname == 'innodellix' then
+    run_once('sleep 5 && slack -s', 'slack')
+    run_once('sleep 8 && thunderbird', 'rbird')
   end
-  run_once("XDG_CURRENT_DESKTOP=gnome telegram-desktop", "telegram")
-  run_once("pasystray")
-	run_once("wezterm start --class mainqterm", "mainqterm", "term")
-	-- one day wezterm might have tmux support 🤞
-	-- run_once("wezterm connect default --class mainqterm", "mainqterm", "term")
-  run_once("picom")
-  run_once("alttab -w 1 -t 400x300 -frame \"" .. string.upper(beautiful.fg_normal) .. "\" -i 100x100 -font xft:firacode-20")
+  run_once('XDG_CURRENT_DESKTOP=gnome telegram-desktop', 'telegram')
+  run_once('pasystray')
+  run_once('wezterm start --class mainqterm', 'mainqterm', 'term')
+  -- one day wezterm might have tmux support 🤞
+  -- run_once("wezterm connect default --class mainqterm", "mainqterm", "term")
+  run_once('picom')
+  run_once(
+    'alttab -w 1 -t 400x300 -frame "'
+      .. string.upper(beautiful.fg_normal)
+      .. '" -i 100x100 -font xft:firacode-20'
+  )
 end)
 
 set_wallpapers(screens_table)
