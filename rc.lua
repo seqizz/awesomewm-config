@@ -382,7 +382,7 @@ spotify:buttons(awful.util.table.join(
     spotify:check()
   end),
   awful.button({}, 3, function() -- right click
-    spotify:raise()
+    spotify:raise_toggle()
   end),
   awful.button({}, 4, function() -- scroll up
     handle_media('previous')
