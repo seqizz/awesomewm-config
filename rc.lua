@@ -56,20 +56,20 @@ awful.key({ win                }, "q",      function (c) c:kill() end),
 awful.key({ win                }, "Return", function (c) c:swap(awful.client.getmaster()) end),
 -- Movement and focus:
 -- Win                + Arrows -> Swap focus between windows
--- Win        + Shift + Arrows -> Move windows to that direction
+-- Win        + Shify + WASD   -> Move windows to that direction
 -- Win + Ctrl         + Arrows -> Expand windows to that direction
 -- Win + Ctrl + Shift + Arrows -> Shrink windows from that direction
 awful.key({ ctrl, win          }, "Right",  function (c) move_or_expand(c, "expand", "right") end),
-awful.key({ win, "Shift"       }, "Left",   function (c) move_or_expand(c, "move", "left") end),
+awful.key({ win,  "Shift"      }, "a",      function (c) move_or_expand(c, "move", "left") end),
 awful.key({ ctrl, win, "Shift" }, "Left",   function (c) move_or_expand(c, "shrink", "left") end),
 awful.key({ ctrl, win          }, "Left",   function (c) move_or_expand(c, "expand", "left") end),
 awful.key({ ctrl, win, "Shift" }, "Right",  function (c) move_or_expand(c, "shrink", "right") end),
-awful.key({ win, "Shift"       }, "Right",  function (c) move_or_expand(c, "move", "right") end),
+awful.key({ win, "Shift"       }, "d",      function (c) move_or_expand(c, "move", "right") end),
 awful.key({ ctrl, win          }, "Down",   function (c) move_or_expand(c, "expand", "down") end),
 awful.key({ ctrl, win, "Shift" }, "Up",     function (c) move_or_expand(c, "shrink", "up") end),
 awful.key({ ctrl, win          }, "Up",     function (c) move_or_expand(c, "expand", "up") end),
-awful.key({ win, "Shift"       }, "Down",   function (c) move_or_expand(c, "move", "down") end),
-awful.key({ win, "Shift"       }, "Up",     function (c) move_or_expand(c, "move", "up") end),
+awful.key({ win, "Shift"       }, "s",      function (c) move_or_expand(c, "move", "down") end),
+awful.key({ win, "Shift"       }, "w",      function (c) move_or_expand(c, "move", "up") end),
 awful.key({ ctrl, win, "Shift" }, "Down",   function (c) move_or_expand(c, "shrink", "down") end),
 awful.key({ win                }, "Right",  function (c) switch_focus_without_mouse(c, "right") end),
 awful.key({ win                }, "Left",   function (c) switch_focus_without_mouse(c, "left") end),
