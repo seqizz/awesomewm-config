@@ -56,7 +56,7 @@ awful.key({ win                }, "q",      function (c) c:kill() end),
 awful.key({ win                }, "Return", function (c) c:swap(awful.client.getmaster()) end),
 -- Movement and focus:
 -- Win                + Arrows -> Swap focus between windows
--- Win        + Shify + WASD   -> Move windows to that direction
+-- Win        + Shift + WASD   -> Move windows to that direction
 -- Win + Ctrl         + Arrows -> Expand windows to that direction
 -- Win + Ctrl + Shift + Arrows -> Shrink windows from that direction
 awful.key({ ctrl, win          }, "Right",  function (c) move_or_expand(c, "expand", "right") end),
@@ -777,7 +777,7 @@ end)
 -- Screen handling
 screen.connect_signal('list', function()
   debug_print('List signal received', true)
-  if my_utils.file_age('/home/gurkan/.awesome_screen_setup_lock', true) < 4 then
+  if my_utils.file_age('/home/gurkan/.awesome_screen_setup_lock', printmore) < 4 then
     debug_print('There is already another lock waiting, skipping this screen change', true)
   else
     os.execute('touch /home/gurkan/.awesome_screen_setup_lock')
