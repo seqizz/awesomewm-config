@@ -34,25 +34,25 @@ Highlights:
 
 #### Window related shortcuts
 
-| Shortcut                    | Action                                                               |
-| ---                         | ---                                                                  |
-| Win + Arrows                | Swap focus between windows                                           |
-| Win + Shift + WASD          | Move windows to that direction                                       |
-| Win + Shift + Arrows        | Move windows to the screen on that direction                         |
-| Win + Ctrl + Arrows         | Expand windows to that direction                                     |
-| Win + Ctrl + Shift + Arrows | Shrink windows from that direction                                   |
-| Win + Q                     | Kill window                                                          |
-| Win + Enter                 | Swap master window                                                   |
-| Win + WASD                  | Expand active windows size to that direction (tiling mode)           |
-| Win + Z                     | Minimize Window                                                      |
-| Ctrl + Alt + S              | Suspend window (Linux SIGSTOP)                                       |
-| Ctrl + Alt + W              | Make window sticky + on top (e.g. video meeting)                     |
-| Ctrl + Alt + Shift + S      | Make window sticky                                     (*)           |
-| Win + Esc                   | Hide sticky windows                                                  |
-| Win + F7 / F8               | Expand / Shrink fake screens                          (**)           |
-| Win + 1234 (n)              | Go to nth tag                                                        |
-| Win + Shift + 1234 (n)      | Move window to nth tag                                               |
-| Win + Tab                   | Tab-cycle between tags (via [alttab](https://github.com/sagb/alttab) |
+| Shortcut                    | Action                                                                |
+| ---                         | ---                                                                   |
+| Win + Arrows                | Swap focus between windows                                            |
+| Win + Shift + WASD          | Move windows to that direction                                        |
+| Win + Shift + Arrows        | Move windows to the screen on that direction                          |
+| Win + Ctrl + Arrows         | Expand windows to that direction                                      |
+| Win + Ctrl + Shift + Arrows | Shrink windows from that direction                                    |
+| Win + Q                     | Kill window                                                           |
+| Win + Enter                 | Swap master window                                                    |
+| Win + WASD                  | Expand active windows size to that direction (tiling mode)            |
+| Win + Z                     | Minimize Window                                                       |
+| Ctrl + Alt + S              | Suspend window (Linux SIGSTOP)                                        |
+| Ctrl + Alt + W              | Make window sticky + on top (e.g. video meeting)                      |
+| Ctrl + Alt + Shift + S      | Make window sticky (*)                                                |
+| Win + Esc                   | Hide sticky windows                                                   |
+| Win + F7 / F8               | Expand / Shrink fake screens (**)                                     |
+| Win + 1234 (n)              | Go to nth tag                                                         |
+| Win + Shift + 1234 (n)      | Move window to nth tag                                                |
+| Win + Tab                   | Tab-cycle between tags (via [alttab](https://github.com/sagb/alttab)) |
 
 And of course, I have tons of other shortcuts for launching helpful stuff, but that's not config-related.
 
