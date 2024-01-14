@@ -148,43 +148,43 @@ end
 
 function switch_to_tag(tag_name, printmore)
 	debug_print('switch_to_tag: Switching to tag ' .. tag_name, printmore)
-    t = find_tag_by_first_word(tag_name, printmore)
-    tags_screen_obj = t.screen
-    awful.tag.viewnone(tags_screen_obj)
-    awful.tag.viewtoggle(t)
+  t = find_tag_by_first_word(tag_name, printmore)
+  tags_screen_obj = t.screen
+  awful.tag.viewnone(tags_screen_obj)
+  awful.tag.viewtoggle(t)
 end
 
 function find_tag_by_first_word(first_word, printmore)
-    local all_tags = root.tags()
-    for _, t in ipairs(all_tags) do
-        if first_word == my_utils.get_first_word(t.name) then
-            return t
-        end
+  local all_tags = root.tags()
+  for _, t in ipairs(all_tags) do
+    if first_word == my_utils.get_first_word(t.name) then
+      return t
     end
+  end
 end
 
 function find_screen_of_tag(screens_table, tag_obj, printmore)
-    for name, properties in pairs(screens_table) do
-        for _, t in ipairs(properties.tags) do
-            if t == tag_obj then
-                debug_print("find_screen_of_tag: Found " .. name .. " for tag " .. tag_obj.name, printmore)
-                return properties["object"]
-            else
-                debug_print("find_screen_of_tag: " .. tag_obj.name .. " not in screen " .. name, printmore)
-            end
-        end
+  for name, properties in pairs(screens_table) do
+    for _, t in ipairs(properties.tags) do
+      if t == tag_obj then
+        debug_print("find_screen_of_tag: Found " .. name .. " for tag " .. tag_obj.name, printmore)
+        return properties["object"]
+      else
+        debug_print("find_screen_of_tag: " .. tag_obj.name .. " not in screen " .. name, printmore)
+      end
     end
+  end
 end
 
 function move_focused_client_to_tag(tag_name)
-	tag_obj = awful.tag.find_by_name(nil, tag_name)
-	if client.focus then
-		my_client_obj = client.focus
-		debug_print('Moving focused window (' .. my_client_obj.name .. ') to tag ' .. tag_name, printmore)
-		my_client_obj:move_to_tag(tag_obj)
-		switch_to_tag(tag_name, printmore)
-		client.focus = my_client_obj
-	end
+  tag_obj = awful.tag.find_by_name(nil, tag_name)
+  if client.focus then
+    my_client_obj = client.focus
+    debug_print('Moving focused window (' .. my_client_obj.name .. ') to tag ' .. tag_name, printmore)
+    my_client_obj:move_to_tag(tag_obj)
+    switch_to_tag(tag_name, printmore)
+    client.focus = my_client_obj
+  end
 end
 
 function hide_stickies()
@@ -231,20 +231,20 @@ function hide_stickies()
 end
 
 function run_once(program, grep_for, on_tag)
-	grep_for = grep_for or program:gmatch("%w+")() -- get first word
-	awful.spawn.easy_async(
-		"pgrep -f " .. grep_for,
-		function(stdout, stderr, reason, exit_code)
-			if exit_code ~= 0 then
-				naughty.notify { text = "starting " .. program .. " once" }
-				if on_tag ~= nil then
-					awful.spawn.with_shell(program, {tag = on_tag})
-				else
-					awful.spawn.with_shell(program)
-				end
-			end
-		end
-	)
+  grep_for = grep_for or program:gmatch("%w+")() -- get first word
+  awful.spawn.easy_async(
+    "pgrep -f " .. grep_for,
+    function(stdout, stderr, reason, exit_code)
+      if exit_code ~= 0 then
+        naughty.notify { text = "starting " .. program .. " once" }
+        if on_tag ~= nil then
+          awful.spawn.with_shell(program, {tag = on_tag})
+        else
+          awful.spawn.with_shell(program)
+        end
+      end
+    end
+  )
 end
 
 -- @Reference experimental fs-level locking for internal ops
@@ -292,45 +292,45 @@ function get_child_of(s, screens_table)
 end
 
 function resize_screen(s, screens_table, shrink)
-    if shrink then
-        diff = -dpi(50)
-    else
-        diff = dpi(50)
-    end
-    for name, properties in pairs(screens_table) do
-        if properties["object"] == s then
-            -- I found my screen
-            if properties["is_fake"] then
-                -- this is a fake screen which has a sibling (parent)
-                -- whatever you do here, do the reverse to the parent
-                local geo = s.geometry
-                local parent_geo = properties["parent"]["object"].geometry
-                s:fake_resize(geo.x, geo.y, geo.width + diff, geo.height)
-                properties["parent"]["object"]:fake_resize(parent_geo.x + diff, parent_geo.y, parent_geo.width - diff, parent_geo.height)
-                -- now we need to refresh/repaint the wallpaper
-                -- not using awful lib yet, see set_wallpapers function
-                -- awful.wallpaper:repaint()
-                set_wallpapers(screens_table)
-            else
-                local geo = s.geometry
-                child = get_child_of(s, screens_table)
-                if child == nil then
-                    -- this screen has no fake screen under it, noop
-                    goto nochange
-                end
-                -- this is a screen which has a fake screen sibling
-                -- whatever you do here, do the reverse to the parent
-                local fake_geo = child.geometry
-                s:fake_resize(geo.x - diff, geo.y, geo.width + diff, geo.height)
-                child:fake_resize(fake_geo.x,fake_geo.y, fake_geo.width - diff, fake_geo.height)
-                -- now we need to refresh/repaint the wallpaper
-                -- not using awful lib yet, see set_wallpapers function
-                -- awful.wallpaper:repaint()
-                set_wallpapers(screens_table)
-                ::nochange::
-            end
+  if shrink then
+      diff = -dpi(50)
+  else
+      diff = dpi(50)
+  end
+  for name, properties in pairs(screens_table) do
+    if properties["object"] == s then
+        -- I found my screen
+      if properties["is_fake"] then
+        -- this is a fake screen which has a sibling (parent)
+        -- whatever you do here, do the reverse to the parent
+        local geo = s.geometry
+        local parent_geo = properties["parent"]["object"].geometry
+        s:fake_resize(geo.x, geo.y, geo.width + diff, geo.height)
+        properties["parent"]["object"]:fake_resize(parent_geo.x + diff, parent_geo.y, parent_geo.width - diff, parent_geo.height)
+        -- now we need to refresh/repaint the wallpaper
+        -- not using awful lib yet, see set_wallpapers function
+        -- awful.wallpaper:repaint()
+        set_wallpapers(screens_table)
+      else
+        local geo = s.geometry
+        child = get_child_of(s, screens_table)
+        if child == nil then
+            -- this screen has no fake screen under it, noop
+            goto nochange
         end
+        -- this is a screen which has a fake screen sibling
+        -- whatever you do here, do the reverse to the parent
+        local fake_geo = child.geometry
+        s:fake_resize(geo.x - diff, geo.y, geo.width + diff, geo.height)
+        child:fake_resize(fake_geo.x,fake_geo.y, fake_geo.width - diff, fake_geo.height)
+        -- now we need to refresh/repaint the wallpaper
+        -- not using awful lib yet, see set_wallpapers function
+        -- awful.wallpaper:repaint()
+        set_wallpapers(screens_table)
+        ::nochange::
+      end
     end
+  end
 end
 
 function set_wallpapers(screens_table)
@@ -436,35 +436,55 @@ function find_screen_by_name(name)
   end
 end
 
-function get_screens()
-	local output_tbl = {}
-	local xrandr = io.popen("xrandr -q --current | grep -E ' connected (primary )?[0-9]'")
+function get_screen_of_focused()
+  -- check if any client is focused
+  local c = client.focus
+  if c then
+    -- found focus, return its screen
+    return c.screen
+  end
+end
 
-	if xrandr then
-        for line in xrandr:lines() do
-            -- if no physical screen is found, skip this line
-            screen_obj = my_utils.find_screen_by_name(line:firstword())
-            if screen_obj == nil then
-                goto skipanother
-            end
-            width, height = line:resolutions()
-            name = line:firstword() .. "_" .. width .. "x" .. height
-            output_tbl[name] = {}
-            primary = false
-            if string.match(line, " primary ") then
-                primary = true
-            end
-            output_tbl[name]["name"] = name
-            output_tbl[name]["primary"] = primary
-            output_tbl[name]["width"] = width
-            output_tbl[name]["height"] = height
-            output_tbl[name]["object"] = screen_obj
-            output_tbl[name]["parent"] = nil
-            output_tbl[name]["tags"] = {}
-            ::skipanother::
-        end
-        xrandr:close()
-	end
+function unminimize_client()
+  local c = awful.client.restore()
+  -- Focus restored client
+  if c then
+    c:emit_signal(
+    "request::activate", "key.unminimize", {raise = true}
+    )
+  end
+end
+
+
+function get_screens()
+  local output_tbl = {}
+  local xrandr = io.popen("xrandr -q --current | grep -E ' connected (primary )?[0-9]'")
+
+  if xrandr then
+    for line in xrandr:lines() do
+      -- if no physical screen is found, skip this line
+      screen_obj = my_utils.find_screen_by_name(line:firstword())
+      if screen_obj == nil then
+          goto skipanother
+      end
+      width, height = line:resolutions()
+      name = line:firstword() .. "_" .. width .. "x" .. height
+      output_tbl[name] = {}
+      primary = false
+      if string.match(line, " primary ") then
+          primary = true
+      end
+      output_tbl[name]["name"] = name
+      output_tbl[name]["primary"] = primary
+      output_tbl[name]["width"] = width
+      output_tbl[name]["height"] = height
+      output_tbl[name]["object"] = screen_obj
+      output_tbl[name]["parent"] = nil
+      output_tbl[name]["tags"] = {}
+      ::skipanother::
+    end
+    xrandr:close()
+  end
 
     -- now check if there is any fake screens needed to be added
     -- if the screen is too wide (or pixel count is too high, e.g. 4K), we will create a fake screen and add it to the table

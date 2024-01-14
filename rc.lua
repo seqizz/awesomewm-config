@@ -411,9 +411,6 @@ local function screen_organizer(s, primary, is_extra)
 
   debug_print('Now organizing screen: ' .. s['name'], printmore)
 
-  -- Wallpaper -- one for each screen
-  -- set_wallpaper(s["object"])
-
   -- Create an imagebox widget which will contain an icon indicating which layout we're using.
   -- We need one layoutbox per screen.
   s['object'].mylayoutbox = awful.widget.layoutbox(s['object'])
@@ -666,72 +663,68 @@ globalkeys = gears.table.join(
   capslock.keyWithWin,
   capslock.keyWithCtrl,
   -- Standard X11 keys, comes from Fn keys etc.
-  -- awful.key({              }, "XF86MonBrightnessUp",   nil, function() set_brightness('5%+') end),
-  -- awful.key({              }, "XF86MonBrightnessDown", nil, function() set_brightness('5%-') end),
   awful.key({              }, "XF86MonBrightnessUp",   nil, function() fn_process_action('brightness', 'up') end),
   awful.key({              }, "XF86MonBrightnessDown", nil, function() fn_process_action('brightness', 'down') end),
   awful.key({              }, "XF86AudioRaiseVolume",  nil, function() fn_process_action('sink', 'up') end),
   awful.key({              }, "XF86AudioLowerVolume",  nil, function() fn_process_action('sink', 'down') end),
-  -- awful.key({              }, "XF86AudioRaiseVolume",  nil, function() set_volume('i') end),
-  -- awful.key({              }, "XF86AudioLowerVolume",  nil, function() set_volume('d') end),
   awful.key({              }, "XF86AudioMute",         nil, function() fn_process_action('sink', 'toggle') end),
   awful.key({              }, "XF86AudioMicMute" ,     nil, function() fn_process_action('source', 'toggle') end),
-  awful.key({              }, "XF86AudioPlay",         nil, function () fn_process_action('media', 'pausetoggle') end),
-  awful.key({              }, "XF86AudioStop",         nil, function () fn_process_action('media', 'stop') end),
-  awful.key({              }, "XF86AudioPrev",         nil, function ()
+  awful.key({              }, "XF86AudioPlay",         nil, function() fn_process_action('media', 'pausetoggle') end),
+  awful.key({              }, "XF86AudioStop",         nil, function() fn_process_action('media', 'stop') end),
+  awful.key({              }, "XF86AudioPrev",         nil, function()
                                                               fn_process_action('media', 'previous')
                                                               spotify:check()
                                                             end),
-  awful.key({              }, "XF86AudioNext",         nil, function ()
+  awful.key({              }, "XF86AudioNext",         nil, function()
                                                               fn_process_action('media', 'next')
                                                               spotify:check()
                                                             end),
   -- Smart plug toggle
-  awful.key({              }, "XF86HomePage",          nil, function () awful.spawn(bulb_toggle) end),
+  awful.key({              }, "XF86HomePage",          nil, function() awful.spawn(bulb_toggle) end),
   -- For laptop, which doesn't have next/prev buttons
-  awful.key({ ctrl         }, "XF86AudioRaiseVolume",  nil, function ()
+  awful.key({ ctrl         }, "XF86AudioRaiseVolume",  nil, function()
                                                               fn_process_action('media', 'next')
                                                               spotify:check()
                                                             end),
-  awful.key({ ctrl         }, "XF86AudioLowerVolume",  nil, function ()
+  awful.key({ ctrl         }, "XF86AudioLowerVolume",  nil, function()
                                                               fn_process_action('media', 'previous')
                                                               spotify:check()
                                                             end),
   -- Dropdown terminal: F12
-  awful.key({              }, "F12",                   nil, function () my_dropdown:toggle() end),
-  awful.key({              }, "Print",                 nil, function () awful.spawn("flameshot gui") end),
-  awful.key({ "Shift"      }, "Print",                      function () awful.spawn("flameshot full -c") end),
-  awful.key({ ctrl         }, "space",                      function () awful.spawn(rofi_cmd) end),
-  awful.key({              }, "F9",                    nil, function () awful.spawn(rofi_emoji_cmd) end),
-  awful.key({ ctrl         }, "F9",                    nil, function () awful.spawn(rofi_calc_cmd) end),
-  awful.key({ "Shift"      }, "F9",                    nil, function () awful.spawn(rofi_subsuper) end),
-  awful.key({ ctrl, alt    }, "c",                          function () awful.spawn(greenclip_cmd) end),
-  awful.key({ win          }, "p",                          function () awful.spawn("rofi-pass") end),
-  awful.key({ ctrl, alt    }, "t",                          function () awful.spawn(terminal) end),
-  awful.key({ win          }, "c",                          function () awful.spawn("chromium-browser") end),
-  -- awful.key({ win          }, "u",                          function () awful.spawn("/home/gurkan/clicky") end),
-  -- awful.key({ ctrl, alt    }, "p",                          function () reset_pulse() end),
-  awful.key({ ctrl, alt    }, "p",                          function () notifytest() end),
-  awful.key({ win          }, "f",                          function () awful.spawn(browser) end),
-  awful.key({ win          }, "l",                          function () awful.spawn("sudo slock") end),
-  -- awful.key({ win          }, "k",                          function () keyboard_widget:toggle() end),
-  -- awful.key({ win          }, "e",                          function () keyboard_widget:toggle() end),
+  awful.key({              }, "F12",                   nil, function() my_dropdown:toggle() end),
+  awful.key({              }, "Print",                 nil, function() awful.spawn("flameshot gui") end),
+  awful.key({ "Shift"      }, "Print",                      function() awful.spawn("flameshot full -c") end),
+  awful.key({ ctrl         }, "space",                      function() awful.spawn(rofi_cmd) end),
+  awful.key({              }, "F9",                    nil, function() awful.spawn(rofi_emoji_cmd) end),
+  awful.key({ ctrl         }, "F9",                    nil, function() awful.spawn(rofi_calc_cmd) end),
+  awful.key({ "Shift"      }, "F9",                    nil, function() awful.spawn(rofi_subsuper) end),
+  awful.key({ ctrl, alt    }, "c",                          function() awful.spawn(greenclip_cmd) end),
+  awful.key({ win          }, "p",                          function() awful.spawn("rofi-pass") end),
+  awful.key({ ctrl, alt    }, "t",                          function() awful.spawn(terminal) end),
+  awful.key({ win          }, "c",                          function() awful.spawn("chromium-browser") end),
+  -- awful.key({ win          }, "u",                          function() awful.spawn("/home/gurkan/clicky") end),
+  -- awful.key({ ctrl, alt    }, "p",                          function() reset_pulse() end),
+  awful.key({ ctrl, alt    }, "p",                          function() notifytest() end),
+  awful.key({ win          }, "f",                          function() awful.spawn(browser) end),
+  awful.key({ win          }, "l",                          function() awful.spawn("sudo slock") end),
+  -- awful.key({ win          }, "k",                          function() keyboard_widget:toggle() end),
+  -- awful.key({ win          }, "e",                          function() keyboard_widget:toggle() end),
   -- If something goes wrong with grobi
-  awful.key({ win          }, "m",                          function () awful.spawn("autorandr single") end),
+  awful.key({ win          }, "m",                          function() awful.spawn("autorandr single") end),
   -- Cycle between available layouts
-  awful.key({ win          }, "space",                      function () awful.layout.inc(1) end),
-  awful.key({ win          }, "x",                          function () awful.spawn("pcmanfm-qt") end),
-  awful.key({ win,         }, "Tab",                        function () awful.tag.viewnext(get_screen_of_focused()) end),
-  awful.key({ win, "Shift" }, "Tab",                        function () awful.tag.viewprev(get_screen_of_focused()) end),
-  awful.key({ win, "Shift" }, "c",                          function () awful.spawn(proxified_chromium_cmd) end),
+  awful.key({ win          }, "space",                      function() awful.layout.inc(1) end),
+  awful.key({ win          }, "x",                          function() awful.spawn("pcmanfm-qt") end),
+  awful.key({ win,         }, "Tab",                        function() awful.tag.viewnext(get_screen_of_focused()) end),
+  awful.key({ win, "Shift" }, "Tab",                        function() awful.tag.viewprev(get_screen_of_focused()) end),
+  awful.key({ win, "Shift" }, "c",                          function() awful.spawn(proxified_chromium_cmd) end),
   awful.key({ win, ctrl    }, "q",                          awesome.quit),
   awful.key({ win, ctrl    }, "r",                          awesome.restart),
   awful.key({ win, "Shift" }, "z",                          unminimize_client)
 )
 if hostname == "innixos" or hostname == "innodellix" then
   gears.table.merge(globalkeys, gears.table.join(
-    awful.key({ win          }, "v",                          function () awful.spawn("innovpn-toggle 'Innogames VPN (aw)'") end),
-    awful.key({ win, "Shift" }, "v",                          function () awful.spawn("innovpn-toggle 'Innogames VPN (af)'") end)
+    awful.key({ win          }, "v",                          function() awful.spawn("innovpn-toggle 'Innogames VPN (aw)'") end),
+    awful.key({ win, "Shift" }, "v",                          function() awful.spawn("innovpn-toggle 'Innogames VPN (af)'") end)
   ))
 end
 
