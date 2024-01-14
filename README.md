@@ -1,8 +1,9 @@
-### My AwesomeWM config
+## My AwesomeWM config
 
 This is the reason I'm still not using Wayland. Too good to lose.
 
-Highlights:
+#### Highlights
+
 - Just 4 permanent tags, no transient crap
 - Only 2 active layouts: Tile and Max (default)
 - Taglist hints client count by dots, dynamically updated

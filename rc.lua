@@ -741,24 +741,6 @@ client.connect_signal("manage", function (c)
     -- Prevent clients from being unreachable after screen count changes.
     awful.placement.no_offscreen(c)
   end
-	-- XXX: doesn't work on awesome-git
-	-- c:buttons(gears.table.join(
-	-- 	c:buttons(),
-	-- 	awful.button({ win }, 4, function (c)
-	-- 		c:emit_signal("request::activate", "mouse_click", {raise = true})
-	-- 		mousegrabber.run(function (_mouse)
-	-- 			c.opacity = c.opacity + 0.1
-	-- 			return false
-	-- 		end, 'mouse')
-	-- 	end, nil),
-	-- 	awful.button({ win }, 5, function (c)
-	-- 		c:emit_signal("request::activate", "mouse_click", {raise = true})
-	-- 		mousegrabber.run(function (_mouse)
-	-- 			c.opacity = c.opacity - 0.1
-	-- 			return false
-	-- 		end, 'mouse')
-	-- 	end, nil)
-	-- ))
 end)
 
 client.connect_signal('property::minimized', function(c)
