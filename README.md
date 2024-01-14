@@ -35,6 +35,7 @@ Highlights:
 #### Window related shortcuts
 
 | Shortcut                    | Action                                                               |
+| ---                         | ---                                                                  |
 | Win + Arrows                | Swap focus between windows                                           |
 | Win + Shift + WASD          | Move windows to that direction                                       |
 | Win + Shift + Arrows        | Move windows to the screen on that direction                         |
