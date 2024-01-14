@@ -36,7 +36,7 @@ dofile ("/home/gurkan/.config/awesome/my_modules/rc_functions.lua")
 dofile ("/home/gurkan/.config/awesome/my_modules/rc_tags.lua")
 
 -- stuff related to volume/brightness OSD notifications
-dofile ("/home/gurkan/.config/awesome/my_modules/rc_sliderstuff.lua")
+dofile ("/home/gurkan/.config/awesome/my_modules/rc_fn_actions.lua")
 
 -- stuff including usernames etc
 dofile ("/home/gurkan/.config/awesome/my_modules/rc_secret.lua")
@@ -378,18 +378,18 @@ end)))
 -- ))
 spotify:buttons(awful.util.table.join(
   awful.button({}, 1, function() -- left click
-    handle_media('play-pause')
+    fn_process_action('media', 'pausetoggle')
     spotify:check()
   end),
   awful.button({}, 3, function() -- right click
     spotify:raise_toggle()
   end),
   awful.button({}, 4, function() -- scroll up
-    handle_media('previous')
+    fn_process_action('media', 'previous')
     spotify:check()
   end),
   awful.button({}, 5, function() -- scroll down
-    handle_media('next')
+    fn_process_action('media', 'next')
     spotify:check()
   end)
 ))
@@ -666,31 +666,35 @@ globalkeys = gears.table.join(
   capslock.keyWithWin,
   capslock.keyWithCtrl,
   -- Standard X11 keys, comes from Fn keys etc.
-  awful.key({              }, "XF86MonBrightnessUp",   nil, function() set_brightness('5%+') end),
-  awful.key({              }, "XF86MonBrightnessDown", nil, function() set_brightness('5%-') end),
-  awful.key({              }, "XF86AudioRaiseVolume",  nil, function() set_volume('i') end),
-  awful.key({              }, "XF86AudioLowerVolume",  nil, function() set_volume('d') end),
-  awful.key({              }, "XF86AudioMute",         nil, audio_mute),
-  awful.key({              }, "XF86AudioMicMute" ,     nil, mic_mute),
-  awful.key({              }, "XF86AudioPlay",         nil, function () handle_media("play-pause") end),
-  awful.key({              }, "XF86AudioStop",         nil, function () handle_media("stop") end),
+  -- awful.key({              }, "XF86MonBrightnessUp",   nil, function() set_brightness('5%+') end),
+  -- awful.key({              }, "XF86MonBrightnessDown", nil, function() set_brightness('5%-') end),
+  awful.key({              }, "XF86MonBrightnessUp",   nil, function() fn_process_action('brightness', 'up') end),
+  awful.key({              }, "XF86MonBrightnessDown", nil, function() fn_process_action('brightness', 'down') end),
+  awful.key({              }, "XF86AudioRaiseVolume",  nil, function() fn_process_action('sink', 'up') end),
+  awful.key({              }, "XF86AudioLowerVolume",  nil, function() fn_process_action('sink', 'down') end),
+  -- awful.key({              }, "XF86AudioRaiseVolume",  nil, function() set_volume('i') end),
+  -- awful.key({              }, "XF86AudioLowerVolume",  nil, function() set_volume('d') end),
+  awful.key({              }, "XF86AudioMute",         nil, function() fn_process_action('sink', 'toggle') end),
+  awful.key({              }, "XF86AudioMicMute" ,     nil, function() fn_process_action('source', 'toggle') end),
+  awful.key({              }, "XF86AudioPlay",         nil, function () fn_process_action('media', 'pausetoggle') end),
+  awful.key({              }, "XF86AudioStop",         nil, function () fn_process_action('media', 'stop') end),
   awful.key({              }, "XF86AudioPrev",         nil, function ()
-                                                              handle_media("previous")
+                                                              fn_process_action('media', 'previous')
                                                               spotify:check()
                                                             end),
   awful.key({              }, "XF86AudioNext",         nil, function ()
-                                                              handle_media("next")
+                                                              fn_process_action('media', 'next')
                                                               spotify:check()
                                                             end),
   -- Smart plug toggle
   awful.key({              }, "XF86HomePage",          nil, function () awful.spawn(bulb_toggle) end),
   -- For laptop, which doesn't have next/prev buttons
   awful.key({ ctrl         }, "XF86AudioRaiseVolume",  nil, function ()
-                                                              handle_media("next")
+                                                              fn_process_action('media', 'next')
                                                               spotify:check()
                                                             end),
   awful.key({ ctrl         }, "XF86AudioLowerVolume",  nil, function ()
-                                                              handle_media("previous")
+                                                              fn_process_action('media', 'previous')
                                                               spotify:check()
                                                             end),
   -- Dropdown terminal: F12
