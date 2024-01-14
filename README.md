@@ -37,13 +37,13 @@ Highlights:
 | Shortcut                    | Action                                                                |
 | ---                         | ---                                                                   |
 | Win + Arrows                | Swap focus between windows                                            |
-| Win + Shift + WASD          | Move windows to that direction                                        |
+| Win + Shift + WASD          | Move (floating) windows to that direction (***)                       |
 | Win + Shift + Arrows        | Move windows to the screen on that direction                          |
-| Win + Ctrl + Arrows         | Expand windows to that direction                                      |
-| Win + Ctrl + Shift + Arrows | Shrink windows from that direction                                    |
+| Win + Ctrl + Arrows         | Expand (floating) windows to that direction                           |
+| Win + Ctrl + Shift + Arrows | Shrink (floating) windows from that direction                         |
 | Win + Q                     | Kill window                                                           |
 | Win + Enter                 | Swap master window                                                    |
-| Win + WASD                  | Expand active windows size to that direction (tiling mode)            |
+| Win + WASD                  | Expand active (tiling) windows size to that direction (***)           |
 | Win + Z                     | Minimize Window                                                       |
 | Ctrl + Alt + S              | Suspend window (Linux SIGSTOP)                                        |
 | Ctrl + Alt + W              | Make window sticky + on top (e.g. video meeting)                      |
@@ -59,6 +59,8 @@ And of course, I have tons of other shortcuts for launching helpful stuff, but t
 (\*) Looking for a better shortcut / not commonly used
 
 (\*\*) I am doing this with a keyboard knob generally, which is a lot easier
+
+(\*\*\*) TODO: Needs single shortcut for all situations, auto-detect floating or not
 
 ![screenshot single screen](./screenshot.jpg)
   
