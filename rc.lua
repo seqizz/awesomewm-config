@@ -657,11 +657,6 @@ root.buttons(gears.table.join(
 
 -- {{{ Key bindings
 globalkeys = gears.table.join(
-  -- needed for capslock helper
-  capslock.key,
-  capslock.keyWithAlt,
-  capslock.keyWithWin,
-  capslock.keyWithCtrl,
   -- Standard X11 keys, comes from Fn keys etc.
   awful.key({              }, "XF86MonBrightnessUp",   nil, function() fn_process_action('brightness', 'up') end),
   awful.key({              }, "XF86MonBrightnessDown", nil, function() fn_process_action('brightness', 'down') end),
@@ -702,15 +697,11 @@ globalkeys = gears.table.join(
   awful.key({ win          }, "p",                          function() awful.spawn("rofi-pass") end),
   awful.key({ ctrl, alt    }, "t",                          function() awful.spawn(terminal) end),
   awful.key({ win          }, "c",                          function() awful.spawn("chromium-browser") end),
-  -- awful.key({ win          }, "u",                          function() awful.spawn("/home/gurkan/clicky") end),
-  -- awful.key({ ctrl, alt    }, "p",                          function() reset_pulse() end),
   awful.key({ ctrl, alt    }, "p",                          function() notifytest() end),
   awful.key({ win          }, "f",                          function() awful.spawn(browser) end),
   awful.key({ win          }, "l",                          function() awful.spawn("sudo slock") end),
-  -- awful.key({ win          }, "k",                          function() keyboard_widget:toggle() end),
-  -- awful.key({ win          }, "e",                          function() keyboard_widget:toggle() end),
-  -- If something goes wrong with grobi
-  awful.key({ win          }, "m",                          function() awful.spawn("autorandr single") end),
+  -- If something goes wrong with loose setup
+  awful.key({ win          }, "r",                          function() awful.spawn("loose rotate") end),
   -- Cycle between available layouts
   awful.key({ win          }, "space",                      function() awful.layout.inc(1) end),
   awful.key({ win          }, "x",                          function() awful.spawn("pcmanfm-qt") end),
@@ -726,7 +717,15 @@ if hostname == "innixos" or hostname == "innodellix" then
     awful.key({ win          }, "v",                          function() awful.spawn("innovpn-toggle 'Innogames VPN (aw)'") end),
     awful.key({ win, "Shift" }, "v",                          function() awful.spawn("innovpn-toggle 'Innogames VPN (af)'") end)
   ))
+  -- Shortcut cemetery
+  -- awful.key({ win          }, "u",                          function() awful.spawn("/home/gurkan/clicky") end),
+  -- awful.key({ ctrl, alt    }, "p",                          function() reset_pulse() end),
+  -- awful.key({ win          }, "k",                          function() keyboard_widget:toggle() end),
+  -- awful.key({ win          }, "e",                          function() keyboard_widget:toggle() end),
 end
+
+-- needed for capslock helper
+gears.table.merge(globalkeys, capslock.possible_combinations)
 
 -- Signal function to execute when a new client appears.
 client.connect_signal("manage", function (c)
@@ -789,7 +788,7 @@ tag.connect_signal('request::default_layouts', function()
   -- awful.layout.append_default_layouts({
   --   awful.layout.suit.tile,
   --   awful.layout.suit.max,
-  -- }) # Not working on awesome-git
+  -- }) # Changed on awesome-git
   awful.layout.layouts = {
     awful.layout.suit.tile,
     awful.layout.suit.max,
