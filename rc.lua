@@ -674,6 +674,32 @@ globalkeys = gears.table.join(
                                                               fn_process_action('media', 'next')
                                                               spotify:check()
                                                             end),
+  -- Alt + sound knob switches between tmux panes 🤯
+  awful.key({ alt          }, "XF86AudioRaiseVolume",  nil, function()
+                                                              root.fake_input('key_press', 'Alt_L')
+                                                              root.fake_input('key_press', 'Shift_L')
+                                                              root.fake_input('key_press', 'Right')
+                                                              root.fake_input('key_release', 'Right')
+                                                              root.fake_input('key_release', 'Shift_L')
+                                                            end),
+  awful.key({ alt          }, "XF86AudioLowerVolume",  nil, function()
+                                                              root.fake_input('key_press', 'Alt_L')
+                                                              root.fake_input('key_press', 'Shift_L')
+                                                              root.fake_input('key_press', 'Left')
+                                                              root.fake_input('key_release', 'Left')
+                                                              root.fake_input('key_release', 'Shift_L')
+                                                            end),
+  -- Win + sound knob switches between all windows 🤯
+  awful.key({ win          }, "XF86AudioRaiseVolume",  nil, function()
+                                                              root.fake_input('key_press', 196)
+                                                              root.fake_input('key_release', 196)
+                                                            end),
+  awful.key({ win          }, "XF86AudioLowerVolume",  nil, function()
+                                                              root.fake_input('key_press', 'Shift_L')
+                                                              root.fake_input('key_press', 196)
+                                                              root.fake_input('key_release', 196)
+                                                              root.fake_input('key_release', 'Shift_L')
+                                                            end),
   -- Smart plug toggle
   awful.key({              }, "XF86HomePage",          nil, function() awful.spawn(bulb_toggle) end),
   -- For laptop, which doesn't have next/prev buttons
@@ -685,6 +711,7 @@ globalkeys = gears.table.join(
                                                               fn_process_action('media', 'previous')
                                                               spotify:check()
                                                             end),
+  awful.key({ win          }, "F9",                    nil, function() awful.spawn("rofi-pulse-select sink") end),
   -- Dropdown terminal: F12
   awful.key({              }, "F12",                   nil, function() my_dropdown:toggle() end),
   awful.key({              }, "Print",                 nil, function() awful.spawn("flameshot gui") end),
@@ -979,10 +1006,20 @@ awesome.connect_signal('startup', function(s, state)
   -- one day wezterm might have tmux support 🤞
   -- run_once("wezterm connect default --class mainqterm", "mainqterm", "term")
   run_once('picom')
+
+  -- standard alt+tab
   run_once(
     'alttab -w 1 -t 400x300 -frame "'
       .. string.upper(beautiful.fg_normal)
-      .. '" -i 100x100 -font xft:firacode-20'
+      .. '" -i 100x100 -font xft:firacode-20',
+      '400x300'
+  )
+  -- Alt+Tab for switching all windows
+  run_once(
+    'alttab -w 1 -t 250x100 -frame "'
+      .. string.upper(beautiful.fg_normal)
+      .. '" -d 1 -kk 0x1008ff49 -mk Super_L -i 50x50 -font xft:firacode-10 -vertical -p none',
+    '0x1008ff49'
   )
 end)
 
