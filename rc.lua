@@ -674,19 +674,19 @@ globalkeys = gears.table.join(
                                                               fn_process_action('media', 'next')
                                                               spotify:check()
                                                             end),
-  -- Alt + sound knob switches between tmux panes 🤯
-  awful.key({ alt          }, "XF86AudioRaiseVolume",  nil, function()
-                                                              root.fake_input('key_press', 'Alt_L')
-                                                              root.fake_input('key_press', 'Shift_L')
-                                                              root.fake_input('key_press', 'Right')
-                                                              root.fake_input('key_release', 'Right')
-                                                              root.fake_input('key_release', 'Shift_L')
+  -- Ctrl + sound knob switches between tmux panes and firefox tabs 🤯
+  awful.key({ ctrl         }, "XF86AudioRaiseVolume",  nil, function()
+                                                              root.fake_input('key_press', 'Ctrl_L')
+                                                              root.fake_input('key_press', 'Tab')
+                                                              root.fake_input('key_release', 'Tab')
+                                                              root.fake_input('key_release', 'Ctrl_L')
                                                             end),
-  awful.key({ alt          }, "XF86AudioLowerVolume",  nil, function()
-                                                              root.fake_input('key_press', 'Alt_L')
+  awful.key({ ctrl         }, "XF86AudioLowerVolume",  nil, function()
                                                               root.fake_input('key_press', 'Shift_L')
-                                                              root.fake_input('key_press', 'Left')
-                                                              root.fake_input('key_release', 'Left')
+                                                              root.fake_input('key_press', 'Ctrl_L')
+                                                              root.fake_input('key_press', 'Tab')
+                                                              root.fake_input('key_release', 'Tab')
+                                                              root.fake_input('key_release', 'Ctrl_L')
                                                               root.fake_input('key_release', 'Shift_L')
                                                             end),
   -- Win + sound knob switches between all windows 🤯
@@ -1002,9 +1002,8 @@ awesome.connect_signal('startup', function(s, state)
   end
   run_once('XDG_CURRENT_DESKTOP=gnome telegram-desktop', 'telegram')
   run_once('pasystray')
-  run_once('wezterm start --class mainqterm', 'mainqterm', 'term')
   -- one day wezterm might have tmux support 🤞
-  -- run_once("wezterm connect default --class mainqterm", "mainqterm", "term")
+  run_once("wezterm connect default --class mainqterm", "mainqterm", "term")
   run_once('picom')
 
   -- standard alt+tab
