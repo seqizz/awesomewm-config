@@ -6,7 +6,6 @@ This is the reason I'm still not using Wayland. Too good to lose.
 
 - Just 4 permanent tags, no transient crap
 - Only 2 active layouts: Tile and Max (default)
-- Taglist hints client count by dots, dynamically updated
 - Remembers which tags were visible/active on every individual screen after WM (re)start
 - Handmade theme
   - Powerline-style wibar
@@ -17,7 +16,8 @@ This is the reason I'm still not using Wayland. Too good to lose.
   - The X display set as "primary" has systray and 2 tags (term & chat) on it
   - Non-primary displays get the web & mail tags (replicated if more screens available)
   - Dynamic re-organisation of tags in case of screen addition/removal (so no clients get lost)
-  - If a monitor is widescreen, automatically split into 2 "fake" screens, which you can expand/shrink
+  - If a monitor is widescreen, automatically split into 2 equal "fake" screens (which you can expand/shrink)
+- Taglist hints client count by dots, dynamically updated
 - Keyboard oriented
   - Can resize, change tag, move, minimize, even suspend any client via shortcuts
     - Special keys for moving clients between visible screens
@@ -27,10 +27,11 @@ This is the reason I'm still not using Wayland. Too good to lose.
 - Useful widgets on wibar, as needed/supported by environment
   - Rotate screen toggle
   - Touchscreen toggle
-  - Caps lock warning widget (hidden if caps locks is off)
+  - Caps lock warning widget (only visible while caps lock on)
   - Pressure information widget (Linux PSI)
-  - Keyboard layout toggle
+  - ~~Keyboard layout toggle~~ (disabled, as I'm using a single layout now)
   - Interactive Spotify widget (when app is running)
+    - Can also hide/show the client
 
 
 #### Window related shortcuts
