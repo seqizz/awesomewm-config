@@ -723,6 +723,7 @@ globalkeys = gears.table.join(
   awful.key({ ctrl, alt    }, "c",                          function() awful.spawn(greenclip_cmd) end),
   awful.key({ win          }, "p",                          function() awful.spawn("rofi-pass") end),
   awful.key({ ctrl, alt    }, "t",                          function() awful.spawn(terminal) end),
+  awful.key({ alt, "Shift" }, "t",                          function() awful.spawn("wezterm --config-file /home/gurkan/.config/wezterm/old-nomux.lua start") end),
   awful.key({ win          }, "c",                          function() awful.spawn("chromium-browser") end),
   awful.key({ ctrl, alt    }, "p",                          function() notifytest() end),
   awful.key({ win          }, "f",                          function() awful.spawn(browser) end),
@@ -1002,7 +1003,7 @@ awesome.connect_signal('startup', function(s, state)
   end
   run_once('XDG_CURRENT_DESKTOP=gnome telegram-desktop', 'telegram')
   run_once('pasystray')
-  -- one day wezterm might have tmux support 🤞
+  run_once("wezterm-mux-server --daemonize", "wezterm-mux-server")
   run_once("wezterm connect default --class mainqterm", "mainqterm", "term")
   run_once('picom')
 
