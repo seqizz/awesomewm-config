@@ -10,7 +10,6 @@ local psitext = wibox.widget({
   align = 'center',
   valign = 'center',
   font = my_theme.font,
-  forced_width = dpi(80),
 })
 
 local psiimage = wibox.widget({
@@ -48,8 +47,6 @@ function psiwidget:check()
       end
       psiimage:set_image(gears.color.recolor_image(my_theme.gauge_icon, color))
       psitext:set_markup_silently(line)
-      self.forced_width = math.max(dpi(10 * #line), dpi(65))
-      psitext.forced_width = math.min(dpi(10 * #line), dpi(70))
     end,
   })
 end
