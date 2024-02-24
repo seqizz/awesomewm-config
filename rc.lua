@@ -11,6 +11,7 @@ local my_utils = require('my_modules/my_utils')
 local lain = require("lain")
 local capslock = require("my_modules/capslock")
 local spotify = require("my_modules/spotify")
+local nextthing = require("my_modules/nextthing")
 local psi_widget = require("my_modules/psi")
 local rotate_widget = require("my_modules/rotatescreen")
 local touch_widget = require("my_modules/touchscreen")
@@ -357,7 +358,10 @@ refresh_tag_name = function()
 end
 
 -- signal function to execute when a client disappears
-client.connect_signal('unmanage', function(c, startup) dynamic_tagging() end)
+client.connect_signal('unmanage', function(c, startup)
+  refresh_tag_name()
+  focus_previous_client()
+end)
 
 -- This is the only host with "rotatable" screen
 if hostname == 'innodellix' then
@@ -405,6 +409,13 @@ spotify_timer = gears.timer({
   autostart = true,
   call_now = true,
   callback = function() spotify:check() end,
+})
+
+nextthing_timer = gears.timer({
+  timeout = 30,
+  autostart = true,
+  call_now = true,
+  callback = function() nextthing:check() end,
 })
 
 local function screen_organizer(s, primary, is_extra)
@@ -534,7 +545,13 @@ local function screen_organizer(s, primary, is_extra)
     table.insert(systray_right_widgets, my_systray)
   end
   table.insert(systray_right_widgets, capslock)
-  table.insert(systray_right_widgets, mytextclock)
+  if primary then
+      table.insert(systray_right_widgets, mytextclock)
+  else
+    -- Not visible on single screen, by choice
+    table.insert(systray_right_widgets, nextthing)
+    table.insert(systray_right_widgets, separator_empty)
+  end
   table.insert(systray_right_widgets, s['object'].mylayoutbox)
 
   -- Add widgets to the wibox
@@ -757,7 +774,7 @@ gears.table.merge(globalkeys, capslock.possible_combinations)
 
 -- Signal function to execute when a new client appears.
 client.connect_signal("manage", function (c)
-	dynamic_tagging()
+  refresh_tag_name()
   -- Set the windows at the slave,
   -- i.e. put it at the end of others instead of setting it master.
   if not awesome.startup then awful.client.setslave(c) end
@@ -775,7 +792,9 @@ client.connect_signal('property::minimized', function(c)
   if c.sticky then
     c.skip_taskbar = false
   end
+  focus_previous_client()
 end)
+
 client.connect_signal('focus', function(c)
   -- If a sticky window is unminimized, remove from taskbar
   if c.sticky and not c.minimized then

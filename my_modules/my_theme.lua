@@ -60,6 +60,8 @@ theme.battery_icon_medium = base_dir .. 'assets/battery-medium.svg'
 theme.battery_icon_low = base_dir .. 'assets/battery-low.svg'
 theme.music_icon = base_dir .. 'assets/music.svg'
 theme.music_icon_paused = base_dir .. 'assets/pause.svg'
+theme.thing_icon_left = base_dir .. 'assets/thing_icon_left.svg'
+theme.thing_icon_right = base_dir .. 'assets/thing_icon_right.svg'
 
 -- Notifications
 -- theme.notification_font = "Operator Mono Lig, Twitter Color Emoji"

@@ -163,6 +163,16 @@ function find_tag_by_first_word(first_word, printmore)
   end
 end
 
+function focus_previous_client()
+  -- A simple function to focus the previously focused client,
+  -- no matter which screen it is on
+  local prev = awful.client.focus.history.get(nil, 0)
+  if prev then
+    client.focus = prev
+    prev:raise()
+  end
+end
+
 function find_screen_of_tag(screens_table, tag_obj, printmore)
   for name, properties in pairs(screens_table) do
     for _, t in ipairs(properties.tags) do
