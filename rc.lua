@@ -113,7 +113,7 @@ awful.key({ win                }, "F8",     nil, function (c) resize_screen(c.sc
 my_systray = wibox.widget.systray()
 my_systray:set_base_size(dpi(24))
 
-function set_keys_after_screen_new(clientkeys, globalkeys)
+function set_keys_after_screen_new(clientkeys, globalkeys, printmore)
   if screen:count() > 1 then
     -- Shortcut for moving window between screens
     clientkeys = gears.table.join(clientkeys,
@@ -339,7 +339,7 @@ calendarwidget = lain.widget.cal({
 })
 
 -- change tag names dynamically
-dynamic_tagging = function()
+refresh_tag_name = function()
   for s = 1, screen.count() do
     -- get a list of all tags
     local atags = screen[s].tags
@@ -612,7 +612,7 @@ function place_tags(properties, primary, screens_table)
   end
 end
 
-function process_screens(systray, screens_table)
+function process_screens(systray, screens_table, printmore)
 
   systray = systray or nil
 
@@ -642,7 +642,7 @@ function process_screens(systray, screens_table)
   -- define rules since we have filled the screen table
   dofile ("/home/gurkan/.config/awesome/my_modules/rc_rules.lua")
 
-	clientkeys, globalkeys = set_keys_after_screen_new(clientkeys, globalkeys)
+  clientkeys, globalkeys = set_keys_after_screen_new(clientkeys, globalkeys, printmore)
   dofile ("/home/gurkan/.config/awesome/my_modules/rc_clientbuttons.lua")
   root.keys(globalkeys)
   set_rules(clientkeys)
@@ -793,13 +793,13 @@ screen.connect_signal('list', function()
     debug_print('Sleeping for 2 secs', true)
     os.execute('sleep 2')
     screens_table = get_screens()
-    process_screens(my_systray, screens_table)
+    process_screens(my_systray, screens_table, printmore)
   end
 end)
 
 os.execute('touch /home/gurkan/.awesome_screen_setup_lock')
 screens_table = get_screens()
-process_screens(my_systray, screens_table)
+process_screens(my_systray, screens_table, printmore)
 
 tag.connect_signal('request::screen', function(t)
   -- recover tags on a removed screen

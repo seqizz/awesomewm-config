@@ -147,7 +147,7 @@ function switch_focus_without_mouse(c, dir)
 end
 
 function switch_to_tag(tag_name, printmore)
-	debug_print('switch_to_tag: Switching to tag ' .. tag_name, printmore)
+  debug_print('switch_to_tag: Switching to tag ' .. tag_name, printmore)
   t = find_tag_by_first_word(tag_name, printmore)
   tags_screen_obj = t.screen
   awful.tag.viewnone(tags_screen_obj)
@@ -177,7 +177,8 @@ function find_screen_of_tag(screens_table, tag_obj, printmore)
 end
 
 function move_focused_client_to_tag(tag_name)
-  tag_obj = awful.tag.find_by_name(nil, tag_name)
+  -- tag_obj = awful.tag.find_by_name(nil, tag_name)
+  tag_obj = find_tag_by_first_word(tag_name)
   if client.focus then
     my_client_obj = client.focus
     debug_print('Moving focused window (' .. my_client_obj.name .. ') to tag ' .. tag_name, printmore)
@@ -276,19 +277,20 @@ end
 -- end
 
 function get_child_of(s, screens_table)
-    for name, properties in pairs(screens_table) do
-        if properties["object"] == s then
-            goto skipthis
-        end
-        if properties["parent"] == nil then
-            goto skipthis
-        end
-        if properties["parent"]["object"] == s then
-            return properties["object"]
-        end
-        ::skipthis::
+  -- Lua doesn't have "continue" statement, so using goto 🤷
+  for name, properties in pairs(screens_table) do
+    if properties["object"] == s then
+      goto skipthis
     end
-    return nil
+    if properties["parent"] == nil then
+      goto skipthis
+    end
+    if properties["parent"]["object"] == s then
+      return properties["object"]
+    end
+    ::skipthis::
+  end
+  return nil
 end
 
 function resize_screen(s, screens_table, shrink)
