@@ -800,6 +800,8 @@ client.connect_signal('focus', function(c)
   if c.sticky and not c.minimized then
     c.skip_taskbar = true
   end
+  -- border setup
+  c.border_color = beautiful.border_focus
 end)
 
 -- Screen handling
@@ -925,11 +927,6 @@ client.connect_signal('property::size', function(c)
     c.sticky = true
     c.ontop = true
   end
-end)
-
-client.connect_signal('focus', function(c)
-  -- border setup
-  c.border_color = beautiful.border_focus
 end)
 
 client.connect_signal('unfocus', function(c)
