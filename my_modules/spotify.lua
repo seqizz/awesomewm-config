@@ -68,6 +68,7 @@ function spotifywidget:raise_toggle()
       end
     end
   end
+  spotifywidget:check()
 end
 
 function spotifywidget:check()

@@ -43,6 +43,32 @@ function suspend_toggle(c)
   end)
 end
 
+function flash_toggle(c)
+  old_opacity = c.opacity
+  c.opacity = 0.2
+  awful.spawn.easy_async("sleep 0.03", function()
+    c.opacity = 0.3
+  end)
+  awful.spawn.easy_async("sleep 0.05", function()
+    c.opacity = 0.4
+  end)
+  awful.spawn.easy_async("sleep 0.09", function()
+    c.opacity = 0.5
+  end)
+  awful.spawn.easy_async("sleep 0.13", function()
+    c.opacity = 0.6
+  end)
+  awful.spawn.easy_async("sleep 0.16", function()
+    c.opacity = 0.7
+  end)
+  awful.spawn.easy_async("sleep 0.20", function()
+    c.opacity = 0.8
+  end)
+  awful.spawn.easy_async("sleep 0.25", function()
+    c.opacity = old_opacity
+  end)
+end
+
 function sticky_toggle(c)
   if c.sticky then
     c.ontop = false
@@ -510,16 +536,11 @@ function get_screens()
             new_width = math.ceil(geo.width/2)
             new_width2 = geo.width - new_width
             if not (( geo.width / geo.height) > 2) then
-                -- this is not a wide screen, let's give more to the left side (web/mail)
-                -- new_width = geo.width - 1000
-                -- new_width2 = 1000
-                fake_width = math.ceil(geo.width*0.60)
+                -- this is not a wide screen, let's give more to the left side a bit more (web/mail)
+                fake_width = math.ceil(geo.width*0.55)
             end
-            -- properties["object"]:fake_resize(geo.x + new_width, geo.y, new_width, geo.height)
-            -- fake_obj = screen.fake_add(geo.x, geo.y, new_width2, geo.height)
             properties["object"]:fake_resize(geo.x + fake_width, geo.y, (geo.width - fake_width), geo.height)
             fake_obj = screen.fake_add(geo.x, geo.y, fake_width, geo.height)
-            -- fake_screen_name = name .. "_sub_" .. tostring(new_width2) .. "x" .. tostring(geo.height)
             fake_screen_name = name .. "_sub_" .. tostring(fake_width) .. "x" .. tostring(geo.height)
             output_tbl[fake_screen_name] = {}
             output_tbl[fake_screen_name]["is_fake"] = true
