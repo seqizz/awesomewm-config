@@ -1041,9 +1041,6 @@ awesome.connect_signal('startup', function(s, state)
 end)
 
 set_wallpapers(screens_table)
--- screen.connect_signal("request::wallpaper", function()
-    -- screen is the global screen module. It is also a list of all screens.
--- end)
 
 debug_print("Last state of the screens table is: \n" .. my_utils.dump(screens_table), printmore)
 load_last_active_tags(screens_table, printmore)

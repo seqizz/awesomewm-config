@@ -345,10 +345,6 @@ function resize_screen(s, screens_table, shrink)
         local parent_geo = properties["parent"]["object"].geometry
         s:fake_resize(geo.x, geo.y, geo.width + diff, geo.height)
         properties["parent"]["object"]:fake_resize(parent_geo.x + diff, parent_geo.y, parent_geo.width - diff, parent_geo.height)
-        -- now we need to refresh/repaint the wallpaper
-        -- not using awful lib yet, see set_wallpapers function
-        -- awful.wallpaper:repaint()
-        set_wallpapers(screens_table)
       else
         local geo = s.geometry
         child = get_child_of(s, screens_table)
@@ -357,59 +353,73 @@ function resize_screen(s, screens_table, shrink)
             goto nochange
         end
         -- this is a screen which has a fake screen sibling
-        -- whatever you do here, do the reverse to the parent
+        -- whatever you do here, do the reverse to the sibling
         local fake_geo = child.geometry
         s:fake_resize(geo.x - diff, geo.y, geo.width + diff, geo.height)
         child:fake_resize(fake_geo.x,fake_geo.y, fake_geo.width - diff, fake_geo.height)
-        -- now we need to refresh/repaint the wallpaper
-        -- not using awful lib yet, see set_wallpapers function
-        -- awful.wallpaper:repaint()
-        set_wallpapers(screens_table)
         ::nochange::
       end
     end
   end
+  set_wallpapers(screens_table)
 end
 
+screen.connect_signal("request::wallpaper", function(s)
+  -- TODO: slow as hell
+    gears.wallpaper.maximized(gears.filesystem.get_random_file_from_dir(
+        "/home/gurkan/syncfolder/wallpaper",
+        {".jpg", ".png", ".svg"},
+        true
+    ), s, false)
+    -- https://github.com/awesomeWM/awesome/issues/3547
+    -- awful.wallpaper {
+    --     screen = s,
+    --     bg     = "#0000ff",
+    --     widget = {
+    --         {
+    --             image  = gears.filesystem.get_random_file_from_dir(
+    --                 "/home/gurkan/syncfolder/wallpaper",
+    --                 {".jpg", ".png", ".svg"},
+    --                 true
+    --             ),
+    --             horizontal_fit_policy = "fit",
+    --             vertical_fit_policy = "fit",
+    --             upscale = true,
+    --             downscale = true,
+    --             widget = wibox.widget.imagebox,
+    --         },
+    --     }
+    -- }
+end)
+
 function set_wallpapers(screens_table)
-  -- choose random wallpaper
-  awful.spawn.easy_async(
-    "find /home/gurkan/syncfolder/wallpaper -not -path 'phone*' -type f",
-    function(stdout, stderr, reason, exit_code)
-      if exit_code == 0 then
-        local wallpapers = {}
-        for wp in stdout:gmatch("[^\r\n]+") do
-          table.insert(wallpapers, wp)
-        end
-        -- lua is the shittiest language ever
-        -- you need to set seed again, or the "random" will always return same
-        math.randomseed(my_utils.get_randomseed())
-        for name, feat in pairs(screens_table) do
-          gears.wallpaper.maximized(wallpapers[math.random(#wallpapers)], feat["object"])
-        end
-        -- supposedly gears.wallpaper is deprecated, but it's the only one that works. Leaving below one for later.
-        -- for name, feat in pairs(screens_table) do
-        --   debug_print("Setting wallpaper for screen " .. name)
-        --   awful.wallpaper {
-        --     screen = feat["object"],
-        --     widget = {
-        --       {
-        --         image  = wallpapers[math.random(#wallpapers)],
-        --         resize = true,
-        --         widget = wibox.widget.imagebox,
-        --       },
-        --       valign = "center",
-        --       halign = "center",
-        --       tiled  = false,
-        --       widget = wibox.container.maximized,
-        --     }
-        --   }
-        -- end
-      else
-        naughty.notify({text = "Wallpaper assign error: " .. stderr})
-      end
-    end)
+  for name, feat in pairs(screens_table) do
+    feat["object"]:emit_signal("request::wallpaper")
+  end
 end
+
+-- @Reference
+-- function set_wallpapers_deprecated(screens_table)
+--   -- choose random wallpaper
+--   awful.spawn.easy_async(
+--     "find /home/gurkan/syncfolder/wallpaper -not -path 'phone*' -type f",
+--     function(stdout, stderr, reason, exit_code)
+--       if exit_code == 0 then
+--         local wallpapers = {}
+--         for wp in stdout:gmatch("[^\r\n]+") do
+--           table.insert(wallpapers, wp)
+--         end
+--         -- lua is the shittiest language ever
+--         -- you need to set seed again, or the "random" will always return same
+--         math.randomseed(my_utils.get_randomseed())
+--         for name, feat in pairs(screens_table) do
+--           gears.wallpaper.maximized(wallpapers[math.random(#wallpapers)], feat["object"])
+--         end
+--       else
+--         naughty.notify({text = "Wallpaper assign error: " .. stderr})
+--       end
+--     end)
+-- end
 
 local function createFolder(folder)
   local p = io.popen('mkdir -p ' .. folder)
