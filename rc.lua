@@ -719,7 +719,7 @@ globalkeys = gears.table.join(
                                                               root.fake_input('key_release', 'Shift_L')
                                                             end),
   -- Smart plug toggle
-  awful.key({              }, "XF86HomePage",          nil, function() awful.spawn(bulb_toggle) end),
+  -- awful.key({              }, "XF86HomePage",          nil, function() awful.spawn(bulb_toggle) end),
   -- For laptop, which doesn't have next/prev buttons
   awful.key({ ctrl         }, "XF86AudioRaiseVolume",  nil, function()
                                                               fn_process_action('media', 'next')
@@ -760,8 +760,8 @@ globalkeys = gears.table.join(
 )
 if hostname == "innixos" or hostname == "innodellix" then
   gears.table.merge(globalkeys, gears.table.join(
-    awful.key({ win          }, "v",                          function() awful.spawn("innovpn-toggle 'Innogames VPN (aw)'") end),
-    awful.key({ win, "Shift" }, "v",                          function() awful.spawn("innovpn-toggle 'Innogames VPN (af)'") end)
+    awful.key({ win          }, "v",                          function() awful.spawn("innovpn-toggle 'Innogames Wireguard (Primary)'") end),
+    awful.key({ win, "Shift" }, "v",                          function() awful.spawn("innovpn-toggle 'Innogames Wireguard (Secondary)'") end)
   ))
   -- Shortcut cemetery
   -- awful.key({ win          }, "u",                          function() awful.spawn("/home/gurkan/clicky") end),
