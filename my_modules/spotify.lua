@@ -6,10 +6,17 @@ local dpi = require('beautiful').xresources.apply_dpi
 local gears = require('gears')
 
 local spotifytext = wibox.widget({
-  widget = wibox.widget.textbox,
-  align = 'center',
-  valign = 'center',
-  font = my_theme.font,
+  layout = wibox.container.scroll.horizontal,
+  max_size = dpi(150),
+  step_function = wibox.container.scroll.step_functions.linear_increase,
+  speed = 25,
+  extra_space = dpi(10),
+  {
+    widget = wibox.widget.textbox,
+    align = 'center',
+    valign = 'center',
+    font = my_theme.font,
+  },
 })
 
 local spotifyimage = wibox.widget({
@@ -39,7 +46,7 @@ function spotifywidget:set(state, is_playing)
     spotifyimage:set_image(gears.color.recolor_image(my_theme.music_icon_paused, my_theme.fg_normal))
   end
 
-  spotifytext:set_markup_silently(' ' .. awful.util.escape(state))
+  spotifytext.widget:set_markup_silently(' ' .. awful.util.escape(state))
 end
 
 _raise_tag_of_client = function(c)
