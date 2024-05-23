@@ -233,7 +233,8 @@ separator_reverse = wibox.widget {
   span_ratio   = 0.7,
   color        = beautiful.separator,
   set_shape    = function(cr, width, height)
-    gears.shape.powerline(cr, width, height, (height / 2) * (-1))
+    gears.shape.parallelogram(cr, width, height)
+    -- gears.shape.powerline(cr, width, height, (height / 2) * (-1))
   end
 }
 
@@ -278,7 +279,7 @@ local battery_widget_text = lain.widget.bat({
       perc = bat_now.perc .. '%'
     end
 
-    widget:set_markup(lain.util.markup.fontfg(beautiful.font, beautiful.fg_normal, perc .. ' '))
+    widget:set_markup(lain.util.markup.fontfg(beautiful.font, beautiful.fg_normal, perc))
     battery_image_widget:set_image(gears.color.recolor_image(battery_image, battery_widget_color))
   end,
 })
