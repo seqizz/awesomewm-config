@@ -548,7 +548,8 @@ local function screen_organizer(s, primary, is_extra)
   end
   table.insert(systray_right_widgets, capslock)
   if primary then
-      table.insert(systray_right_widgets, mytextclock)
+    table.insert(systray_right_widgets, separator_reverse)
+    table.insert(systray_right_widgets, mytextclock)
   else
     -- Not visible on single screen, by choice
     table.insert(systray_right_widgets, nextthing)
