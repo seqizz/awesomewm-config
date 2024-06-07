@@ -384,18 +384,18 @@ end)))
 -- ))
 spotify:buttons(awful.util.table.join(
   awful.button({}, 1, function() -- left click
-    fn_process_action('media', 'pausetoggle')
+    fn_process_action('media', 'pausetoggle', 'spotify')
     spotify:check()
   end),
   awful.button({}, 3, function() -- right click
     spotify:raise_toggle()
   end),
   awful.button({}, 4, function() -- scroll up
-    fn_process_action('media', 'previous')
+    fn_process_action('media', 'previous', 'spotify')
     spotify:check()
   end),
   awful.button({}, 5, function() -- scroll down
-    fn_process_action('media', 'next')
+    fn_process_action('media', 'next', 'spotify')
     spotify:check()
   end)
 ))

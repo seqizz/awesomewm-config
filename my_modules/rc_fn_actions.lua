@@ -125,8 +125,9 @@ triggerwibox = function(action)
   slider_timer:again()
 end
 
-function fn_process_action(action, direction)
+function fn_process_action(action, direction, player)
   direction = direction or 'toggle'
+  player = player or nil
 
   -- Case 1: Sound mute toggle
   if action == 'sink' then
@@ -193,18 +194,38 @@ function fn_process_action(action, direction)
   elseif action == 'media' then
     show_osd = false
     if direction == 'pausetoggle' then
-      helpers.async('playerctl play-pause', function(out) end)
+      if player ~= nil then
+        helpers.async('playerctl play-pause -p ' .. player, function(out) end)
+      else
+        helpers.async('playerctl play-pause', function(out) end)
+      end
       show_osd = true
     elseif direction == 'stop' then
-      helpers.async('playerctl stop', function(out) end)
+      if player ~= nil then
+        helpers.async('playerctl stop -p ' .. player, function(out) end)
+      else
+        helpers.async('playerctl stop', function(out) end)
+      end
       show_osd = true
     elseif direction == 'next' then
-      helpers.async('playerctl next', function(out) end)
+      if player ~= nil then
+        helpers.async('playerctl next -p ' .. player, function(out) end)
+      else
+        helpers.async('playerctl next', function(out) end)
+      end
     elseif direction == 'previous' then
-      helpers.async('playerctl previous', function(out) end)
+      if player ~= nil then
+        helpers.async('playerctl previous -p ' .. player, function(out) end)
+      else
+        helpers.async('playerctl previous', function(out) end)
+      end
     end
     if show_osd then
-      helpers.async('playerctl status', function(out) triggerwibox(out) end, 0.3)
+      if player ~= nil then
+        helpers.async('playerctl status -p ' .. player, function(out) triggerwibox(out) end, 0.3)
+      else
+        helpers.async('playerctl status', function(out) triggerwibox(out) end, 0.3)
+      end
     end
   end
 end
