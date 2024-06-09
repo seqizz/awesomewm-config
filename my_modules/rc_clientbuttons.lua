@@ -6,6 +6,9 @@ clientbuttons = gears.table.join(
   awful.button({}, 2, function(c) c:emit_signal('request::activate', 'mouse_click', { raise = true }) end),
   awful.button({ win }, 1, function(c)
     c:emit_signal('request::activate', 'mouse_click', { raise = true })
+    if c.maximized then
+      c.maximized = false
+    end
     awful.mouse.client.move(c)
   end),
   awful.button({ win }, 3, function(c)

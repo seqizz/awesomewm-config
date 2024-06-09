@@ -244,7 +244,8 @@ function set_rules(clientkeys)
         }
       },
       properties = {
-        tag    = awful.tag.find_by_name(nil, "mail"),
+        tag       = awful.tag.find_by_name(nil, "mail"),
+        maximized = true,
       }
     },
   }
