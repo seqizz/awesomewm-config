@@ -151,8 +151,13 @@ function fn_process_action(action, direction, player)
       elseif direction == 'down' then
         word = 'd'
       end
-      helpers.async('pamixer --get-volume -' .. word .. ' 5', function(out)
+      helpers.async('pamixer --get-volume --allow-boost -' .. word .. ' 5', function(out)
         sound_slider.widget.value = tonumber(out)
+        if tonumber(out) > 100 then
+          sound_slider.widget.color = '#FF0000'
+        else
+          sound_slider.widget.color = beautiful.slider_sound_fg
+        end
         triggerwibox('volume')
       end)
     end
