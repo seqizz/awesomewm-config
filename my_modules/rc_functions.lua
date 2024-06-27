@@ -372,22 +372,28 @@ screen.connect_signal("request::wallpaper", function(s)
         true
     ), s, false)
     -- https://github.com/awesomeWM/awesome/issues/3547
-    -- awful.wallpaper {
+    -- -- awful.wallpaper {
     --     screen = s,
-    --     bg     = "#0000ff",
     --     widget = {
-    --         {
+    --         -- {
     --             image  = gears.filesystem.get_random_file_from_dir(
     --                 "/home/gurkan/syncfolder/wallpaper",
     --                 {".jpg", ".png", ".svg"},
     --                 true
     --             ),
-    --             horizontal_fit_policy = "fit",
-    --             vertical_fit_policy = "fit",
-    --             upscale = true,
+    --             upscale = false,
     --             downscale = true,
+    --             resize = true,
+    --             valign = "center",
+    --             scaling_quality = "good",
+    --             vertical_fit_policy = "pad",
+    --             horizontal_fit_policy = "none",
     --             widget = wibox.widget.imagebox,
-    --         },
+    --         -- },
+    --         -- valign = "center",
+    --         -- halign = "center",
+    --         -- tiled = false,
+    --         -- widget = wibox.container.tile,
     --     }
     -- }
 end)

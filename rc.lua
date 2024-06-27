@@ -754,6 +754,8 @@ globalkeys = gears.table.join(
   awful.key({ win          }, "space",                      function() awful.layout.inc(1) end),
   awful.key({ win          }, "x",                          function() awful.spawn("pcmanfm-qt") end),
   awful.key({ win,         }, "Tab",                        function() awful.tag.viewnext(get_screen_of_focused()) end),
+  -- There is no "win-capslock", we meant win-tab probably
+  awful.key({ win,         }, "Caps_Lock",                  function() awful.tag.viewnext(get_screen_of_focused()) end),
   awful.key({ win, "Shift" }, "Tab",                        function() awful.tag.viewprev(get_screen_of_focused()) end),
   awful.key({ win, "Shift" }, "c",                          function() awful.spawn(proxified_chromium_cmd) end),
   awful.key({ win, ctrl    }, "q",                          awesome.quit),
