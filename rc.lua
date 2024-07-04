@@ -874,11 +874,6 @@ end)
 -- end
 -- end)
 
-awesome.connect_signal('exit', function(c)
-  -- We are about to exit / restart awesome, save our last used tag
-  save_current_tags(screens_table)
-end)
-
 -- Add a titlebar if titlebars_enabled is set to true in the rules.
 client.connect_signal('request::titlebars', function(c)
   -- buttons for the titlebar
@@ -917,6 +912,11 @@ client.connect_signal('request::titlebars', function(c)
     },
     layout = wibox.layout.align.horizontal,
   })
+end)
+
+awesome.connect_signal('save-tags', function()
+  -- We are about to exit / restart awesome, save our last used tag
+  save_current_tags(screens_table)
 end)
 
 tag.connect_signal('property::layout', function(t)
