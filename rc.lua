@@ -695,20 +695,20 @@ globalkeys = gears.table.join(
                                                               spotify:check()
                                                             end),
   -- Ctrl + sound knob switches between tmux panes and firefox tabs 🤯
-  awful.key({ ctrl         }, "XF86AudioRaiseVolume",  nil, function()
-                                                              root.fake_input('key_press', 'Ctrl_L')
-                                                              root.fake_input('key_press', 'Tab')
-                                                              root.fake_input('key_release', 'Tab')
-                                                              root.fake_input('key_release', 'Ctrl_L')
-                                                            end),
-  awful.key({ ctrl         }, "XF86AudioLowerVolume",  nil, function()
-                                                              root.fake_input('key_press', 'Shift_L')
-                                                              root.fake_input('key_press', 'Ctrl_L')
-                                                              root.fake_input('key_press', 'Tab')
-                                                              root.fake_input('key_release', 'Tab')
-                                                              root.fake_input('key_release', 'Ctrl_L')
-                                                              root.fake_input('key_release', 'Shift_L')
-                                                            end),
+  -- awful.key({ ctrl         }, "XF86AudioRaiseVolume",  nil, function()
+  --                                                             root.fake_input('key_press', 'Ctrl_L')
+  --                                                             root.fake_input('key_press', 'Tab')
+  --                                                             root.fake_input('key_release', 'Tab')
+  --                                                             root.fake_input('key_release', 'Ctrl_L')
+  --                                                           end),
+  -- awful.key({ ctrl         }, "XF86AudioLowerVolume",  nil, function()
+  --                                                             root.fake_input('key_press', 'Shift_L')
+  --                                                             root.fake_input('key_press', 'Ctrl_L')
+  --                                                             root.fake_input('key_press', 'Tab')
+  --                                                             root.fake_input('key_release', 'Tab')
+  --                                                             root.fake_input('key_release', 'Ctrl_L')
+  --                                                             root.fake_input('key_release', 'Shift_L')
+  --                                                           end),
   -- Win + sound knob switches between all windows 🤯
   awful.key({ win          }, "XF86AudioRaiseVolume",  nil, function()
                                                               root.fake_input('key_press', 196)
@@ -758,8 +758,11 @@ globalkeys = gears.table.join(
   awful.key({ win,         }, "Caps_Lock",                  function() awful.tag.viewnext(get_screen_of_focused()) end),
   awful.key({ win, "Shift" }, "Tab",                        function() awful.tag.viewprev(get_screen_of_focused()) end),
   awful.key({ win, "Shift" }, "c",                          function() awful.spawn(proxified_chromium_cmd) end),
-  awful.key({ win, ctrl    }, "q",                          awesome.quit),
-  awful.key({ win, ctrl    }, "r",                          awesome.restart),
+  -- awful.key({ win, ctrl    }, "q",                          awesome.quit),
+  awful.key({ win, ctrl    }, "r",                          function()
+                                                                save_current_tags(screens_table)
+                                                                awesome.restart()
+                                                            end),
   awful.key({ win, "Shift" }, "z",                          unminimize_client)
 )
 if hostname == "innixos" or hostname == "innodellix" then
