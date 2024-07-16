@@ -810,6 +810,10 @@ client.connect_signal('focus', function(c)
   end
   -- border setup
   c.border_color = beautiful.border_focus
+  -- transparency
+  if c.opacity == 0.95 then
+    c.opacity = 1
+  end
 end)
 
 -- Screen handling
@@ -940,6 +944,11 @@ end)
 client.connect_signal('unfocus', function(c)
   -- border setup
   c.border_color = beautiful.border_normal
+
+  -- transparency
+  if c.opacity == 1 then
+    c.opacity = 0.95
+  end
 
   -- auto-hide dropdown
   if c.instance == my_dropdown.name then
