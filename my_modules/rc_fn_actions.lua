@@ -154,8 +154,10 @@ function fn_process_action(action, direction, player)
       helpers.async('pamixer --get-volume --allow-boost -' .. word .. ' 5', function(out)
         sound_slider.widget.value = tonumber(out)
         if tonumber(out) > 100 then
+          sound_slider.forced_height = dpi(250 + tonumber(out) - 100)
           sound_slider.widget.color = '#FF0000'
         else
+          sound_slider.forced_height = dpi(250)
           sound_slider.widget.color = beautiful.slider_sound_fg
         end
         triggerwibox('volume')
