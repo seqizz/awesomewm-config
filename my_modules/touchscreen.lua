@@ -31,9 +31,16 @@ function touchwidget:set(state)
   self.markup = markup_value
 end
 
+hostname = io.popen("uname -n"):read()
+if hostname == 'innodellix' then
+  fingerdevice = 'Wacom HID 48EC Finger'
+elseif hostname == 'splinter' then
+  fingerdevice = 'ELAN900C:00 04F3:41EE'
+end
+
 function touchwidget:check()
   awful.spawn.with_line_callback(
-    "xinput-toggle query 'Wacom HID 48EC Finger'",
+    "xinput-toggle query '" .. fingerdevice .. "'",
     {
       stdout = function (line)
         local fg = "#6c71c4"
@@ -65,7 +72,7 @@ end
 
 function touchwidget:toggle()
   awful.spawn.with_line_callback(
-    "xinput-toggle query 'Wacom HID 48EC Finger'",
+    "xinput-toggle query '" .. fingerdevice .. "'",
     {
       stdout = function (line)
         if line == "on" then
@@ -73,7 +80,7 @@ function touchwidget:toggle()
         elseif line == "off" then
           touchwidget:set('on')
         end
-        awful.spawn("xinput-toggle 'Wacom HID 48EC Finger'")
+        awful.spawn("xinput-toggle '" .. fingerdevice .. "'")
       end
     }
   )

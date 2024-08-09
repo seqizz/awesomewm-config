@@ -9,7 +9,7 @@ tag_web = awful.tag.add('web', {
   gap = 4,
   selected = true,
 })
-if hostname == 'innodellix' then
+if hostname == 'innodellix' or hostname == 'splinter' then
   tag_mail = awful.tag.add('mail', {
     layout = l.max,
     layouts = { l.max, l.tile },

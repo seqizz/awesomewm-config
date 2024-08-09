@@ -366,7 +366,7 @@ client.connect_signal('unmanage', function(c, startup)
 end)
 
 -- This is the only host with "rotatable" screen
-if hostname == 'innodellix' then
+if (hostname == 'innodellix' or hostname == 'splinter') then
   rotate_widget:buttons(awful.util.table.join(awful.button({}, 1, function() -- left click
     rotate_widget:toggle()
   end)))
@@ -532,7 +532,7 @@ local function screen_organizer(s, primary, is_extra)
 
   table.insert(systray_right_widgets, separator_empty)
   if primary then
-    if screen:count() == 1 and hostname == 'innodellix' then
+    if screen:count() == 1 and ( hostname == 'innodellix' or hostname == 'splinter' ) then
       table.insert(systray_right_widgets, touch_widget)
       table.insert(systray_right_widgets, rotate_widget)
     end
@@ -748,6 +748,7 @@ globalkeys = gears.table.join(
   awful.key({ ctrl, alt    }, "p",                          function() notifytest() end),
   awful.key({ win          }, "f",                          function() awful.spawn(browser) end),
   awful.key({ win          }, "l",                          function() awful.spawn("sudo slock") end),
+  -- awful.key({ win, "Shift" }, "l",                          function() awful.spawn("xdotool search --name \" Slack\" windowactivate &&  sleep 1 && xdotool key ctrl+k && sleep 0.8 && xdotool key g u r k a n Return && sleep 0.8 && xdotool key slash a w a y Return && sleep 0.8 && xdotool key slash s t a t u s space semicolon a y o o semicolon space l u n c h Return") end),
   -- If something goes wrong with loose setup
   awful.key({ win          }, "r",                          function() awful.spawn("loose rotate") end),
   -- Cycle between available layouts
@@ -765,7 +766,7 @@ globalkeys = gears.table.join(
                                                             end),
   awful.key({ win, "Shift" }, "z",                          unminimize_client)
 )
-if hostname == "innixos" or hostname == "innodellix" then
+if ( hostname == "splinter" or hostname == "innodellix" ) then
   gears.table.merge(globalkeys, gears.table.join(
     awful.key({ win          }, "v",                          function() awful.spawn("innovpn-toggle 'Innogames Wireguard (Primary)'") end),
     awful.key({ win, "Shift" }, "v",                          function() awful.spawn("innovpn-toggle 'Innogames Wireguard (Secondary)'") end)
@@ -1030,7 +1031,7 @@ end)
 awesome.connect_signal('startup', function(s, state)
   run_once('sleep 3 && firefox', 'firefox')
   -- only makes sense on this laptop
-  if hostname == 'innodellix' then
+  if ( hostname == 'innodellix' or hostname == 'splinter' ) then
     run_once('sleep 5 && slack -s', 'slack')
     run_once('sleep 8 && thunderbird', 'rbird')
   end
