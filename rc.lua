@@ -366,10 +366,12 @@ client.connect_signal('unmanage', function(c, startup)
 end)
 
 -- This is the only host with "rotatable" screen
-if hostname == 'innodellix' then
-  rotate_widget:buttons(awful.util.table.join(awful.button({}, 1, function() -- left click
-    rotate_widget:toggle()
-  end)))
+if hostname == 'innodellix' or hostname == 'splinter' then
+  if hostname == 'innodellix' then
+    rotate_widget:buttons(awful.util.table.join(awful.button({}, 1, function() -- left click
+      rotate_widget:toggle()
+    end)))
+  end
   touch_widget:buttons(awful.util.table.join(awful.button({}, 1, function() -- left click
     touch_widget:toggle()
   end)))
