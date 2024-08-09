@@ -366,7 +366,7 @@ client.connect_signal('unmanage', function(c, startup)
 end)
 
 -- This is the only host with "rotatable" screen
-if (hostname == 'innodellix' or hostname == 'splinter') then
+if hostname == 'innodellix' then
   rotate_widget:buttons(awful.util.table.join(awful.button({}, 1, function() -- left click
     rotate_widget:toggle()
   end)))
@@ -534,7 +534,9 @@ local function screen_organizer(s, primary, is_extra)
   if primary then
     if screen:count() == 1 and ( hostname == 'innodellix' or hostname == 'splinter' ) then
       table.insert(systray_right_widgets, touch_widget)
-      table.insert(systray_right_widgets, rotate_widget)
+      if hostname == 'innodellix' then
+        table.insert(systray_right_widgets, rotate_widget)
+      end
     end
     -- table.insert(systray_right_widgets, separator_reverse)
     -- table.insert(systray_right_widgets, keyboard_widget)
