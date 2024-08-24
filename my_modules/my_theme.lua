@@ -24,7 +24,8 @@ theme.master_width_factor = 0.6
 
 theme.bg_normal     = "#282828"
 theme.bg_focus      = "#504945"
-theme.bg_urgent     = "#dc322f"
+theme.bg_urgent     = "#d65d0e"
+-- theme.bg_urgent     = "#cc241d"
 theme.bg_minimize   = theme.bg_normal
 theme.bg_systray    = theme.bg_normal
 
@@ -40,7 +41,8 @@ theme.bg_notification = theme.bg_normal
 theme.useless_gap   = dpi(2)
 theme.border_width  = dpi(1)
 theme.border_marked = "#91231c"
-theme.border_focus  = "#d65d0e"
+-- theme.border_focus  = "#d65d0e"
+theme.border_focus  = "#d79921"
 theme.border_normal = "#252525"
 -- theme.separator     = theme.bg_focus
 theme.separator     = theme.bg_focus

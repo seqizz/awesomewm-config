@@ -32,7 +32,7 @@ function touchwidget:set(state)
 end
 
 hostname = io.popen("uname -n"):read()
-if hostname == 'innodellix' then
+if hostname == 'bebop' then
   fingerdevice = 'Wacom HID 48EC Finger'
 elseif hostname == 'splinter' then
   fingerdevice = 'ELAN900C:00 04F3:41EE'

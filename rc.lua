@@ -366,8 +366,8 @@ client.connect_signal('unmanage', function(c, startup)
 end)
 
 -- This is the only host with "rotatable" screen
-if hostname == 'innodellix' or hostname == 'splinter' then
-  if hostname == 'innodellix' then
+if hostname == 'bebop' or hostname == 'splinter' then
+  if hostname == 'bebop' then
     rotate_widget:buttons(awful.util.table.join(awful.button({}, 1, function() -- left click
       rotate_widget:toggle()
     end)))
@@ -534,9 +534,9 @@ local function screen_organizer(s, primary, is_extra)
 
   table.insert(systray_right_widgets, separator_empty)
   if primary then
-    if screen:count() == 1 and ( hostname == 'innodellix' or hostname == 'splinter' ) then
+    if screen:count() == 1 and ( hostname == 'bebop' or hostname == 'splinter' ) then
       table.insert(systray_right_widgets, touch_widget)
-      if hostname == 'innodellix' then
+      if hostname == 'bebop' then
         table.insert(systray_right_widgets, rotate_widget)
       end
     end
@@ -770,7 +770,7 @@ globalkeys = gears.table.join(
                                                             end),
   awful.key({ win, "Shift" }, "z",                          unminimize_client)
 )
-if ( hostname == "splinter" or hostname == "innodellix" ) then
+if ( hostname == "splinter" ) then
   gears.table.merge(globalkeys, gears.table.join(
     awful.key({ win          }, "v",                          function() awful.spawn("innovpn-toggle 'Innogames Wireguard (Primary)'") end),
     awful.key({ win, "Shift" }, "v",                          function() awful.spawn("innovpn-toggle 'Innogames Wireguard (Secondary)'") end)
@@ -1035,10 +1035,10 @@ end)
 awesome.connect_signal('startup', function(s, state)
   run_once('sleep 3 && firefox', 'firefox')
   -- only makes sense on this laptop
-  if ( hostname == 'innodellix' or hostname == 'splinter' ) then
+  if ( hostname == 'splinter' ) then
     run_once('sleep 5 && slack -s', 'slack')
-    run_once('sleep 8 && thunderbird', 'rbird')
   end
+  run_once('sleep 8 && thunderbird', 'rbird')
   run_once('XDG_CURRENT_DESKTOP=gnome telegram-desktop', 'telegram')
   run_once('pasystray')
   run_once("wezterm-mux-server --daemonize", "wezterm-mux-server")
