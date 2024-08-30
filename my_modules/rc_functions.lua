@@ -189,15 +189,54 @@ function find_tag_by_first_word(first_word, printmore)
   end
 end
 
-function focus_previous_client()
-  -- A simple function to focus the previously focused client,
-  -- no matter which screen it is on
-  local prev = awful.client.focus.history.get(nil, 0)
-  if prev then
-    client.focus = prev
-    prev:raise()
-  end
+function focus_previous_client(tag_name)
+    -- Iterate through the history to find a client in the same tag
+    -- If we don't find any, focus the most recent client
+    local idx = 0
+    local client_to_focus = nil
+    local max_history_depth = 100  -- Set an upper limit to avoid infinite loop
+
+    while idx < max_history_depth do
+        local client = awful.client.focus.history.get(nil, idx)
+
+        if not client then
+            -- We've exhausted the history without finding a match
+            break
+        end
+
+        if client.first_tag and client.first_tag.name == tag_name then
+            -- We found a client in the same tag
+            client_to_focus = client
+            break
+        end
+
+        idx = idx + 1
+    end
+
+    -- If we found a client in the same tag, focus it
+    if client_to_focus then
+        client.focus = client_to_focus
+        client_to_focus:raise()
+    else
+        -- If we didn't find any in the same tag, focus the most recent (idx 0)
+        local most_recent = awful.client.focus.history.get(nil, 0)
+        if most_recent then
+            client.focus = most_recent
+            most_recent:raise()
+        end
+    end
 end
+
+-- function focus_previous_client(tag_name)
+--   -- local prev_idx = 0
+--   local prev = awful.client.focus.history.get(nil, 0)
+--   if prev then
+--     -- if prev.first_tag.name == tag_name then
+--       client.focus = prev
+--       prev:raise()
+--     -- end
+--   end
+-- end
 
 function find_screen_of_tag(screens_table, tag_obj, printmore)
   for name, properties in pairs(screens_table) do
