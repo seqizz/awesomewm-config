@@ -4,16 +4,16 @@ This is the reason I'm still not using Wayland. Too good to lose.
 
 #### Highlights
 
-- Just 4 permanent tags, no transient crap
+- Just 4 permanent tags, no transient crap: `term`, `chat`, `web`, `mail`
 - Only 2 active layouts: Tile and Max (default)
-- Remembers which tags were visible/active on every individual screen after WM (re)start
+- Remembers/loads which tags were visible/active on every individual screen on WM (re)start
 - Handmade theme
   - Powerline-style wibar
-  - Gruvbox colors (for now), different colors hinting the status of all widgets
+  - Gruvbox colors, different colors hinting the status of all widgets
   - Custom volume/brightness sliders & media notifications
   - Random wallpapers per screen, from given directory
 - Multi-monitor support
-  - The X display set as "primary" has systray and 2 tags (term & chat) on it
+  - The X display which has "primary" set shows systray and 2 tags (term & chat) on it
   - Non-primary displays get the web & mail tags (replicated if more screens available)
   - Dynamic re-organisation of tags in case of screen addition/removal (so no clients get lost)
   - If a monitor is widescreen, automatically split into 2 equal "fake" screens (which you can expand/shrink)
@@ -31,7 +31,7 @@ This is the reason I'm still not using Wayland. Too good to lose.
   - Pressure information widget (Linux PSI)
   - ~~Keyboard layout toggle~~ (disabled, as I'm using a single layout now)
   - Interactive Spotify widget (when app is running)
-    - Can also hide/show the client
+    - Can also swallow the client
 
 
 #### Window related shortcuts
