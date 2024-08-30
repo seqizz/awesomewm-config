@@ -361,8 +361,10 @@ end
 
 -- signal function to execute when a client disappears
 client.connect_signal('unmanage', function(c, startup)
+  if c.type == 'normal' then
+    focus_previous_client(c.screen.selected_tag.name, printmore)
+  end
   refresh_tag_name()
-  focus_previous_client(c.first_tag)
 end)
 
 -- This is the only host with "rotatable" screen
@@ -805,7 +807,9 @@ client.connect_signal('property::minimized', function(c)
   if c.sticky then
     c.skip_taskbar = false
   end
-  focus_previous_client(c.first_tag)
+  if c.type == 'normal' then
+    focus_previous_client(c.screen.selected_tag.name, printmore)
+  end
 end)
 
 client.connect_signal('focus', function(c)

@@ -189,22 +189,25 @@ function find_tag_by_first_word(first_word, printmore)
   end
 end
 
-function focus_previous_client(tag_name)
+function focus_previous_client(tag_name, printmore)
     -- Iterate through the history to find a client in the same tag
     -- If we don't find any, focus the most recent client
     local idx = 0
     local client_to_focus = nil
-    local max_history_depth = 100  -- Set an upper limit to avoid infinite loop
+    local max_history_depth = 10  -- Set an upper limit to avoid infinite loop
+
+    local tag_of_gone = find_tag_by_first_word(my_utils.get_first_word(tag_name))
+    debug_print("focus_previous_client: Looking for clients in tag " .. tag_of_gone.name, printmore)
 
     while idx < max_history_depth do
         local client = awful.client.focus.history.get(nil, idx)
 
-        if not client then
+        if not client or tag_of_gone == nil then
             -- We've exhausted the history without finding a match
             break
         end
 
-        if client.first_tag and client.first_tag.name == tag_name then
+        if my_utils.table_contains(client:tags(), tag_of_gone) then
             -- We found a client in the same tag
             client_to_focus = client
             break
