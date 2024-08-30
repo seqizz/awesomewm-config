@@ -1038,6 +1038,10 @@ awesome.connect_signal('startup', function(s, state)
   if ( hostname == 'splinter' ) then
     run_once('sleep 5 && slack -s', 'slack')
   end
+  -- on-screen keyboard
+  if ( hostname == 'bebop' ) then
+    run_once('onboard')
+  end
   run_once('sleep 8 && thunderbird', 'rbird')
   run_once('XDG_CURRENT_DESKTOP=gnome telegram-desktop', 'telegram')
   run_once('pasystray')
