@@ -474,7 +474,24 @@ local function createFolder(folder)
   p:close()
 end
 
+local function get_tag_with_focused_window()
+    for s in screen do
+        for _, t in ipairs(s.tags) do
+            if t.selected then
+                for _, c in ipairs(t:clients()) do
+                    if client.focus == c then
+                        return t
+                    end
+                end
+            end
+        end
+    end
+    return nil
+end
+
 function save_current_tags(screens_table)
+  focused_tag = get_tag_with_focused_window()
+
   -- Ensure that the folder exists
   createFolder(tagsave_folder)
   for name, feat in pairs(screens_table) do
@@ -483,7 +500,12 @@ function save_current_tags(screens_table)
     os.remove(filename)
     for _, tagobj in pairs(feat["object"].selected_tags) do
         if my_utils.table_contains(feat["tags"], tagobj) then
-            table.insert(active_tags, my_utils.get_first_word(tagobj.name))
+            if tagobj == focused_tag then
+              -- this is the focused tag so it has to get marked
+              table.insert(active_tags, my_utils.get_first_word(tagobj.name) .. ":")
+            else
+              table.insert(active_tags, my_utils.get_first_word(tagobj.name))
+            end
         end
     end
     local f = assert(io.open(filename, "w"))
@@ -494,22 +516,48 @@ function save_current_tags(screens_table)
   end
 end
 
-function load_last_active_tags(screens_table, printmore)
-    for name, feat in pairs(screens_table) do
-        local filename = tagsave_folder .. "/tagsave-" .. name
-        tag_list = my_utils.read_lines_from(filename)
-        if next(tag_list) ~= nil then
-            local previous_tags = {}
-            for _, tag_name in pairs(tag_list) do
-                local t = find_tag_by_first_word(tag_name, printmore)
-                table.insert(previous_tags, t)
-            end
-            local _, firsttag = next(previous_tags)
-            local screen_name = find_screen_of_tag(screens_table, firsttag, printmore)
-            awful.tag.viewnone(screen_name)
-            awful.tag.viewmore(previous_tags, screen_name)
+
+function get_latest_urgent_client()
+    local latest_urgent_client = nil
+    local latest_urgent_time = 0
+
+    for _, c in ipairs(client.get()) do
+        if c.urgent == true and c.urgent_since and c.urgent_since > latest_urgent_time then
+            latest_urgent_client = c
+            latest_urgent_time = c.urgent_since
         end
     end
+
+    return latest_urgent_client
+end
+
+function load_last_active_tags(screens_table, printmore)
+  focused_tag = nil
+  for name, feat in pairs(screens_table) do
+    local filename = tagsave_folder .. "/tagsave-" .. name
+    tag_list = my_utils.read_lines_from(filename)
+    if next(tag_list) ~= nil then
+      local previous_tags = {}
+      for _, tag_name in pairs(tag_list) do
+        if tag_name:sub(-1) == ":" then
+          tag_name = tag_name:sub(1, -2)
+          focused_tag = find_tag_by_first_word(tag_name, printmore)
+        end
+        local t = find_tag_by_first_word(tag_name, printmore)
+        table.insert(previous_tags, t)
+      end
+      local _, firsttag = next(previous_tags)
+      local screen_name = find_screen_of_tag(screens_table, firsttag, printmore)
+      awful.tag.viewnone(screen_name)
+      awful.tag.viewmore(previous_tags, screen_name)
+    end
+  end
+  if focused_tag then
+    debug_print("load_last_active_tags: Last focused tag is " .. focused_tag.name .. " .. loading last", printmore)
+    -- Switch to the screen of the focused tag by emptying its screen and toggling it
+    awful.tag.viewnone(find_screen_of_tag(screens_table, focused_tag, printmore))
+    awful.tag.viewtoggle(focused_tag)
+  end
 end
 
 function string:firstword()

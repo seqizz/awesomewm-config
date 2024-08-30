@@ -966,6 +966,7 @@ client.connect_signal('unfocus', function(c)
   end
 end)
 
+-- HACK START --
 -- Git version workaround, shit is not complete (e.g. slack does not switch to)
 -- alerting chat etc. but at least hovers the app itself
 -- https://github.com/awesomeWM/awesome/issues/3182 waiting for proper fix
@@ -976,11 +977,8 @@ naughty.connect_signal('destroyed', function(n, reason)
   end
   if reason == require('naughty.constants').notification_closed_reason.dismissed_by_user then
     -- If we clicked on a notification, we get a new urgent client to jump to
-    client.connect_signal('property::urgent', function(c)
-      -- We don't use notification_client because it's not reliable (Ex: If we have two different instances of chrome)
-      -- cf: https://awesomewm.org/apidoc/core_components/naughty.notification.html#clients
-      -- So we just check if the client name of our notification is the same as the last urgent client
-      -- and jump to this one.
+    -- We're optimistic, will just jump to latest urgent client
+      c = get_latest_urgent_client()
       for _, notification_client in ipairs(n.clients) do
         if not c.name or not notification_client then
           -- Means we can't compare anyway
@@ -992,9 +990,15 @@ naughty.connect_signal('destroyed', function(n, reason)
         end
         ::noclientname::
       end
-    end)
   end
 end)
+
+client.connect_signal('property::urgent', function(c)
+    if c.urgent then
+        c.urgent_since = os.time()
+    end
+end)
+-- HACK END --
 
 -- Show OSD notification of current status on volume:change signal
 awesome.connect_signal('volume::change', function()
