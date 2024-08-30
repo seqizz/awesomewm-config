@@ -982,7 +982,7 @@ naughty.connect_signal('destroyed', function(n, reason)
       -- So we just check if the client name of our notification is the same as the last urgent client
       -- and jump to this one.
       for _, notification_client in ipairs(n.clients) do
-        if not c.name or not c.notification_client then
+        if not c.name or not notification_client then
           -- Means we can't compare anyway
           goto noclientname
         end
