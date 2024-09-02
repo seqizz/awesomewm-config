@@ -827,12 +827,12 @@ end)
 
 -- Screen handling
 screen.connect_signal('list', function()
-  debug_print('List signal received', true)
+  debug_print('List signal received', printmore)
   if my_utils.file_age('/home/gurkan/.awesome_screen_setup_lock', printmore) < 4 then
-    debug_print('There is already another lock waiting, skipping this screen change', true)
+    debug_print('There is already another lock waiting, skipping this screen change', printmore)
   else
     os.execute('touch /home/gurkan/.awesome_screen_setup_lock')
-    debug_print('Sleeping for 2 secs', true)
+    debug_print('Sleeping for 2 secs', printmore)
     os.execute('sleep 2')
     screens_table = get_screens()
     process_screens(my_systray, screens_table, printmore)
@@ -994,7 +994,9 @@ naughty.connect_signal('destroyed', function(n, reason)
     end
   end
   if client_to_jump then
+    x, y, prev_scr = save_mouse_location()
     client_to_jump:jump_to()
+    restore_mouse_location(x, y, prev_scr)
   end
 end)
 

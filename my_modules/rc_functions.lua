@@ -163,13 +163,21 @@ function move_or_expand(c, action, direction)
   end
 end
 
-function switch_focus_without_mouse(c, dir)
-  -- Get the mouse position
-  mouselocation_x = mouse.coords().x
-  mouselocation_y = mouse.coords().y
-  awful.client.focus.global_bydirection(dir, c, true)
-  -- Keep the mouse position
+function save_mouse_location()
+  debug_print('save_mouse_location, x: ' .. mouse.coords().x .. ', y: ' .. mouse.coords().y, printmore)
+  return mouse.coords().x, mouse.coords().y, awful.screen.focused()
+end
+
+function restore_mouse_location(x, y, screen)
+  debug_print('restore_mouse_location: Restoring mouse location to ' .. x .. ', ' .. y, printmore)
   mouse.coords {x = mouselocation_x, y = mouselocation_y}
+  awful.screen.focus(screen)
+end
+
+function switch_focus_without_mouse(c, dir)
+  x, y, prev_scr = save_mouse_location()
+  awful.client.focus.global_bydirection(dir, c, true)
+  restore_mouse_location(x, y, prev_scr)
 end
 
 function switch_to_tag(tag_name, printmore)
