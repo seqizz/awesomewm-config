@@ -971,25 +971,30 @@ end)
 -- alerting chat etc. but at least hovers the app itself
 -- https://github.com/awesomeWM/awesome/issues/3182 waiting for proper fix
 naughty.connect_signal('destroyed', function(n, reason)
-  -- debug_print(my_utils.dump(n))
-  if not n.clients then
-    return
-  end
+  client_to_jump = nil
   if reason == require('naughty.constants').notification_closed_reason.dismissed_by_user then
-    -- If we clicked on a notification, we get a new urgent client to jump to
-    -- We're optimistic, will just jump to latest urgent client
-      c = get_latest_urgent_client()
+    if n.clients then
+      -- notification thingy (maybe) gave us some client names, use them
       for _, notification_client in ipairs(n.clients) do
-        if not c.name or not notification_client then
-          -- Means we can't compare anyway
-          goto noclientname
+        if not notification_client then
+          -- Means this is nothingburger
+          goto noclient
         end
-        if c.name == notification_client.name then
-          c:jump_to()
-          break
-        end
-        ::noclientname::
+        client_to_jump = notification_client
+        debug_print('Jumping to notification-client: ' .. client_to_jump.name, printmore)
+        break
+        ::noclient::
       end
+    else
+      -- no notification client is here
+      -- we will just assume when we clicked the pop-up, we have created
+      -- an urgent client. So we will be optimistic, will just jump to it
+      client_to_jump = get_latest_urgent_client()
+      debug_print('Jumping to latest urgent one: ' .. client_to_jump.name, printmore)
+    end
+  end
+  if client_to_jump then
+    client_to_jump:jump_to()
   end
 end)
 
