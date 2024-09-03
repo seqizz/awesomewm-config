@@ -72,8 +72,8 @@ awful.key({ ctrl, win          }, "Up",     function (c) move_or_expand(c, "expa
 awful.key({ win, "Shift"       }, "s",      function (c) move_or_expand(c, "move", "down") end),
 awful.key({ win, "Shift"       }, "w",      function (c) move_or_expand(c, "move", "up") end),
 awful.key({ ctrl, win, "Shift" }, "Down",   function (c) move_or_expand(c, "shrink", "down") end),
-awful.key({ win                }, "Right",  function (c) switch_focus_without_mouse(c, "right") end),
-awful.key({ win                }, "Left",   function (c) switch_focus_without_mouse(c, "left") end),
+awful.key({ win                }, "Right",  function (c) switch_focus_without_mouse(c, "right", printmore) end),
+awful.key({ win                }, "Left",   function (c) switch_focus_without_mouse(c, "left", printmore) end),
 awful.key({ win                }, "Down",   function (c)
   if c.sticky then
     -- in case it's on top
@@ -678,7 +678,7 @@ end
 root.buttons(gears.table.join(
   awful.button({ }, 4, awful.tag.viewprev),
   awful.button({ }, 5, awful.tag.viewnext)
-      ))
+))
 -- }}}
 
 -- {{{ Key bindings
@@ -996,7 +996,7 @@ naughty.connect_signal('destroyed', function(n, reason)
   if client_to_jump then
     x, y, prev_scr = save_mouse_location()
     client_to_jump:jump_to()
-    restore_mouse_location(x, y, prev_scr)
+    restore_mouse_location(x, y, prev_scr, printmore, true)
   end
 end)
 
