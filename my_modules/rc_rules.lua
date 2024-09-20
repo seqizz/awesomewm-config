@@ -166,9 +166,8 @@ function set_rules(clientkeys)
       properties = {
         titlebars_enabled = true,
         placement = awful.placement.centered,
-        height = dpi(300),
-        width = dpi(500),
-        opacity = 0.8,
+        height = dpi(500),
+        width = dpi(600),
       },
     },
 
