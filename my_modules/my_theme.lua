@@ -55,6 +55,7 @@ theme.border_radius        = 2
 -- relative paths, so fucking easy with lua..
 local base_dir = string.gsub(debug.getinfo(1).source, "^@(.+/)[^/]+$", "%1")
 theme.gauge_icon = base_dir .. 'assets/gauge.svg'
+theme.rotate_icon = base_dir .. 'assets/rotate.svg'
 theme.battery_icon_empty = base_dir .. 'assets/battery.svg'
 theme.battery_icon_charging = base_dir .. 'assets/battery-charging.svg'
 theme.battery_icon_full = base_dir .. 'assets/battery-full.svg'
