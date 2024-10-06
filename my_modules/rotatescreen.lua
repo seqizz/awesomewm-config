@@ -19,11 +19,12 @@ local rotatewidget = wibox.container.margin(
   dpi(2) -- bottom margin to match visually
 )
 
-local tt = awful.tooltip {
-    objects = { rotatewidget },
-    text = '',
-    visible = false,
-}
+local tt = awful.tooltip({
+  objects = { rotatewidget },
+  text = '',
+  visible = false,
+  bg = my_theme.tooltip_bg,
+})
 
 function rotatewidget:set(state)
   if state == 'start' then

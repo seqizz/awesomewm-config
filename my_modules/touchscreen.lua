@@ -33,6 +33,7 @@ local tt = awful.tooltip({
   objects = { touchwidget },
   text = '',
   visible = false,
+  bg = my_theme.tooltip_bg,
 })
 
 hostname = io.popen('uname -n'):read()
