@@ -1,4 +1,5 @@
 local awful = require('awful')
+local gears = require('gears')
 local wibox = require('wibox')
 local my_utils = require('my_modules/my_utils')
 local my_theme = require('my_modules/my_theme')
@@ -35,6 +36,9 @@ local tt = awful.tooltip({
   visible = false,
   bg = my_theme.tooltip_bg,
 })
+tt:set_shape(function(cr, width, height)
+    gears.shape.infobubble(cr, width, height, corner_radius, 5, 3)
+end)
 
 hostname = io.popen('uname -n'):read()
 if hostname == 'bebop' then

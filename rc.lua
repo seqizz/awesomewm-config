@@ -247,6 +247,17 @@ battery_image_widget = wibox.widget {
   resize = true,
   widget = wibox.widget.imagebox,
 }
+local bat_tooltip = awful.tooltip({
+  objects = { battery_image_widget },
+  text = '',
+  margin_topbottom = dpi(6),
+  visible = false,
+  align = 'bottom_right',
+  bg = beautiful.tooltip_bg,
+})
+bat_tooltip:set_shape(function(cr, width, height)
+    gears.shape.infobubble(cr, width, height, corner_radius, 5, 3)
+end)
 local battery_widget_text = lain.widget.bat({
   battery = adapter_name,
   full_notify = 'off',
@@ -279,6 +290,7 @@ local battery_widget_text = lain.widget.bat({
       perc = bat_now.perc .. '%'
     end
 
+    bat_tooltip.text = bat_now.status .. ' (' .. bat_now.perc .. '%)'
     widget:set_markup(lain.util.markup.fontfg(beautiful.font, beautiful.fg_normal, perc))
     battery_image_widget:set_image(gears.color.recolor_image(battery_image, battery_widget_color))
   end,
