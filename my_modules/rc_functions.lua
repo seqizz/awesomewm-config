@@ -4,6 +4,7 @@ local gears = require("gears")
 local beautiful = require("beautiful")
 local naughty = require("naughty")
 local my_utils = require('my_modules/my_utils')
+local my_theme = require('my_modules/my_theme')
 local xresources = require("beautiful.xresources")
 local dpi = xresources.apply_dpi
 
@@ -674,3 +675,19 @@ function get_screens()
 	return output_tbl
 end
 
+function get_tooltip(object_to_attach)
+  local tt = awful.tooltip({
+    align = 'bottom_right',
+    bg = my_theme.tooltip_bg,
+    fg = my_theme.tooltip_fg,
+    font = my_theme.font,
+    margin_topbottom = dpi(5),
+    objects = { object_to_attach },
+    text = '',
+    visible = false,
+  })
+  tt:set_shape(function(cr, width, height)
+    gears.shape.partially_rounded_rect(cr, width, height, false, true, true, true, 30)
+  end)
+  return tt
+end

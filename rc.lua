@@ -6,6 +6,7 @@ require("awful.autofocus")
 local wibox = require("wibox")
 local menubar = require("menubar")
 local beautiful = require("beautiful")
+local my_theme = require('my_modules/my_theme')
 local naughty = require("naughty")
 local my_utils = require('my_modules/my_utils')
 local lain = require("lain")
@@ -247,17 +248,9 @@ battery_image_widget = wibox.widget {
   resize = true,
   widget = wibox.widget.imagebox,
 }
-local bat_tooltip = awful.tooltip({
-  objects = { battery_image_widget },
-  text = '',
-  margin_topbottom = dpi(6),
-  visible = false,
-  align = 'bottom_right',
-  bg = beautiful.tooltip_bg,
-})
-bat_tooltip:set_shape(function(cr, width, height)
-    gears.shape.infobubble(cr, width, height, corner_radius, 5, 3)
-end)
+
+bat_tooltip = get_tooltip(battery_image_widget)
+
 local battery_widget_text = lain.widget.bat({
   battery = adapter_name,
   full_notify = 'off',

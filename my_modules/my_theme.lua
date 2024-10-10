@@ -44,6 +44,7 @@ theme.border_marked = "#91231c"
 -- theme.border_focus  = "#d65d0e"
 theme.border_focus  = "#d79921"
 theme.tooltip_bg = "#d79921a0"
+theme.tooltip_fg = "#ffffff"
 theme.border_normal = "#252525"
 -- theme.separator     = theme.bg_focus
 theme.separator     = theme.bg_focus

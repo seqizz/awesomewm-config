@@ -4,6 +4,9 @@ local wibox = require('wibox')
 local my_utils = require('my_modules/my_utils')
 local my_theme = require('my_modules/my_theme')
 
+-- Helpful functions
+dofile ("/home/gurkan/.config/awesome/my_modules/rc_functions.lua")
+
 local touchwidget = wibox.widget({
   widget = wibox.widget.textbox,
   align = 'center',
@@ -30,15 +33,7 @@ function touchwidget:set(state)
   self.markup = markup_value
 end
 
-local tt = awful.tooltip({
-  objects = { touchwidget },
-  text = '',
-  visible = false,
-  bg = my_theme.tooltip_bg,
-})
-tt:set_shape(function(cr, width, height)
-    gears.shape.infobubble(cr, width, height, corner_radius, 5, 3)
-end)
+local touch_tooltip = get_tooltip(touchwidget)
 
 hostname = io.popen('uname -n'):read()
 if hostname == 'bebop' then
@@ -54,13 +49,13 @@ function touchwidget:check()
 
       if line == 'on' then
         fg = '#268bd2'
-        tt.text = 'Touchy touchy ;)'
+        touch_tooltip.text = 'Touchy touchy ;)'
       elseif line == 'off' then
         fg = '#cb4b16'
-        tt.text = 'No touchy :('
+        touch_tooltip.text = 'No touchy :('
       else
         fg = '#FF0000'
-        tt.text = 'Not sure if touchy or not?!?'
+        touch_tooltip.text = 'Not sure if touchy or not?!?'
       end
       markup_value = my_utils.create_markup({
         text = '',
@@ -80,10 +75,10 @@ function touchwidget:toggle()
     stdout = function(line)
       if line == 'on' then
         touchwidget:set('off')
-        tt.text = 'No touchy :('
+        touch_tooltip.text = 'No touchy :('
       elseif line == 'off' then
         touchwidget:set('on')
-        tt.text = 'Touchy touchy ;)'
+        touch_tooltip.text = 'Touchy touchy ;)'
       end
       awful.spawn('xinput-toggle \'' .. fingerdevice .. '\'')
     end,

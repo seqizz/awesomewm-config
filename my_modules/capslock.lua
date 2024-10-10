@@ -4,6 +4,9 @@ local wibox = require('wibox')
 local my_theme = require('my_modules/my_theme')
 local dpi = require('beautiful').xresources.apply_dpi
 
+-- Helpful functions
+dofile ("/home/gurkan/.config/awesome/my_modules/rc_functions.lua")
+
 local capslock = wibox.widget({
   widget = wibox.widget.textbox,
   align = 'center',
@@ -14,9 +17,7 @@ local capslock = wibox.widget({
 capslock.activated = '<span background=\'#dc322f\' foreground=\'white\'> CAPS </span>'
 capslock.deactivated = ''
 
-local tooltip = awful.tooltip({})
-
-tooltip:add_to_object(capslock)
+local tooltip = get_tooltip(capslock)
 
 function capslock:check()
   awful.spawn.with_line_callback('bash -c \'sleep 0.2 && xset q\'', {
