@@ -150,7 +150,7 @@ editor_cmd = terminal .. ' -e ' .. editor
 greenclip_cmd = 'rofi -dpi '
   .. dpi(80)
   .. ' -modi \'clipboard:greenclip print\' -show clipboard -run-command \'{cmd}\' '
-rofi_cmd = 'rofi -dpi ' .. dpi(80) .. ' -show run'
+rofi_cmd = 'rofi -dpi ' .. dpi(80) .. ' -disable-history -show run -sort'
 rofi_emoji_cmd = 'rofi -dpi ' .. dpi(80) .. ' -show emoji -modi emoji'
 rofi_calc_cmd = 'rofi -dpi ' .. dpi(80) .. ' -show calc -modi calc'
 rofi_subsuper = 'rofi -dpi ' .. dpi(80) .. ' -show fb -modes \'fb:rofi-subsuper\''
@@ -754,6 +754,7 @@ globalkeys = gears.table.join(
   awful.key({ ctrl, alt    }, "c",                          function() awful.spawn(greenclip_cmd) end),
   awful.key({ win          }, "p",                          function() awful.spawn("rofi-pass") end),
   awful.key({ ctrl, alt    }, "t",                          function() awful.spawn(terminal) end),
+  awful.key({ win          }, "XF86WakeUp",            nil, function() awful.spawn("sudo systemctl suspend") end),
   awful.key({ alt, "Shift" }, "t",                          function() awful.spawn("wezterm --config-file /home/gurkan/.config/wezterm/old-nomux.lua start") end),
   awful.key({ win          }, "c",                          function() awful.spawn("chromium-browser") end),
   awful.key({ ctrl, alt    }, "p",                          function() notifytest() end),
