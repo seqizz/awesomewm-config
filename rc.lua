@@ -1086,7 +1086,7 @@ awesome.connect_signal('startup', function(s, state)
   )
 end)
 
-set_wallpapers(screens_table)
+-- set_wallpapers(screens_table)
 
 debug_print("Last state of the screens table is: \n" .. my_utils.dump(screens_table), printmore)
 load_last_active_tags(screens_table, printmore)

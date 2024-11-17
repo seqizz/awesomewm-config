@@ -385,12 +385,14 @@ function get_child_of(s, screens_table)
   return nil
 end
 
+local lock_file = "/tmp/awesome_wallpaper.lock"
 function resize_screen(s, screens_table, shrink)
   if shrink then
       diff = -dpi(50)
   else
       diff = dpi(50)
   end
+
   for name, properties in pairs(screens_table) do
     if properties["object"] == s then
         -- I found my screen
@@ -417,16 +419,38 @@ function resize_screen(s, screens_table, shrink)
       end
     end
   end
-  set_wallpapers(screens_table)
+end
+
+local function set_wallpaper(s)
+  gears.wallpaper.maximized(gears.filesystem.get_random_file_from_dir(
+    "/home/gurkan/syncfolder/wallpaper",
+    {".jpg", ".png", ".svg"},
+    true
+  ), s, false)
 end
 
 screen.connect_signal("request::wallpaper", function(s)
+  -- Need to delay the wallpaper change in case we are resizing screen too quickly
+  -- Otherwise running it on each change is too slow
+  if gears.filesystem.file_readable(lock_file) then
+    -- We are already setting wallpaper, bye
+    return
+  end
+  -- Touch the wallpaper file so it won't change in the middle of the operation
+  awful.spawn.with_shell("touch " .. lock_file)
+    gears.timer.start_new(3, function()
+      for scr in screen do
+        set_wallpaper(scr)
+      end
+      awful.spawn.with_shell("rm -f " .. lock_file)
+      return false
+    end)
   -- TODO: slow as hell
-    gears.wallpaper.maximized(gears.filesystem.get_random_file_from_dir(
-        "/home/gurkan/syncfolder/wallpaper",
-        {".jpg", ".png", ".svg"},
-        true
-    ), s, false)
+    -- gears.wallpaper.maximized(gears.filesystem.get_random_file_from_dir(
+    --     "/home/gurkan/syncfolder/wallpaper",
+    --     {".jpg", ".png", ".svg"},
+    --     true
+    -- ), s, false)
     -- https://github.com/awesomeWM/awesome/issues/3547
     -- -- awful.wallpaper {
     --     screen = s,
@@ -454,11 +478,11 @@ screen.connect_signal("request::wallpaper", function(s)
     -- }
 end)
 
-function set_wallpapers(screens_table)
-  for name, feat in pairs(screens_table) do
-    feat["object"]:emit_signal("request::wallpaper")
-  end
-end
+-- function set_wallpapers(screens_table)
+--   for name, feat in pairs(screens_table) do
+--     feat["object"]:emit_signal("request::wallpaper")
+--   end
+-- end
 
 -- @Reference
 -- function set_wallpapers_deprecated(screens_table)
