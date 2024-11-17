@@ -109,7 +109,6 @@ awful.key({ ctrl, alt, "Shift" }, "s",      function (c) sticky_toggle(c) end),
 -- Hide stickies to the bottom-right corner (toggle) : Win + Esc
 awful.key({ win                }, "Escape", function (c) hide_stickies() end),
 awful.key({ win                }, "F7",     nil, function (c) resize_screen(c.screen, screens_table, false) end),
-awful.key({ win                }, "XF86HomePage",nil, function(c) flash_toggle(c) end),
 awful.key({ win                }, "F8",     nil, function (c) resize_screen(c.screen, screens_table, true) end)
 )
 
@@ -1085,8 +1084,6 @@ awesome.connect_signal('startup', function(s, state)
     '0x1008ff49'
   )
 end)
-
--- set_wallpapers(screens_table)
 
 debug_print("Last state of the screens table is: \n" .. my_utils.dump(screens_table), printmore)
 load_last_active_tags(screens_table, printmore)

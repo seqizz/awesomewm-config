@@ -44,6 +44,7 @@ function suspend_toggle(c)
   end)
 end
 
+-- Used from xidlehook to notify we're about to lock the screen
 function flash_toggle(c)
   old_opacity = c.opacity
   c.opacity = 0.2
@@ -244,6 +245,7 @@ function focus_previous_client(tag_name, printmore)
     end
 end
 
+-- @Reference:
 -- function focus_previous_client(tag_name)
 --   -- local prev_idx = 0
 --   local prev = awful.client.focus.history.get(nil, 0)
@@ -449,67 +451,7 @@ screen.connect_signal("request::wallpaper", function(s)
       awful.spawn.with_shell("rm -f " .. lock_file)
       return false
     end)
-  -- TODO: slow as hell
-    -- gears.wallpaper.maximized(gears.filesystem.get_random_file_from_dir(
-    --     "/home/gurkan/syncfolder/wallpaper",
-    --     {".jpg", ".png", ".svg"},
-    --     true
-    -- ), s, false)
-    -- https://github.com/awesomeWM/awesome/issues/3547
-    -- -- awful.wallpaper {
-    --     screen = s,
-    --     widget = {
-    --         -- {
-    --             image  = gears.filesystem.get_random_file_from_dir(
-    --                 "/home/gurkan/syncfolder/wallpaper",
-    --                 {".jpg", ".png", ".svg"},
-    --                 true
-    --             ),
-    --             upscale = false,
-    --             downscale = true,
-    --             resize = true,
-    --             valign = "center",
-    --             scaling_quality = "good",
-    --             vertical_fit_policy = "pad",
-    --             horizontal_fit_policy = "none",
-    --             widget = wibox.widget.imagebox,
-    --         -- },
-    --         -- valign = "center",
-    --         -- halign = "center",
-    --         -- tiled = false,
-    --         -- widget = wibox.container.tile,
-    --     }
-    -- }
 end)
-
--- function set_wallpapers(screens_table)
---   for name, feat in pairs(screens_table) do
---     feat["object"]:emit_signal("request::wallpaper")
---   end
--- end
-
--- @Reference
--- function set_wallpapers_deprecated(screens_table)
---   -- choose random wallpaper
---   awful.spawn.easy_async(
---     "find /home/gurkan/syncfolder/wallpaper -not -path 'phone*' -type f",
---     function(stdout, stderr, reason, exit_code)
---       if exit_code == 0 then
---         local wallpapers = {}
---         for wp in stdout:gmatch("[^\r\n]+") do
---           table.insert(wallpapers, wp)
---         end
---         -- lua is the shittiest language ever
---         -- you need to set seed again, or the "random" will always return same
---         math.randomseed(my_utils.get_randomseed())
---         for name, feat in pairs(screens_table) do
---           gears.wallpaper.maximized(wallpapers[math.random(#wallpapers)], feat["object"])
---         end
---       else
---         naughty.notify({text = "Wallpaper assign error: " .. stderr})
---       end
---     end)
--- end
 
 local function createFolder(folder)
   local p = io.popen('mkdir -p ' .. folder)
