@@ -399,6 +399,10 @@ function resize_screen(s, screens_table, shrink)
       if properties["is_fake"] then
         -- this is a fake screen which has a sibling (parent)
         -- whatever you do here, do the reverse to the parent
+        -- first, we will reverse the action on the shrink variable
+        -- because we want to have a consistent shortcut, independent of our current screen
+        -- e.g. same key will always cause growth on the same screen, shrink on the other
+        diff = -diff
         local geo = s.geometry
         local parent_geo = properties["parent"]["object"].geometry
         s:fake_resize(geo.x, geo.y, geo.width + diff, geo.height)
