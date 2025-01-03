@@ -150,7 +150,7 @@ editor_cmd = terminal .. ' -e ' .. editor
 greenclip_cmd = 'rofi -dpi '
   .. dpi(80)
   .. ' -modi \'clipboard:greenclip print\' -show clipboard -run-command \'{cmd}\' '
-rofi_cmd = 'rofi -dpi ' .. dpi(80) .. ' -disable-history -show run -sort'
+rofi_cmd = 'rofi -dpi ' .. dpi(80) .. ' -show run'
 rofi_emoji_cmd = 'rofi -dpi ' .. dpi(80) .. ' -show emoji -modi emoji'
 rofi_calc_cmd = 'rofi -dpi ' .. dpi(80) .. ' -show calc -modi calc'
 rofi_subsuper = 'rofi -dpi ' .. dpi(80) .. ' -show fb -modes \'fb:rofi-subsuper\''
