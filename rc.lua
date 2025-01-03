@@ -104,6 +104,7 @@ awful.key({ win                }, "z",      function (c) c.minimized = true end)
 awful.key({ ctrl, alt          }, "s",      function (c) suspend_toggle(c) end),
 -- Shrink window and make it sticky & on top (e.g. conference call): Ctrl + Alt + w
 awful.key({ ctrl, alt          }, "w",      function (c) float_toggle(c) end),
+awful.key({ ctrl, alt          }, "f",      function (c) c.fullscreen = not c.fullscreen end),
 -- Sticky toggle for window: Ctrl + Alt + Shift + s
 awful.key({ ctrl, alt, "Shift" }, "s",      function (c) sticky_toggle(c) end),
 -- Hide stickies to the bottom-right corner (toggle) : Win + Esc
