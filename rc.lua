@@ -855,6 +855,7 @@ tag.connect_signal('request::screen', function(t)
   for s in screen do
     t.screen = s
     my_dropdown.screen = s
+    my_dropdown.visible = false
     return
   end
 end)
