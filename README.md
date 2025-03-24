@@ -13,7 +13,7 @@ This is the reason I'm still not using Wayland. Too good to lose.
   - Custom volume/brightness sliders & media notifications
   - Random wallpapers per screen, from given directory
 - Multi-monitor support
-  - The X display which has "primary" set shows systray and 2 tags (term & chat) on it
+  - The X display which has "primary" set shows systray and 2 tags (term & chat) on it, so primary is needed
   - Non-primary displays get the web & mail tags (replicated if more screens available)
   - Dynamic re-organisation of tags in case of screen addition/removal (so no clients get lost)
   - If a monitor is widescreen, automatically split into 2 equal "fake" screens (which you can expand/shrink)
