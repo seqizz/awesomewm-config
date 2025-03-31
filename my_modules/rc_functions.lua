@@ -190,9 +190,7 @@ end
 function switch_to_tag(tag_name, printmore)
   debug_print('switch_to_tag: Switching to tag ' .. tag_name, printmore)
   t = find_tag_by_first_word(tag_name, printmore)
-  tags_screen_obj = t.screen
-  awful.tag.viewnone(tags_screen_obj)
-  awful.tag.viewtoggle(t)
+  awful.tag.viewonly(t)
 end
 
 function find_tag_by_first_word(first_word, printmore)
