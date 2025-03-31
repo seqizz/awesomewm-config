@@ -188,9 +188,24 @@ function switch_focus_without_mouse(c, dir, printmore)
 end
 
 function switch_to_tag(tag_name, printmore)
+  -- This whole parade can be awful.tag.viewonly, but this is done for
+  -- multiple screen support. Viewonly will also disable tags on irrelevant
+  -- screens.
   debug_print('switch_to_tag: Switching to tag ' .. tag_name, printmore)
   t = find_tag_by_first_word(tag_name, printmore)
-  awful.tag.viewonly(t)
+  current_tags = awful.screen.focused().selected_tags
+  tags_screen_obj = t.screen
+  if not my_utils.table_contains(current_tags, t) then
+    awful.tag.viewtoggle(t)
+  end
+  if my_utils.table_length(current_tags) > 0 then
+    -- Toggle visibility of all
+    for _, tag in ipairs(current_tags) do
+      if tag ~= t then
+        awful.tag.viewtoggle(tag)
+      end
+    end
+  end
 end
 
 function find_tag_by_first_word(first_word, printmore)
