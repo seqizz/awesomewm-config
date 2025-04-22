@@ -396,6 +396,9 @@ spotify:buttons(awful.util.table.join(
     fn_process_action('media', 'pausetoggle', 'spotify')
     spotify:check()
   end),
+  awful.button({}, 2, function() -- middle click
+    awful.spawn('systemctl --user restart updatesong.service')
+  end),
   awful.button({}, 3, function() -- right click
     spotify:raise_toggle()
   end),
