@@ -87,4 +87,8 @@ end
 
 touchwidget:check()
 
+touchwidget:buttons(awful.util.table.join(awful.button({}, 1, function() -- left click
+  touchwidget:toggle()
+end)))
+
 return touchwidget

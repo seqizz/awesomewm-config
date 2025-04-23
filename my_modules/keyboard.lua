@@ -80,4 +80,10 @@ end
 
 keyboardwidget:check()
 
+keyboardwidget:buttons(awful.util.table.join(
+  awful.button({}, 1, function() -- left click
+      keyboardwidget:toggle()
+  end)
+))
+
 return keyboardwidget

@@ -101,4 +101,25 @@ end
 
 spotifywidget:check()
 
+spotifywidget:buttons(awful.util.table.join(
+  awful.button({}, 1, function() -- left click
+    fn_process_action('media', 'pausetoggle', 'spotify')
+    spotifywidget:check()
+  end),
+  awful.button({}, 2, function() -- middle click
+    awful.spawn('systemctl --user restart updatesong.service')
+  end),
+  awful.button({}, 3, function() -- right click
+    spotifywidget:raise_toggle()
+  end),
+  awful.button({}, 4, function() -- scroll up
+    fn_process_action('media', 'previous', 'spotify')
+    spotifywidget:check()
+  end),
+  awful.button({}, 5, function() -- scroll down
+    fn_process_action('media', 'next', 'spotify')
+    spotifywidget:check()
+  end)
+))
+
 return spotifywidget

@@ -372,46 +372,6 @@ client.connect_signal('unmanage', function(c, startup)
   refresh_tag_name()
 end)
 
--- This is the only host with "rotatable" screen
-if hostname == 'bebop' or hostname == 'splinter' then
-  if hostname == 'bebop' then
-    rotate_widget:buttons(awful.util.table.join(awful.button({}, 1, function() -- left click
-      rotate_widget:toggle()
-    end)))
-  end
-  touch_widget:buttons(awful.util.table.join(awful.button({}, 1, function() -- left click
-    touch_widget:toggle()
-  end)))
-end
-capslock:buttons(awful.util.table.join(awful.button({}, 1, function() -- left click
-  capslock:toggle()
-end)))
--- keyboard_widget:buttons(awful.util.table.join(
---   awful.button({}, 1, function() -- left click
---       keyboard_widget:toggle()
---   end)
--- ))
-spotify:buttons(awful.util.table.join(
-  awful.button({}, 1, function() -- left click
-    fn_process_action('media', 'pausetoggle', 'spotify')
-    spotify:check()
-  end),
-  awful.button({}, 2, function() -- middle click
-    awful.spawn('systemctl --user restart updatesong.service')
-  end),
-  awful.button({}, 3, function() -- right click
-    spotify:raise_toggle()
-  end),
-  awful.button({}, 4, function() -- scroll up
-    fn_process_action('media', 'previous', 'spotify')
-    spotify:check()
-  end),
-  awful.button({}, 5, function() -- scroll down
-    fn_process_action('media', 'next', 'spotify')
-    spotify:check()
-  end)
-))
-
 psi_timer = gears.timer({
   timeout = 15,
   autostart = true,

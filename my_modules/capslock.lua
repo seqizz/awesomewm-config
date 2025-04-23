@@ -57,4 +57,8 @@ capslock.possible_combinations = gears.table.join(
 
 capslock:check()
 
+capslock:buttons(awful.util.table.join(awful.button({}, 1, function() -- left click
+  capslock:toggle()
+end)))
+
 return capslock

@@ -72,4 +72,8 @@ end
 
 rotatewidget:check()
 
+rotatewidget:buttons(awful.util.table.join(awful.button({}, 1, function() -- left click
+  rotatewidget:toggle()
+end)))
+
 return rotatewidget
