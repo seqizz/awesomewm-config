@@ -433,22 +433,35 @@ local function set_wallpaper(s)
   ), s, false)
 end
 
-screen.connect_signal("request::wallpaper", function(s)
-  -- Need to delay the wallpaper change in case we are resizing screen too quickly
-  -- Otherwise running it on each change is too slow
-  if gears.filesystem.file_readable(lock_file) then
-    -- We are already setting wallpaper, bye
-    return
-  end
-  -- Touch the wallpaper file so it won't change in the middle of the operation
-  awful.spawn.with_shell("touch " .. lock_file)
+local function is_fresh(filepath, max_age_seconds)
+    local f = io.popen("stat -c %Y " .. filepath)
+    if not f then return false end
+    local mod_time = tonumber(f:read("*all"))
+    f:close()
+    if not mod_time then return false end
+    return (os.time() - mod_time) < max_age_seconds
+end
+
+
+screen.connect_signal("request::wallpaper", function(_)
+  if wallpaper_timer then return end  -- Already scheduled
+  wallpaper_timer = gears.timer.start_new(0.1, function()
+    -- Lock logic as above
+    if gears.filesystem.file_readable(lock_file) and is_fresh(lock_file, 10) then
+      wallpaper_timer = nil
+      return false
+    end
+    awful.spawn.with_shell("touch " .. lock_file)
     gears.timer.start_new(3, function()
       for scr in screen do
         set_wallpaper(scr)
       end
       awful.spawn.with_shell("rm -f " .. lock_file)
+      wallpaper_timer = nil
       return false
     end)
+    return false
+  end)
 end)
 
 local function createFolder(folder)
@@ -659,3 +672,4 @@ function get_tooltip(object_to_attach)
   end)
   return tt
 end
+--  vim: set ts=2 sw=2 tw=0 et :
