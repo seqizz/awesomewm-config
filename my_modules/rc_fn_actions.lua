@@ -188,9 +188,21 @@ function fn_process_action(action, direction, player)
     elseif direction == 'down' then
       symbol = '-'
     end
-    helpers.async('brightnessctl -q s 5%-' .. symbol, function(out)
-      awful.spawn.easy_async('brightnessctl -q get', function(current)
-        awful.spawn.easy_async('brightnessctl -q max', function(max)
+
+    -- use ddcutil if we are on external monitor, otherwise use brightnessctl
+    if detect_external_monitor() then
+      set_command = 'sudo ddcutil setvcp 10 ' .. symbol .. ' 5'
+      get_command = 'get-ddc-current-brightness'
+      max_command = 'get-ddc-max-brightness'
+    else
+      set_command = 'brightnessctl -q s 5%-' .. symbol
+      get_command = 'brightnessctl -q get'
+      max_command = 'brightnessctl -q max'
+    end
+
+    helpers.async(set_command, function(out)
+      awful.spawn.easy_async(get_command, function(current)
+        awful.spawn.easy_async(max_command, function(max)
           brightness_slider.widget.value = 100 * tonumber(current) / tonumber(max)
           triggerwibox('brightness')
         end)

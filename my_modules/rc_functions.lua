@@ -672,4 +672,13 @@ function get_tooltip(object_to_attach)
   end)
   return tt
 end
+
+function detect_external_monitor()
+  for name, _ in pairs(awful.screen.focused().outputs) do
+    if name ~= 'eDP-1' then
+      return true
+    end
+  end
+  return false
+end
 --  vim: set ts=2 sw=2 tw=0 et :
