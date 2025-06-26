@@ -1028,7 +1028,7 @@ awesome.connect_signal('startup', function(s, state)
     run_once('onboard')
   end
   run_once('sleep 8 && thunderbird', 'rbird')
-  run_once('sleep 3 && XDG_CURRENT_DESKTOP=gnome telegram-desktop', 'telegram')
+  run_once('sleep 3 && XDG_CURRENT_DESKTOP=gnome Telegram', 'Telegram')
   run_once('pasystray')
   run_once("wezterm-mux-server --daemonize", "wezterm-mux-server")
   run_once("wezterm connect default --class mainqterm", "mainqterm", "term")
