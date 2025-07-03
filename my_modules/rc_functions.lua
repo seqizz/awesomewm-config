@@ -212,7 +212,7 @@ function focus_previous_client(tag_name, printmore)
     local max_history_depth = 10  -- Set an upper limit to avoid infinite loop
 
     local tag_of_gone = find_tag_by_first_word(my_utils.get_first_word(tag_name))
-    debug_print("focus_previous_client: Looking for clients in tag " .. tag_of_gone.name, printmore)
+    debug_print("focus_previous_client: Looking for clients in tag: " .. tag_of_gone.name, printmore)
 
     while idx < max_history_depth do
         local client = awful.client.focus.history.get(nil, idx)
@@ -234,9 +234,11 @@ function focus_previous_client(tag_name, printmore)
     -- If we found a client in the same tag, focus it
     if client_to_focus then
         client.focus = client_to_focus
+        debug_print("focus_previous_client: Focusing client " .. client_to_focus.name .. " in tag " .. tag_of_gone.name, printmore)
         client_to_focus:raise()
     else
         -- If we didn't find any in the same tag, focus the most recent (idx 0)
+        debug_print("focus_previous_client: No client found in tag " .. tag_of_gone.name .. ", focusing most recent client", printmore)
         local most_recent = awful.client.focus.history.get(nil, 0)
         if most_recent then
             client.focus = most_recent
