@@ -191,12 +191,14 @@ function switch_to_tag(tag_name, printmore)
   debug_print('switch_to_tag: Switching to tag ' .. tag_name, printmore)
   t = find_tag_by_first_word(tag_name, printmore)
   awful.tag.viewmore({t}, t.screen)
+  awful.screen.focus(t.screen)
 end
 
 function find_tag_by_first_word(first_word, printmore)
   local all_tags = root.tags()
   for _, t in ipairs(all_tags) do
     if first_word == my_utils.get_first_word(t.name) then
+      debug_print("find_tag_by_first_word: Found tag " .. t.name, printmore)
       return t
     end
   end
