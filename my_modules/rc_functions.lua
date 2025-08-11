@@ -205,45 +205,63 @@ function find_tag_by_first_word(first_word, printmore)
 end
 
 function focus_previous_client(tag_name, printmore)
-    -- Iterate through the history to find a client in the same tag
-    -- If we don't find any, focus the most recent client
-    local idx = 0
-    local client_to_focus = nil
-    local max_history_depth = 10  -- Set an upper limit to avoid infinite loop
-
-    local tag_of_gone = find_tag_by_first_word(my_utils.get_first_word(tag_name))
-    debug_print("focus_previous_client: Looking for clients in tag: " .. tag_of_gone.name, printmore)
-
-    while idx < max_history_depth do
-        local client = awful.client.focus.history.get(nil, idx)
-
-        if not client or tag_of_gone == nil then
-            -- We've exhausted the history without finding a match
-            break
-        end
-
-        if my_utils.table_contains(client:tags(), tag_of_gone) then
-            -- We found a client in the same tag
-            client_to_focus = client
-            break
-        end
-
-        idx = idx + 1
+    local tag_of_gone = find_tag_by_first_word(my_utils.get_first_word(tag_name), printmore)
+    if not tag_of_gone then
+        debug_print("focus_previous_client: Could not find tag for " .. tag_name, printmore)
+        return
     end
 
-    -- If we found a client in the same tag, focus it
-    if client_to_focus then
+    debug_print("focus_previous_client: Looking for clients in tag: " .. tag_of_gone.name, printmore)
+
+    -- FIRST: Check actual clients currently on this tag (including new ones not in history yet)
+    local clients_on_tag = tag_of_gone:clients()
+    if #clients_on_tag > 0 then
+        -- We have clients on this tag, try to find one in focus history first
+        local max_history_depth = 10
+        local client_to_focus = nil
+
+        for idx = 0, max_history_depth - 1 do
+            local history_client = awful.client.focus.history.get(nil, idx)
+            if not history_client then break end
+
+            -- Check if this history client is in our current tag's client list
+            for _, tag_client in ipairs(clients_on_tag) do
+                if history_client == tag_client then
+                    client_to_focus = history_client
+                    debug_print("focus_previous_client: Found client " .. client_to_focus.name .. " in both history and tag", printmore)
+                    break
+                end
+            end
+            if client_to_focus then break end
+        end
+
+        -- If no client found in history, just pick the first client on the tag
+        if not client_to_focus then
+            client_to_focus = clients_on_tag[1]
+            debug_print("focus_previous_client: No client in history, focusing first client on tag: " .. client_to_focus.name, printmore)
+        end
+
         client.focus = client_to_focus
-        debug_print("focus_previous_client: Focusing client " .. client_to_focus.name .. " in tag " .. tag_of_gone.name, printmore)
         client_to_focus:raise()
     else
-        -- If we didn't find any in the same tag, focus the most recent (idx 0)
-        debug_print("focus_previous_client: No client found in tag " .. tag_of_gone.name .. ", focusing most recent client", printmore)
-        local most_recent = awful.client.focus.history.get(nil, 0)
-        if most_recent then
-            client.focus = most_recent
-            most_recent:raise()
+        -- No clients on this tag, fall back to most recent on same screen only
+        debug_print("focus_previous_client: No clients on tag " .. tag_of_gone.name .. ", looking for clients on same screen", printmore)
+        local current_screen = tag_of_gone.screen
+        local max_history_depth = 10
+
+        for idx = 0, max_history_depth - 1 do
+            local history_client = awful.client.focus.history.get(nil, idx)
+            if not history_client then break end
+
+            -- Only focus clients on the same screen to avoid jumping to different tags
+            if history_client.screen == current_screen then
+                client.focus = history_client
+                debug_print("focus_previous_client: Focusing screen-local client " .. history_client.name, printmore)
+                history_client:raise()
+                return
+            end
         end
+        debug_print("focus_previous_client: No suitable client found, leaving focus empty", printmore)
     end
 end
 
