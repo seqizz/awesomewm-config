@@ -175,7 +175,7 @@ function restore_mouse_location(x, y, screen, printmore, refocus)
   refocus = refocus or false
   printmore = printmore or false
   debug_print('restore_mouse_location: Restoring mouse location to ' .. x .. ', ' .. y, printmore)
-  mouse.coords {x = mouselocation_x, y = mouselocation_y}
+  mouse.coords {x = x, y = y}
   if refocus then
     awful.screen.focus(screen)
   end
