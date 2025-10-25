@@ -75,13 +75,9 @@ function set_rules(clientkeys)
     },
 
     {
-      rule_any = {
-        name = {
-          'Media viewer',
-        },
-        class = {
-          'telegram-desktop',
-        },
+      rule = {
+        name = 'Media viewer',
+        class = 'TelegramDesktop',
       },
       properties = {
         skip_decoration = true,

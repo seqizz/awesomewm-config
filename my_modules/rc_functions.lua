@@ -703,4 +703,18 @@ function detect_external_monitor()
   end
   return false
 end
+
+function get_total_screen_count(screens_table)
+  if screens_table then
+    -- Count all screens in the screens_table (including fake ones)
+    local count = 0
+    for _, _ in pairs(screens_table) do
+      count = count + 1
+    end
+    return count
+  else
+    -- Fallback to built-in count if no screens_table provided
+    return screen:count()
+  end
+end
 --  vim: set ts=2 sw=2 tw=0 et :

@@ -113,11 +113,8 @@ awful.key({ win                }, "F7",     nil, function (c) resize_screen(c.sc
 awful.key({ win                }, "F8",     nil, function (c) resize_screen(c.screen, screens_table, true) end)
 )
 
-my_systray = wibox.widget.systray()
-my_systray:set_base_size(dpi(24))
-
-function set_keys_after_screen_new(clientkeys, globalkeys, printmore)
-  if screen:count() > 1 then
+function set_keys_after_screen_new(clientkeys, globalkeys, screens_table, printmore)
+  if get_total_screen_count(screens_table) > 1 then
     -- Shortcut for moving window between screens
     clientkeys = gears.table.join(clientkeys,
     awful.key({ win, "Shift" }, "Left",   function (c) c:move_to_screen(c.screen.index-1) end),
@@ -392,7 +389,7 @@ nextthing_timer = gears.timer({
   callback = function() nextthing:check() end,
 })
 
-local function screen_organizer(s, primary, is_extra)
+local function screen_organizer(s, screen_count, primary, is_extra)
 
   debug_print('Now organizing screen: ' .. s['name'], printmore)
 
@@ -409,7 +406,7 @@ local function screen_organizer(s, primary, is_extra)
   )
 
   -- some convenience stuff
-  if screen:count() > 1 then
+  if screen_count > 1 then
     taglist_width = dpi(250)
     wibar_height = dpi(25)
   else
@@ -504,7 +501,7 @@ local function screen_organizer(s, primary, is_extra)
 
   table.insert(systray_right_widgets, separator_empty)
   if primary then
-    if screen:count() == 1 and ( hostname == 'bebop' or hostname == 'splinter' ) then
+    if screen_count == 1 and ( hostname == 'bebop' or hostname == 'splinter' ) then
       table.insert(systray_right_widgets, touch_widget)
       if hostname == 'bebop' then
         table.insert(systray_right_widgets, rotate_widget)
@@ -606,6 +603,16 @@ function place_tags(properties, primary, screens_table)
   end
 end
 
+screens_table = get_screens()
+
+-- Fucking hacks we have to do
+if get_total_screen_count(screens_table) > 1 then
+  systray_top_margin = dpi(3)
+else
+  systray_top_margin = 0
+end
+my_systray = wibox.container.margin(wibox.widget.systray(), 0 , 0, systray_top_margin, 0)
+
 function process_screens(systray, screens_table, printmore)
 
   systray = systray or nil
@@ -618,12 +625,12 @@ function process_screens(systray, screens_table, printmore)
     -- non-primary screen as 2nd, others won't get tags.
     if properties['primary'] then
       -- this is the "primary" screen so it should have the systray
-      systray:set_screen(properties['object'])
-      screen_organizer(properties, true, false, false)
+      systray.widget:set_screen(properties['object'])
+      screen_organizer(properties, get_total_screen_count(screens_table), true, false, false)
       debug_print('Checking tags for: ' .. name .. ' (primary) ', printmore)
       place_tags(properties, true, screens_table)
     else
-      screen_organizer(properties, false, second_screen_already_processed)
+      screen_organizer(properties, get_total_screen_count(screens_table), false, second_screen_already_processed)
       if second_screen_already_processed then
         debug_print('Extra screen found: ' .. my_utils.dump(properties['object']), printmore)
       else
@@ -636,7 +643,7 @@ function process_screens(systray, screens_table, printmore)
   -- define rules since we have filled the screen table
   dofile ("/home/gurkan/.config/awesome/my_modules/rc_rules.lua")
 
-  clientkeys, globalkeys = set_keys_after_screen_new(clientkeys, globalkeys, printmore)
+  clientkeys, globalkeys = set_keys_after_screen_new(clientkeys, globalkeys, screens_table, printmore)
   dofile ("/home/gurkan/.config/awesome/my_modules/rc_clientbuttons.lua")
   root.keys(globalkeys)
   set_rules(clientkeys)
@@ -804,12 +811,29 @@ screen.connect_signal('list', function()
     debug_print('Sleeping for 2 secs', printmore)
     os.execute('sleep 2')
     screens_table = get_screens()
+
+    -- Reconfigure systray size when screens change
+    debug_print('Total screen count after screen change: ' .. get_total_screen_count(screens_table), printmore)
+    if get_total_screen_count(screens_table) > 1 then
+      my_systray.widget:set_base_size(dpi(20))
+    else
+      my_systray.widget:set_base_size(dpi(24))
+    end
+
     process_screens(my_systray, screens_table, printmore)
   end
 end)
 
 os.execute('touch /home/gurkan/.awesome_screen_setup_lock')
-screens_table = get_screens()
+
+-- Configure systray size based on total screen count (including fake screens)
+debug_print('Total screen count: ' .. get_total_screen_count(screens_table), printmore)
+if get_total_screen_count(screens_table) > 1 then
+  my_systray.widget:set_base_size(dpi(20))
+else
+  my_systray.widget:set_base_size(dpi(24))
+end
+
 process_screens(my_systray, screens_table, printmore)
 
 tag.connect_signal('request::screen', function(t)
