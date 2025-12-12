@@ -152,7 +152,7 @@ rofi_emoji_cmd = 'rofi -dpi ' .. dpi(80) .. ' -show emoji -modi emoji'
 rofi_calc_cmd = 'rofi -dpi ' .. dpi(80) .. ' -show calc -modi calc'
 rofi_subsuper = 'rofi -dpi ' .. dpi(80) .. ' -show fb -modes \'fb:rofi-subsuper\''
 proxified_chromium_cmd =
-  'chromium-browser --incognito --proxy-server="socks://127.0.0.1:8080" --host-resolver-rules="MAP * ~NOTFOUND, EXCLUDE 127.0.0.1"'
+  'chromium-browser --password-store=basic --incognito --proxy-server="socks://127.0.0.1:8080" --host-resolver-rules="MAP * ~NOTFOUND, EXCLUDE 127.0.0.1"'
 
 win = 'Mod4'
 alt = 'Mod1'
@@ -726,7 +726,7 @@ globalkeys = gears.table.join(
   awful.key({ ctrl, alt    }, "t",                          function() awful.spawn(terminal) end),
   awful.key({ win          }, "XF86WakeUp",            nil, function() awful.spawn("sudo systemctl suspend") end),
   awful.key({ alt, "Shift" }, "t",                          function() awful.spawn("wezterm --config-file /home/gurkan/.config/wezterm/old-nomux.lua start") end),
-  awful.key({ win          }, "c",                          function() awful.spawn("chromium-browser") end),
+  awful.key({ win          }, "c",                          function() awful.spawn("chromium-browser --password-store=basic") end),
   awful.key({ ctrl, alt    }, "p",                          function() notifytest() end),
   awful.key({ win          }, "f",                          function() awful.spawn(browser) end),
   awful.key({ win          }, "l",                          function() awful.spawn("sudo slock") end),
