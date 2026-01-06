@@ -237,6 +237,14 @@ separator_reverse = wibox.widget {
   end
 }
 
+separator_faint = wibox.widget {
+  widget       = wibox.widget.separator,
+  orientation  = "horizontal",
+  forced_width = 30,
+  color        = beautiful.bg_focus .. "70",
+  shape        = gears.shape.powerline
+}
+
 adapter_name = "BAT0"
 if my_utils.file_exists('/sys/class/power_supply/BAT1/status') then
   adapter_name = "BAT1"
@@ -551,7 +559,11 @@ local function screen_organizer(s, screen_count, primary, is_extra)
         s['object'].mytaglist,
         separator,
       },
-      s['object'].mytasklist, -- Middle widget
+      { -- Middle widget
+        layout = wibox.layout.fixed.horizontal,
+        s['object'].mytasklist,
+        separator_faint,
+      },
       systray_right_widgets,
     })
   end
