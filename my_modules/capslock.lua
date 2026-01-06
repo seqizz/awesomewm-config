@@ -1,45 +1,22 @@
-local awful = require('awful')
-local gears = require("gears")
-local wibox = require('wibox')
 local my_theme = require('my_modules/my_theme')
-local dpi = require('beautiful').xresources.apply_dpi
+local create_toggle_widget = require('my_modules/toggle_widget')
+local awful = require('awful')
+local gears = require('gears')
 
--- Helpful functions
-dofile ("/home/gurkan/.config/awesome/my_modules/rc_functions.lua")
-
-local capslock = wibox.widget({
-  widget = wibox.widget.textbox,
-  align = 'center',
-  valign = 'center',
-  font = my_theme.font_small,
+local capslock = create_toggle_widget({
+  check_cmd = "bash -c 'sleep 0.15 && xset q | grep Caps'",
+  enabled_pattern = "Caps Lock:   on",
+  disabled_pattern = "Caps Lock:   off",
+  toggle_cmd = "xdotool key Caps_Lock",
+  icon = my_theme.capslock_icon,
+  color_enabled = '#ffffff',
+  background_enabled = '#dc322f',
+  tooltip_on = "Caps Lock on",
+  tooltip_off = "Caps Lock off",
+  visible_when_disabled = false,
 })
 
-capslock.activated = '<span background=\'#dc322f\' foreground=\'white\'> CAPS </span>'
-capslock.deactivated = ''
-
-local tooltip = get_tooltip(capslock)
-
-function capslock:check()
-  awful.spawn.with_line_callback('bash -c \'sleep 0.2 && xset q\'', {
-    stdout = function(line)
-      if line:match('Caps Lock') then
-        local status = line:gsub('.*(Caps Lock:%s+)(%a+).*', '%2')
-        tooltip.text = 'Caps Lock ' .. status
-        if status == 'on' then
-          self.markup = self.activated
-          self.forced_width = dpi(50)
-        else
-          self.markup = self.deactivated
-          self.forced_width = 0
-        end
-      end
-    end,
-  })
-end
-
-function capslock:toggle() awful.spawn('xdotool key Caps_Lock') end
-
--- keybindings
+-- keybindings (these need to be global for rc.lua to merge them)
 win = 'Mod4'
 alt = 'Mod1'
 ctrl = 'Control'
@@ -54,11 +31,5 @@ capslock.possible_combinations = gears.table.join(
   awful.key({ win, ctrl }, 'Caps_Lock', function() capslock:check() end),
   awful.key({ 'Shift' }, 'Caps_Lock', function() capslock:check() end)
 )
-
-capslock:check()
-
-capslock:buttons(awful.util.table.join(awful.button({}, 1, function() -- left click
-  capslock:toggle()
-end)))
 
 return capslock

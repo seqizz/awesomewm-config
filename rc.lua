@@ -16,6 +16,7 @@ local nextthing = require("my_modules/nextthing")
 local psi_widget = require("my_modules/psi")
 local rotate_widget = require("my_modules/rotatescreen")
 local touch_widget = require("my_modules/touchscreen")
+local autolock_widget = require("my_modules/autolock")
 -- local keyboard_widget = require("my_modules/keyboard")
 local helpers = require("my_modules/geo_helpers")
 local edid = require('my_modules/edid')
@@ -500,6 +501,7 @@ local function screen_organizer(s, screen_count, primary, is_extra)
   }
 
   table.insert(systray_right_widgets, separator_empty)
+  table.insert(systray_right_widgets, capslock)
   if primary then
     if screen_count == 1 and ( hostname == 'bebop' or hostname == 'splinter' ) then
       table.insert(systray_right_widgets, touch_widget)
@@ -507,6 +509,7 @@ local function screen_organizer(s, screen_count, primary, is_extra)
         table.insert(systray_right_widgets, rotate_widget)
       end
     end
+    table.insert(systray_right_widgets, autolock_widget)
     -- table.insert(systray_right_widgets, separator_reverse)
     -- table.insert(systray_right_widgets, keyboard_widget)
     table.insert(systray_right_widgets, separator_reverse)
@@ -517,7 +520,6 @@ local function screen_organizer(s, screen_count, primary, is_extra)
     table.insert(systray_right_widgets, spotify)
     table.insert(systray_right_widgets, my_systray)
   end
-  table.insert(systray_right_widgets, capslock)
   if primary then
     table.insert(systray_right_widgets, separator_reverse)
     table.insert(systray_right_widgets, mytextclock)
