@@ -245,6 +245,83 @@ separator_faint = wibox.widget {
   shape        = gears.shape.powerline
 }
 
+-- Dynamic widget placement for fake screens
+-- Containers that can hold dynamic widgets, keyed by screen object
+dynamic_widget_containers = {}
+
+-- Build the dynamic widgets layout (touch, rotate, autolock, spotify)
+function build_dynamic_widgets_layout()
+  local layout = wibox.layout.fixed.horizontal()
+  local sc = screens_table and get_total_screen_count(screens_table) or 1
+  if sc == 1 and (hostname == 'bebop' or hostname == 'splinter') then
+    layout:add(touch_widget)
+    if hostname == 'bebop' then
+      layout:add(rotate_widget)
+    end
+  end
+  layout:add(separator_reverse)
+  layout:add(autolock_widget)
+  layout:add(separator_reverse)
+  layout:add(spotify)
+  return layout
+end
+
+-- Update which screen shows dynamic widgets based on which is larger in fake screen pairs
+function update_dynamic_widgets()
+  if not screens_table then return end
+
+  -- Find which screen should have the widgets (larger one in fake pairs, or primary)
+  local target_screen = nil
+  local largest_width = 0
+
+  for name, props in pairs(screens_table) do
+    local dominated_area = false
+    local dominated_by_itself = false
+
+    local dominated_parent_name = nil
+    if props['is_fake'] then
+      dominated_parent_name = props['parent']['name']
+    else
+      for n2, p2 in pairs(screens_table) do
+        if p2['is_fake'] and p2['parent'] and p2['parent']['object'] == props['object'] then
+          dominated_parent_name = n2
+          break
+        end
+      end
+    end
+
+    if dominated_parent_name then
+      -- we have fake screens
+      local dominated_parent_props = screens_table[dominated_parent_name]
+      if props['is_fake'] then
+        dominated_by_itself = props['object'].geometry.width >= props['parent']['object'].geometry.width
+      else
+        dominated_by_itself = props['object'].geometry.width > dominated_parent_props['object'].geometry.width
+      end
+      dominated_area = dominated_by_itself
+    else
+      dominated_area = props['primary']
+    end
+
+    if dominated_area and props['object'].geometry.width > largest_width then
+      largest_width = props['object'].geometry.width
+      target_screen = props['object']
+    end
+  end
+
+  -- Move dynamic widgets to the target screen's container
+  local dynamic_layout = build_dynamic_widgets_layout()
+  for scr, container in pairs(dynamic_widget_containers) do
+    if scr == target_screen then
+      container.widget = dynamic_layout
+      container.visible = true
+    else
+      container.widget = nil
+      container.visible = false
+    end
+  end
+end
+
 adapter_name = "BAT0"
 if my_utils.file_exists('/sys/class/power_supply/BAT1/status') then
   adapter_name = "BAT1"
@@ -511,22 +588,21 @@ local function screen_organizer(s, screen_count, primary, is_extra)
   table.insert(systray_right_widgets, separator_empty)
   table.insert(systray_right_widgets, capslock)
   if primary then
-    if screen_count == 1 and ( hostname == 'bebop' or hostname == 'splinter' ) then
-      table.insert(systray_right_widgets, touch_widget)
-      if hostname == 'bebop' then
-        table.insert(systray_right_widgets, rotate_widget)
-      end
-    end
-    table.insert(systray_right_widgets, autolock_widget)
-    -- table.insert(systray_right_widgets, separator_reverse)
     -- table.insert(systray_right_widgets, keyboard_widget)
     table.insert(systray_right_widgets, separator_reverse)
     table.insert(systray_right_widgets, battery_widget)
     table.insert(systray_right_widgets, separator_reverse)
     table.insert(systray_right_widgets, psi_widget)
     table.insert(systray_right_widgets, separator_reverse)
-    table.insert(systray_right_widgets, spotify)
     table.insert(systray_right_widgets, my_systray)
+  end
+
+  -- Create container for dynamic widgets (touch, rotate, autolock, spotify)
+  -- These move to the larger screen when fake screens are present
+  if not is_extra then
+    local dynamic_container = wibox.container.background()
+    dynamic_widget_containers[s['object']] = dynamic_container
+    table.insert(systray_right_widgets, dynamic_container)
   end
   if primary then
     table.insert(systray_right_widgets, separator_reverse)
@@ -661,6 +737,9 @@ function process_screens(systray, screens_table, printmore)
   dofile ("/home/gurkan/.config/awesome/my_modules/rc_clientbuttons.lua")
   root.keys(globalkeys)
   set_rules(clientkeys)
+
+  -- Set initial spotify placement based on screen sizes
+  update_dynamic_widgets()
 end
 
 -- {{{ Mouse bindings

@@ -98,6 +98,8 @@ clientbuttons = awful.util.table.join(
         end
         return true
       end
+      -- Mouse released, update dynamic widgets (spotify placement)
+      update_dynamic_widgets()
       return false
     end, 'sb_h_double_arrow')
   end)
