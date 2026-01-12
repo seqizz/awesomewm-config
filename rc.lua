@@ -253,13 +253,13 @@ dynamic_widget_containers = {}
 function build_dynamic_widgets_layout()
   local layout = wibox.layout.fixed.horizontal()
   local sc = screens_table and get_total_screen_count(screens_table) or 1
+  layout:add(separator_reverse)
   if sc == 1 and (hostname == 'bebop' or hostname == 'splinter') then
     layout:add(touch_widget)
     if hostname == 'bebop' then
       layout:add(rotate_widget)
     end
   end
-  layout:add(separator_reverse)
   layout:add(autolock_widget)
   layout:add(separator_reverse)
   layout:add(spotify)
