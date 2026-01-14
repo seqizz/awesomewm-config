@@ -110,8 +110,8 @@ awful.key({ ctrl, alt          }, "f",      function (c) c.fullscreen = not c.fu
 awful.key({ ctrl, alt, "Shift" }, "s",      function (c) sticky_toggle(c) end),
 -- Hide stickies to the bottom-right corner (toggle) : Win + Esc
 awful.key({ win                }, "Escape", function (c) hide_stickies() end),
-awful.key({ win                }, "F7",     nil, function (c) resize_screen(c.screen, screens_table, false) end),
-awful.key({ win                }, "F8",     nil, function (c) resize_screen(c.screen, screens_table, true) end)
+awful.key({ win                }, "F7",     nil, function (c) resize_screen(c.screen, screens_table, false); update_dynamic_widgets() end),
+awful.key({ win                }, "F8",     nil, function (c) resize_screen(c.screen, screens_table, true); update_dynamic_widgets() end)
 )
 
 function set_keys_after_screen_new(clientkeys, globalkeys, screens_table, printmore)
@@ -1048,7 +1048,7 @@ client.connect_signal('unfocus', function(c)
 
   -- auto-hide dropdown
   if c.instance == my_dropdown.name then
-    my_dropdown.visible = not my_dropdown.visible
+    my_dropdown.visible = false
     my_dropdown:display()
   end
 end)
