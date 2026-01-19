@@ -17,6 +17,7 @@ local psi_widget = require("my_modules/psi")
 local rotate_widget = require("my_modules/rotatescreen")
 local touch_widget = require("my_modules/touchscreen")
 local autolock_widget = require("my_modules/autolock")
+local dynamic_separator = require("my_modules/dynamic_separator")
 -- local keyboard_widget = require("my_modules/keyboard")
 local helpers = require("my_modules/geo_helpers")
 local edid = require('my_modules/edid')
@@ -245,6 +246,11 @@ separator_faint = wibox.widget {
   shape        = gears.shape.powerline
 }
 
+spotify_separator = dynamic_separator.create({
+  signal = "widget::spotify::visible",
+  initial_visible = false
+})
+
 -- Dynamic widget placement for fake screens
 -- Containers that can hold dynamic widgets, keyed by screen object
 dynamic_widget_containers = {}
@@ -261,7 +267,7 @@ function build_dynamic_widgets_layout()
     end
   end
   layout:add(autolock_widget)
-  layout:add(separator_reverse)
+  layout:add(spotify_separator)
   layout:add(spotify)
   return layout
 end

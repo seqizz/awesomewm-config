@@ -83,6 +83,7 @@ function spotifywidget:check()
     stderr = function(line)
       if line == 'No players found' then
         self.forced_width = dpi(0)
+        awesome.emit_signal("widget::spotify::visible", false)
       end
     end,
     stdout = function(line)
@@ -95,6 +96,7 @@ function spotifywidget:check()
         function(stdout, stderr, reason, exit_code) spotifywidget:set(stdout, is_playing) end
       )
       self.forced_width = nil
+      awesome.emit_signal("widget::spotify::visible", true)
     end,
   })
 end
