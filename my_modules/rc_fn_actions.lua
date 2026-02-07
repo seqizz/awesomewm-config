@@ -167,16 +167,21 @@ function fn_process_action(action, direction, player)
   -- Case 3: Mic mute toggle
   elseif action == 'source' then
     if direction == 'toggle' then
-      -- directly toggle and print the result
+      -- Query current state first (forces sync with hardware), then toggle
       awful.spawn.easy_async(
-        'pamixer --default-source --get-mute -t',
+        'pamixer --default-source --get-mute',
         function(stdout, stderr, reason, exit_code)
           stdout = stdout:gsub('%s+', '') -- f*king whitespaces
-          if stdout == 'true' then
-            triggerwibox('micmute')
-          else
-            triggerwibox('micunmute')
-          end
+          local was_muted = (stdout == 'true')
+          -- Toggle the state
+          awful.spawn.easy_async('pamixer --default-source -t', function()
+            -- Show notification for the NEW state (opposite of what it was)
+            if was_muted then
+              triggerwibox('micunmute')
+            else
+              triggerwibox('micmute')
+            end
+          end)
         end
       )
     end
