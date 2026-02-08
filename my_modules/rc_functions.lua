@@ -192,6 +192,8 @@ function switch_to_tag(tag_name, printmore)
   t = find_tag_by_first_word(tag_name, printmore)
   awful.tag.viewmore({t}, t.screen)
   awful.screen.focus(t.screen)
+  -- Shoo any lingering Thunderbird tooltip windows (they bypass WM) buggy as fuck
+  awful.spawn.easy_async('bash /home/gurkan/.path/hide-tb-tooltips', function() end)
 end
 
 function find_tag_by_first_word(first_word, printmore)
