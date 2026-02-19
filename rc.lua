@@ -24,26 +24,30 @@ local edid = require('my_modules/edid')
 local dpi = require('beautiful').xresources.apply_dpi
 hostname = io.popen("uname -n"):read()
 
+-- Get config and cache paths dynamically
+local config_path = gears.filesystem.get_configuration_dir()
+local cache_path = gears.filesystem.get_cache_dir()
+
 -- debug stuff if needed
 local printmore = false
 
 -- my theme
-beautiful.init("/home/gurkan/.config/awesome/my_modules/my_theme.lua")
+beautiful.init(config_path .. "my_modules/my_theme.lua")
 
 -- print errors as naughty notifications
-dofile ("/home/gurkan/.config/awesome/my_modules/rc_errorhandling.lua")
+dofile(config_path .. "my_modules/rc_errorhandling.lua")
 
 -- some fancy functions I'm using
-dofile ("/home/gurkan/.config/awesome/my_modules/rc_functions.lua")
+dofile(config_path .. "my_modules/rc_functions.lua")
 
 -- define tags at the beginning
-dofile ("/home/gurkan/.config/awesome/my_modules/rc_tags.lua")
+dofile(config_path .. "my_modules/rc_tags.lua")
 
 -- stuff related to volume/brightness OSD notifications
-dofile ("/home/gurkan/.config/awesome/my_modules/rc_fn_actions.lua")
+dofile(config_path .. "my_modules/rc_fn_actions.lua")
 
 -- stuff including usernames etc
-dofile ("/home/gurkan/.config/awesome/my_modules/rc_secret.lua")
+dofile(config_path .. "my_modules/rc_secret.lua")
 
 -- @Reference: disable notification system
 -- package.loaded["naughty.dbus"] = {}
@@ -737,10 +741,10 @@ function process_screens(systray, screens_table, printmore)
     end
   end
   -- define rules since we have filled the screen table
-  dofile ("/home/gurkan/.config/awesome/my_modules/rc_rules.lua")
+  dofile(config_path .. "my_modules/rc_rules.lua")
 
   clientkeys, globalkeys = set_keys_after_screen_new(clientkeys, globalkeys, screens_table, printmore)
-  dofile ("/home/gurkan/.config/awesome/my_modules/rc_clientbuttons.lua")
+  dofile(config_path .. "my_modules/rc_clientbuttons.lua")
   root.keys(globalkeys)
   set_rules(clientkeys)
 
@@ -901,12 +905,13 @@ client.connect_signal('focus', function(c)
 end)
 
 -- Screen handling
+local screen_setup_lock = cache_path .. "awesome_screen_setup_lock"
 screen.connect_signal('list', function()
   debug_print('List signal received', printmore)
-  if my_utils.file_age('/home/gurkan/.awesome_screen_setup_lock', printmore) < 4 then
+  if my_utils.file_age(screen_setup_lock, printmore) < 4 then
     debug_print('There is already another lock waiting, skipping this screen change', printmore)
   else
-    os.execute('touch /home/gurkan/.awesome_screen_setup_lock')
+    os.execute('touch ' .. screen_setup_lock)
     debug_print('Sleeping for 2 secs', printmore)
     os.execute('sleep 2')
     screens_table = get_screens()
@@ -923,7 +928,7 @@ screen.connect_signal('list', function()
   end
 end)
 
-os.execute('touch /home/gurkan/.awesome_screen_setup_lock')
+os.execute('touch ' .. screen_setup_lock)
 
 -- Configure systray size based on total screen count (including fake screens)
 debug_print('Total screen count: ' .. get_total_screen_count(screens_table), printmore)

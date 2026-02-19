@@ -8,7 +8,7 @@ local my_theme = require('my_modules/my_theme')
 local xresources = require("beautiful.xresources")
 local dpi = xresources.apply_dpi
 
-tagsave_folder = "/home/gurkan/.awesome-tagsaves"
+tagsave_folder = gears.filesystem.get_cache_dir() .. "tagsaves"
 
 function debug_print(text, needed)
   if needed == nil then

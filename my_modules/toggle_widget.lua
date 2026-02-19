@@ -4,7 +4,7 @@ local wibox = require('wibox')
 local dpi = require('beautiful').xresources.apply_dpi
 
 -- Helpful functions
-dofile("/home/gurkan/.config/awesome/my_modules/rc_functions.lua")
+dofile(gears.filesystem.get_configuration_dir() .. "my_modules/rc_functions.lua")
 
 -- Default colors (solarized)
 local COLOR_ENABLED = '#268bd2'

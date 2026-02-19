@@ -6,7 +6,7 @@ local dpi = require('beautiful').xresources.apply_dpi
 local gears = require('gears')
 
 -- Helpful functions
-dofile ("/home/gurkan/.config/awesome/my_modules/rc_functions.lua")
+dofile(gears.filesystem.get_configuration_dir() .. "my_modules/rc_functions.lua")
 
 local psitext = wibox.widget({
   widget = wibox.widget.textbox,
