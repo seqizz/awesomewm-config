@@ -215,40 +215,25 @@ awful.button({ }, 5, function ()
 end)
 )
 
-separator = wibox.widget {
-  widget       = wibox.widget.separator,
-  orientation  = "horizontal",
-  forced_width = 30,
-  color        = beautiful.separator,
-  shape        = gears.shape.powerline
-}
+separator = my_utils.create_separator()
 
-separator_empty = wibox.widget {
-  widget       = wibox.widget.separator,
-  orientation  = "horizontal",
-  forced_width = 10,
-  color        = beautiful.bg_normal,
-}
+separator_empty = my_utils.create_separator({
+  width = 10,
+  color = beautiful.bg_normal,
+  shape = nil  -- no shape for empty separator
+})
 
-separator_reverse = wibox.widget {
-  widget       = wibox.widget.separator,
-  orientation  = "horizontal",
-  forced_width = 30,
-  span_ratio   = 0.7,
-  color        = beautiful.separator,
-  set_shape    = function(cr, width, height)
+separator_reverse = my_utils.create_separator({
+  span_ratio = 0.7,
+  set_shape = function(cr, width, height)
     gears.shape.parallelogram(cr, width, height)
     -- gears.shape.powerline(cr, width, height, (height / 2) * (-1))
   end
-}
+})
 
-separator_faint = wibox.widget {
-  widget       = wibox.widget.separator,
-  orientation  = "horizontal",
-  forced_width = 30,
-  color        = beautiful.bg_focus .. "70",
-  shape        = gears.shape.powerline
-}
+separator_faint = my_utils.create_separator({
+  color = beautiful.bg_focus .. "70"
+})
 
 spotify_separator = dynamic_separator.create({
   signal = "widget::spotify::visible",

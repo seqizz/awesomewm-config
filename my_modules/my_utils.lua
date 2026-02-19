@@ -182,5 +182,32 @@ function my_utils.random_string(length)
     return my_utils.random_string(length - 1) .. charset[math.random(1, #charset)]
 end
 
+function my_utils.create_separator(opts)
+  local wibox = require('wibox')
+  local gears = require('gears')
+  local beautiful = require('beautiful')
+
+  opts = opts or {}
+
+  local separator = {
+    widget = wibox.widget.separator,
+    orientation = opts.orientation or "horizontal",
+    forced_width = opts.width or 30,
+    color = opts.color or beautiful.separator,
+    span_ratio = opts.span_ratio,
+  }
+
+  -- Handle shape - either custom set_shape function or standard shape
+  if opts.set_shape then
+    separator.set_shape = opts.set_shape
+  elseif opts.shape then
+    separator.shape = opts.shape
+  else
+    separator.shape = gears.shape.powerline
+  end
+
+  return wibox.widget(separator)
+end
+
 return my_utils
 -- vim: set ts=2 sw=2 tw=0 et :
