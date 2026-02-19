@@ -905,15 +905,26 @@ client.connect_signal('focus', function(c)
 end)
 
 -- Screen handling
-local screen_setup_lock = cache_path .. "awesome_screen_setup_lock"
+local screen_change_in_progress = false
+local screen_change_timer = nil
+
 screen.connect_signal('list', function()
   debug_print('List signal received', printmore)
-  if my_utils.file_age(screen_setup_lock, printmore) < 4 then
-    debug_print('There is already another lock waiting, skipping this screen change', printmore)
-  else
-    os.execute('touch ' .. screen_setup_lock)
-    debug_print('Sleeping for 2 secs', printmore)
-    os.execute('sleep 2')
+
+  if screen_change_in_progress then
+    debug_print('Screen change already in progress, skipping this signal', printmore)
+    return
+  end
+
+  screen_change_in_progress = true
+  debug_print('Starting screen change timer (2 secs)', printmore)
+
+  -- Cancel any existing timer
+  if screen_change_timer then
+    screen_change_timer:stop()
+  end
+
+  screen_change_timer = gears.timer.start_new(2, function()
     screens_table = get_screens()
 
     -- Reconfigure systray size when screens change
@@ -925,10 +936,12 @@ screen.connect_signal('list', function()
     end
 
     process_screens(my_systray, screens_table, printmore)
-  end
-end)
 
-os.execute('touch ' .. screen_setup_lock)
+    screen_change_in_progress = false
+    screen_change_timer = nil
+    return false  -- don't repeat
+  end)
+end)
 
 -- Configure systray size based on total screen count (including fake screens)
 debug_print('Total screen count: ' .. get_total_screen_count(screens_table), printmore)
