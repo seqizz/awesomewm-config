@@ -83,14 +83,16 @@ end
 theme.notification_shape = ntf_shape
 theme.notification_bg = theme.bg_notification
 
--- Generate taglist squares:
-local taglist_square_size = dpi(4)
-theme.taglist_squares_sel = theme_assets.taglist_squares_sel(
-    taglist_square_size, theme.fg_normal
-)
-theme.taglist_squares_unsel = theme_assets.taglist_squares_unsel(
-    taglist_square_size, theme.fg_normal
-)
+-- Disable taglist squares (not needed with powerline shapes)
+-- local taglist_square_size = dpi(4)
+-- theme.taglist_squares_sel = theme_assets.taglist_squares_sel(
+--     taglist_square_size, theme.fg_normal
+-- )
+-- theme.taglist_squares_unsel = theme_assets.taglist_squares_unsel(
+--     taglist_square_size, theme.fg_normal
+-- )
+theme.taglist_squares_sel = nil
+theme.taglist_squares_unsel = nil
 
 local tagshape = function(cr, width, height)
     shape.powerline(cr,width,height)
