@@ -848,7 +848,7 @@ if ( hostname == "splinter" ) then
   -- awful.key({ win          }, "e",                          function() keyboard_widget:toggle() end),
 elseif ( hostname == "bebop" ) then
   gears.table.merge(globalkeys, gears.table.join(
-    awful.key({ win          }, "v",                          function() awful.spawn("vpn-toggle 'Truenas connection for bebop'") end),
+    awful.key({ win          }, "v",                          function() awful.spawn("vpn-toggle 'Truenas connection for bebop'") end)
   ))
 end
 
