@@ -838,14 +838,18 @@ globalkeys = gears.table.join(
 )
 if ( hostname == "splinter" ) then
   gears.table.merge(globalkeys, gears.table.join(
-    awful.key({ win          }, "v",                          function() awful.spawn("innovpn-toggle 'Innogames Wireguard (Primary)'") end),
-    awful.key({ win, "Shift" }, "v",                          function() awful.spawn("innovpn-toggle 'Innogames Wireguard (Secondary)'") end)
+    awful.key({ win          }, "v",                          function() awful.spawn("vpn-toggle 'Innogames Wireguard (Primary)'") end),
+    awful.key({ win, "Shift" }, "v",                          function() awful.spawn("vpn-toggle 'Innogames Wireguard (Secondary)'") end)
   ))
   -- Shortcut cemetery
   -- awful.key({ win          }, "u",                          function() awful.spawn("/home/gurkan/clicky") end),
   -- awful.key({ ctrl, alt    }, "p",                          function() reset_pulse() end),
   -- awful.key({ win          }, "k",                          function() keyboard_widget:toggle() end),
   -- awful.key({ win          }, "e",                          function() keyboard_widget:toggle() end),
+elseif ( hostname == "bebop" ) then
+  gears.table.merge(globalkeys, gears.table.join(
+    awful.key({ win          }, "v",                          function() awful.spawn("vpn-toggle 'Truenas connection for bebop'") end),
+  ))
 end
 
 -- needed for capslock helper
