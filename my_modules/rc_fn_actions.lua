@@ -5,6 +5,12 @@ local helpers = require('my_modules/geo_helpers')
 local wibox = require('wibox')
 local dpi = require('beautiful').xresources.apply_dpi
 
+-- Headset (Zone Vibe) mute is hardware-only: invisible to PipeWire/pamixer.
+-- Only signal we get is XF86AudioMicMute key event. Track state locally.
+-- Headset starts in muted position by default.
+local mic_is_muted = true
+local mic_debounce = false
+
 local function create_slider_widget(color)
   local sliderwidget = wibox.widget({
     {
@@ -165,25 +171,26 @@ function fn_process_action(action, direction, player)
     end
 
   -- Case 3: Mic mute toggle
+  -- Headset mute is hardware-only (invisible to PipeWire), so we just track
+  -- XF86AudioMicMute key events with a local boolean.
+  -- Keyboard press generates two events (headset follows), so debounce 300ms.
   elseif action == 'source' then
     if direction == 'toggle' then
-      -- Query current state first (forces sync with hardware), then toggle
-      awful.spawn.easy_async(
-        'pamixer --default-source --get-mute',
-        function(stdout, stderr, reason, exit_code)
-          stdout = stdout:gsub('%s+', '') -- f*king whitespaces
-          local was_muted = (stdout == 'true')
-          -- Toggle the state
-          awful.spawn.easy_async('pamixer --default-source -t', function()
-            -- Show notification for the NEW state (opposite of what it was)
-            if was_muted then
-              triggerwibox('micunmute')
-            else
-              triggerwibox('micmute')
-            end
-          end)
-        end
-      )
+      if mic_debounce then
+        debug_print('[MIC] debounce: ignoring event')
+        return
+      end
+      mic_debounce = true
+      gears.timer.start_new(0.3, function() mic_debounce = false return false end)
+      mic_is_muted = not mic_is_muted
+      debug_print('[MIC] toggled → mic_is_muted=' .. tostring(mic_is_muted))
+      -- Software-toggle default source for keyboard-only case (harmless if headset handles it)
+      awful.spawn('pamixer --default-source -t')
+      if mic_is_muted then
+        triggerwibox('micmute')
+      else
+        triggerwibox('micunmute')
+      end
     end
 
   -- Case 4: Brightness up/down
@@ -253,3 +260,4 @@ function fn_process_action(action, direction, player)
     end
   end
 end
+
