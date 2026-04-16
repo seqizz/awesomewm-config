@@ -12,6 +12,7 @@ local my_utils = require('my_modules/my_utils')
 local lain = require("lain")
 local capslock = require("my_modules/capslock")
 local spotify = require("my_modules/spotify")
+local spotify_lyrics= require("my_modules/spotify_lyrics")
 local nextthing = require("my_modules/nextthing")
 local psi_widget = require("my_modules/psi")
 local rotate_widget = require("my_modules/rotatescreen")
@@ -605,6 +606,7 @@ local function screen_organizer(s, screen_count, primary, is_extra)
   else
     -- Not visible on single screen, by choice
     table.insert(systray_right_widgets, nextthing)
+    table.insert(systray_right_widgets, spotify_lyrics)
     table.insert(systray_right_widgets, separator_empty)
   end
   table.insert(systray_right_widgets, s['object'].mylayoutbox)
