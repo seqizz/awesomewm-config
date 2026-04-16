@@ -41,6 +41,7 @@ local state = {
   lines     = nil,      -- parsed LRC lines for current track (sorted)
   current_line_text = CONFIG.no_lyric_text,
   fetching  = false,    -- prevent duplicate fetches
+  lyrics_paused = true, -- lyrics display paused (starts paused)
 }
 
 -- ─── widget ───────────────────────────────────────────────────────────────────
@@ -375,6 +376,11 @@ end
 -- ─── display update ───────────────────────────────────────────────────────────
 
 local function update_display()
+  if state.lyrics_paused then
+    lyrictext:set_markup_silently(' ' .. awful.util.escape('(lyrics paused)'))
+    return
+  end
+
   if state.status == 'Stopped' or not state.lines then
     local display_text = CONFIG.no_lyric_text
     if state.lines == nil and state.cache_key ~= '' then
@@ -507,10 +513,13 @@ else
 end
 
 -- ─── click handlers ───────────────────────────────────────────────────────────
--- right-click: toggle spotify client visibility (reuse main spotify widget logic)
 local spotify_main = require('my_modules/spotify')
 lyrics_widget:buttons(awful.util.table.join(
-  awful.button({}, 3, function() -- right click
+  awful.button({}, 2, function() -- middle click: toggle lyrics pause
+    state.lyrics_paused = not state.lyrics_paused
+    update_display()
+  end),
+  awful.button({}, 3, function() -- right click: toggle spotify client visibility
     spotify_main:raise_toggle()
   end)
 ))
