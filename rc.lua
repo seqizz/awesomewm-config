@@ -595,11 +595,6 @@ local function screen_organizer(s, screen_count, primary, is_extra)
 
   -- Create container for dynamic widgets (touch, rotate, autolock, spotify)
   -- These move to the larger screen when fake screens are present
-  if not is_extra then
-    local dynamic_container = wibox.container.background()
-    dynamic_widget_containers[s['object']] = dynamic_container
-    table.insert(systray_right_widgets, dynamic_container)
-  end
   if primary then
     table.insert(systray_right_widgets, separator_reverse)
     table.insert(systray_right_widgets, mytextclock)
@@ -608,6 +603,11 @@ local function screen_organizer(s, screen_count, primary, is_extra)
     table.insert(systray_right_widgets, nextthing)
     table.insert(systray_right_widgets, spotify_lyrics)
     table.insert(systray_right_widgets, separator_empty)
+  end
+  if not is_extra then
+    local dynamic_container = wibox.container.background()
+    dynamic_widget_containers[s['object']] = dynamic_container
+    table.insert(systray_right_widgets, dynamic_container)
   end
   table.insert(systray_right_widgets, s['object'].mylayoutbox)
 
