@@ -812,7 +812,7 @@ globalkeys = gears.table.join(
   awful.key({ ctrl         }, "F9",                    nil, function() awful.spawn(rofi_calc_cmd) end),
   awful.key({ "Shift"      }, "F9",                    nil, function() awful.spawn(rofi_subsuper) end),
   awful.key({ ctrl, alt    }, "c",                          function() awful.spawn(greenclip_cmd) end),
-  awful.key({ win          }, "p",                          function() awful.spawn("rofi-pass") end),
+  awful.key({ win          }, "p",                          function() awful.spawn("rofi-rbw") end),
   awful.key({ ctrl, alt    }, "t",                          function() awful.spawn(terminal) end),
   awful.key({ win          }, "XF86WakeUp",            nil, function() awful.spawn("sudo systemctl suspend") end),
   awful.key({ alt, "Shift" }, "t",                          function() awful.spawn("wezterm --config-file /home/gurkan/.config/wezterm/old-nomux.lua start") end),
