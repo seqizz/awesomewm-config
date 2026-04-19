@@ -383,9 +383,9 @@ local function update_display()
 
   if state.status == 'Stopped' or not state.lines then
     local display_text = CONFIG.no_lyric_text
-    if state.lines == nil and state.cache_key ~= '' then
-      -- no lyrics available for this track
-      display_text = ''
+    if state.lines == nil and state.cache_key ~= '' and not state.fetching then
+      -- no lyrics available for this track (fetch completed, confirmed missing)
+      display_text = '(no lyrics)'
     end
     lyrictext:set_markup_silently(' ' .. awful.util.escape(display_text))
     lyrics_tooltip.text = state.artist ~= '' and (state.artist .. ' - ' .. state.title) or ''
@@ -487,8 +487,9 @@ vis_timer = gears.timer({
   autostart = false, -- managed by battery watcher
   callback = function()
     local has_lyrics = state.lines and #state.lines > 0
+    local no_lyrics_known = state.lines == nil and state.cache_key ~= '' and not state.fetching
     local is_active = state.status == 'Playing' or state.status == 'Paused'
-    lyrics_widget:set_visible_state(has_lyrics and is_active)
+    lyrics_widget:set_visible_state((has_lyrics or no_lyrics_known) and is_active)
   end,
 })
 
