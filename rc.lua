@@ -296,7 +296,10 @@ function update_dynamic_widgets()
       end
       dominated_area = dominated_by_itself
     else
-      dominated_area = props['primary']
+      -- No fake screens: single screen → primary gets it,
+      -- dual physical screens → non-primary gets it
+      local sc = get_total_screen_count(screens_table)
+      dominated_area = (sc == 1) and props['primary'] or not props['primary']
     end
 
     if dominated_area and props['object'].geometry.width > largest_width then
@@ -583,6 +586,14 @@ local function screen_organizer(s, screen_count, primary, is_extra)
 
   table.insert(systray_right_widgets, separator_empty)
   table.insert(systray_right_widgets, capslock)
+
+  -- On single screen, place dynamic widgets early (before battery/psi/systray)
+  if not is_extra and screen_count == 1 then
+    local dynamic_container = wibox.container.background()
+    dynamic_widget_containers[s['object']] = dynamic_container
+    table.insert(systray_right_widgets, dynamic_container)
+  end
+
   if primary then
     -- table.insert(systray_right_widgets, keyboard_widget)
     table.insert(systray_right_widgets, separator_reverse)
@@ -604,7 +615,8 @@ local function screen_organizer(s, screen_count, primary, is_extra)
     table.insert(systray_right_widgets, spotify_lyrics)
     table.insert(systray_right_widgets, separator_empty)
   end
-  if not is_extra then
+  -- Multi-screen: dynamic container goes after other widgets (as before)
+  if not is_extra and screen_count > 1 then
     local dynamic_container = wibox.container.background()
     dynamic_widget_containers[s['object']] = dynamic_container
     table.insert(systray_right_widgets, dynamic_container)
