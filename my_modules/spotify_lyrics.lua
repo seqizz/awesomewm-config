@@ -29,6 +29,34 @@ local CONFIG = {
 -- nil value means "tried, no lyrics available"
 local lyrics_cache = {}
 
+-- disk cache dir for persisting lyrics across restarts
+local cache_dir = os.getenv('HOME') .. '/.cache/awesome-lyrics'
+os.execute('mkdir -p ' .. cache_dir)
+
+-- sanitize cache key into safe filename
+local function cache_filename(key)
+  local safe = key:gsub('[/%z\n\r]', '_'):gsub('[^%w%s%-_%.%(%)]+', '_')
+  return cache_dir .. '/' .. safe .. '.lrc'
+end
+
+-- write raw LRC string to disk; empty file = no lyrics available
+local function cache_write(key, lrc_string)
+  local f = io.open(cache_filename(key), 'w')
+  if f then
+    f:write(lrc_string or '')
+    f:close()
+  end
+end
+
+-- read cached LRC from disk; returns lrc_string, or "" for negative cache, or nil for miss
+local function cache_read(key)
+  local f = io.open(cache_filename(key), 'r')
+  if not f then return nil end
+  local content = f:read('*a')
+  f:close()
+  return content
+end
+
 -- ─── state ────────────────────────────────────────────────────────────────────
 local state = {
   artist    = '',
@@ -252,12 +280,27 @@ local function fetch_lyrics(artist, title, album, duration)
   state.fetching = true
   local key = make_cache_key(artist, title, duration)
 
-  -- check cache first
+  -- check memory cache first
   if lyrics_cache[key] ~= nil then
     if lyrics_cache[key] == false then
       state.lines = nil -- no lyrics available
     else
       state.lines = lyrics_cache[key]
+    end
+    state.fetching = false
+    return
+  end
+
+  -- check disk cache before hitting network
+  local cached_lrc = cache_read(key)
+  if cached_lrc ~= nil then
+    if cached_lrc == '' then
+      lyrics_cache[key] = false
+      state.lines = nil
+    else
+      local parsed = split_long_lines(parse_lrc(cached_lrc), CONFIG.max_width)
+      lyrics_cache[key] = (#parsed > 0) and parsed or false
+      state.lines = lyrics_cache[key] or nil
     end
     state.fetching = false
     return
@@ -278,6 +321,7 @@ local function fetch_lyrics(artist, title, album, duration)
         local parsed = split_long_lines(parse_lrc(synced), CONFIG.max_width)
         if #parsed > 0 then
           lyrics_cache[key] = parsed
+          cache_write(key, synced)
           state.lines = parsed
           state.fetching = false
           return
@@ -298,6 +342,7 @@ local function fetch_lyrics(artist, title, album, duration)
           local parsed2 = split_long_lines(parse_lrc(synced2), CONFIG.max_width)
           if #parsed2 > 0 then
             lyrics_cache[key] = parsed2
+            cache_write(key, synced2)
             state.lines = parsed2
             state.fetching = false
             return
@@ -306,6 +351,7 @@ local function fetch_lyrics(artist, title, album, duration)
       end
       -- no lyrics found at all
       lyrics_cache[key] = false
+      cache_write(key, '') -- negative cache on disk too
       state.lines = nil
       state.fetching = false
     end)
@@ -536,6 +582,7 @@ end
 -- clear cache (e.g. if lyrics were wrong)
 function lyrics_widget:clear_cache()
   lyrics_cache = {}
+  os.execute('rm -f ' .. cache_dir .. '/*.lrc')
   self:check()
 end
 
