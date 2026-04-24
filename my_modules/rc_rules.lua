@@ -81,9 +81,12 @@ function set_rules(clientkeys)
         class = 'TelegramDesktop',
       },
       properties = {
-        skip_decoration = true,
+        titlebars_enabled = false,
         ontop = true,
         floating = true,
+        fullscreen = false,
+        maximized = true,
+        placement = awful.placement.centered,
       },
     },
 
@@ -94,7 +97,7 @@ function set_rules(clientkeys)
       properties = {
         focus = false,
         draw_backdrop = false,
-        skip_decoration = true,
+        titlebars_enabled = false,
         ontop = true,
         sticky = true,
         skip_taskbar = true,
@@ -229,6 +232,9 @@ function set_rules(clientkeys)
           'discord',
           '.zoom ',
         },
+      },
+      except = {
+        name = 'Media viewer',
       },
       name_any = {
         'Zoom - Free Account',

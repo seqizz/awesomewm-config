@@ -884,6 +884,13 @@ client.connect_signal("manage", function (c)
   end
 end)
 
+-- Telegram Media viewer keeps requesting fullscreen — block it
+client.connect_signal("property::fullscreen", function(c)
+  if c.class == "TelegramDesktop" and c.name == "Media viewer" and c.fullscreen then
+    c.fullscreen = false
+  end
+end)
+
 client.connect_signal('property::minimized', function(c)
   -- If a sticky window is minimized, ensure it's visible on taskbar
   if c.sticky then
