@@ -183,7 +183,32 @@ end
 
 function switch_focus_without_mouse(c, dir, printmore)
   x, y, prev_scr = save_mouse_location(printmore)
+  local prev_screen = c.screen
+
+  -- Snapshot each other screen's currently focused client before global_bydirection mutates history
+  local screen_focused = {}
+  for s in screen do
+    if s ~= prev_screen then
+      screen_focused[s] = awful.client.focus.history.get(s, 0)
+    end
+  end
+
   awful.client.focus.global_bydirection(dir, c, true)
+  local new_c = client.focus
+
+  -- In max layout, global_bydirection may focus a hidden client.
+  -- Re-focus the client that was actually displayed on target screen.
+  if new_c and new_c.screen ~= prev_screen then
+    local target_tag = new_c.screen.selected_tag
+    if target_tag and target_tag.layout.name == "max" then
+      local prev_focused = screen_focused[new_c.screen]
+      if prev_focused and prev_focused ~= new_c then
+        debug_print('switch_focus_without_mouse: max layout correction, focusing: ' .. prev_focused.name, printmore)
+        client.focus = prev_focused
+      end
+    end
+  end
+
   restore_mouse_location(x, y, prev_scr, printmore)
 end
 
