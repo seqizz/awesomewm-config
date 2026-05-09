@@ -448,6 +448,16 @@ end
 
 -- signal function to execute when a client disappears
 client.connect_signal('unmanage', function(c, startup)
+  -- dropdown killed: restore pre-dropdown focus instead of picking randomly
+  if c.instance == my_dropdown.name then
+    if my_dropdown.pre_focus and my_dropdown.pre_focus.valid then
+      client.focus = my_dropdown.pre_focus
+      my_dropdown.pre_focus:raise()
+    end
+    my_dropdown.pre_focus = nil
+    refresh_tag_name()
+    return
+  end
   if c.type == 'normal' then
     focus_previous_client(c.screen.selected_tag.name, printmore)
   end
@@ -816,7 +826,13 @@ globalkeys = gears.table.join(
                                                             end),
   awful.key({ win          }, "F9",                    nil, function() awful.spawn("rofi-pulse-select sink") end),
   -- Dropdown terminal: F12
-  awful.key({              }, "F12",                   nil, function() my_dropdown:toggle() end),
+  awful.key({              }, "F12",                   nil, function()
+    -- record focused client before showing, so we can restore on unmanage
+    if not my_dropdown.visible then
+      my_dropdown.pre_focus = client.focus
+    end
+    my_dropdown:toggle()
+  end),
   awful.key({              }, "Print",                 nil, function() awful.spawn("flameshot gui") end),
   awful.key({ "Shift"      }, "Print",                      function() awful.spawn("flameshot full -c") end),
   awful.key({ ctrl         }, "space",                      function() awful.spawn(rofi_cmd) end),
