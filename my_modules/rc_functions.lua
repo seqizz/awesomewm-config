@@ -181,6 +181,31 @@ function restore_mouse_location(x, y, screen, printmore, refocus)
   end
 end
 
+-- Navigate wezterm panes via the wezterm CLI when there is no adjacent
+-- awesome client to focus. Only acts on mainqterm windows.
+-- dir must be capitalised: Up, Down, Left, Right.
+function wezterm_navigate(c, dir)
+  if not c or not c.valid or c.class ~= "mainqterm" then return end
+  local sock = "WEZTERM_UNIX_SOCKET=" .. wezterm_sock .. " "
+  awful.spawn.easy_async_with_shell(
+    sock .. "wezterm cli list-clients --format json | jq -r 'first(.[]).focused_pane_id'",
+    function(pane_id)
+      pane_id = pane_id:gsub("%s+", "")
+      if pane_id == "" or pane_id == "null" then return end
+      awful.spawn.with_shell(sock .. "wezterm cli activate-pane-direction --pane-id " .. pane_id .. " " .. dir)
+    end
+  )
+end
+
+-- Single-screen directional focus with wezterm pane fallback (used for Up/Down).
+function focus_bydirection_or_wezterm(c, dir)
+  local prev_c = client.focus
+  awful.client.focus.bydirection(dir)
+  if client.focus == prev_c then
+    wezterm_navigate(c, dir:sub(1,1):upper() .. dir:sub(2))
+  end
+end
+
 function switch_focus_without_mouse(c, dir, printmore)
   x, y, prev_scr = save_mouse_location(printmore)
   local prev_screen = c.screen
@@ -196,8 +221,24 @@ function switch_focus_without_mouse(c, dir, printmore)
   awful.client.focus.global_bydirection(dir, c, true)
   local new_c = client.focus
 
-  -- In max layout, global_bydirection may focus a hidden client.
-  -- Re-focus the client that was actually displayed on target screen.
+  -- Skip sticky windows on the same screen for left/right navigation;
+  -- they are only reachable via up/down. Hop over them in the same direction.
+  local visited = { [c] = true }
+  while new_c and new_c ~= c and new_c.sticky and new_c.screen == prev_screen do
+    if visited[new_c] then
+      client.focus = c
+      new_c = c
+      break
+    end
+    visited[new_c] = true
+    awful.client.focus.global_bydirection(dir, new_c, true)
+    new_c = client.focus
+  end
+
+  -- Corrections when landing on a different screen:
+  -- 1. In max layout, global_bydirection may focus a hidden client; use the
+  --    client that was actually displayed on the target screen instead.
+  -- 2. Prefer a non-sticky client unless sticky is the only option.
   if new_c and new_c.screen ~= prev_screen then
     local target_tag = new_c.screen.selected_tag
     if target_tag and target_tag.layout.name == "max" then
@@ -205,11 +246,31 @@ function switch_focus_without_mouse(c, dir, printmore)
       if prev_focused and prev_focused ~= new_c then
         debug_print('switch_focus_without_mouse: max layout correction, focusing: ' .. prev_focused.name, printmore)
         client.focus = prev_focused
+        new_c = client.focus
+      end
+    end
+    -- After max-layout correction, if we still ended up on a sticky,
+    -- walk the focus history of the target screen to find a non-sticky.
+    if new_c.sticky then
+      for i = 0, 100 do
+        local candidate = awful.client.focus.history.get(new_c.screen, i)
+        if not candidate then break end
+        if not candidate.sticky then
+          client.focus = candidate
+          new_c = candidate
+          break
+        end
       end
     end
   end
 
   restore_mouse_location(x, y, prev_scr, printmore)
+  local changed = client.focus ~= c
+  if not changed then
+    -- no adjacent client found; pass the direction to wezterm if applicable
+    wezterm_navigate(c, dir:sub(1,1):upper() .. dir:sub(2))
+  end
+  return changed
 end
 
 function switch_to_tag(tag_name, printmore)

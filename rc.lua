@@ -24,6 +24,8 @@ local helpers = require("my_modules/geo_helpers")
 local edid = require('my_modules/edid')
 local dpi = require('beautiful').xresources.apply_dpi
 hostname = io.popen("uname -n"):read()
+-- wezterm mux socket path; needed when spawning wezterm CLI from outside a wezterm pane
+wezterm_sock = os.getenv("WEZTERM_UNIX_SOCKET") or (os.getenv("HOME") .. "/.wezterm.sock")
 
 -- Get config and cache paths dynamically
 local config_path = gears.filesystem.get_configuration_dir()
@@ -81,28 +83,28 @@ awful.key({ win, "Shift"       }, "s",      function (c) move_or_expand(c, "move
 awful.key({ win, "Shift"       }, "w",      function (c) move_or_expand(c, "move", "up") end),
 awful.key({ ctrl, win, "Shift" }, "Down",   function (c) move_or_expand(c, "shrink", "down") end),
 awful.key({ win                }, "Right",  function (c) switch_focus_without_mouse(c, "right", printmore) end),
-awful.key({ win                }, "Left",   function (c) switch_focus_without_mouse(c, "left", printmore) end),
+awful.key({ win                }, "Left",   function (c) switch_focus_without_mouse(c, "left",  printmore) end),
 awful.key({ win                }, "Down",   function (c)
   if c.sticky then
-    -- in case it's on top
-    awful.client.focus.history.previous()
+    -- sticky is on top; go back to previous client on the same screen
+    local prev = awful.client.focus.history.get(c.screen, 1)
+    if prev then client.focus = prev; prev:raise() end
   else
-    awful.client.focus.bydirection("down")
+    focus_bydirection_or_wezterm(c, "down")
   end
 end),
 awful.key({ win                }, "Up",     function (c)
-  local cls = client.get()
-  local stickies = {}
-  -- Get all the stickies
-  for _, c in ipairs(cls) do
-    if c.sticky then
-      table.insert(stickies, c)
+  -- only consider stickies on the same screen
+  local has_screen_sticky = false
+  for _, sc in ipairs(client.get()) do
+    if sc.sticky and sc.screen == c.screen then
+      has_screen_sticky = true; break
     end
   end
-  if my_utils.table_length(stickies) == 0 then
-    awful.client.focus.bydirection("up")
-  else
+  if has_screen_sticky then
     awful.client.focus.history.previous()
+  else
+    focus_bydirection_or_wezterm(c, "up")
   end
 end),
 -- Minimize window: Win + z
