@@ -84,11 +84,6 @@ function sticky_toggle(c)
   }
 end
 
-function shit(c)
-  nextcl = awful.client.next (1, c, true)
-  print(nextcl.name)
-end
-
 function float_toggle(c)
   awful.client.floating.toggle()
   if c.floating then
@@ -207,7 +202,7 @@ function focus_bydirection_or_wezterm(c, dir)
 end
 
 function switch_focus_without_mouse(c, dir, printmore)
-  x, y, prev_scr = save_mouse_location(printmore)
+  local x, y, prev_scr = save_mouse_location(printmore)
   local prev_screen = c.screen
 
   -- Snapshot each other screen's currently focused client before global_bydirection mutates history
@@ -380,9 +375,9 @@ end
 
 function move_focused_client_to_tag(tag_name)
   -- tag_obj = awful.tag.find_by_name(nil, tag_name)
-  tag_obj = find_tag_by_first_word(tag_name)
+  local tag_obj = find_tag_by_first_word(tag_name)
   if client.focus then
-    my_client_obj = client.focus
+    local my_client_obj = client.focus
     debug_print('Moving focused window (' .. my_client_obj.name .. ') to tag ' .. tag_name, printmore)
     my_client_obj:move_to_tag(tag_obj)
     switch_to_tag(tag_name, printmore)
@@ -497,6 +492,7 @@ end
 
 local lock_file = "/tmp/awesome_wallpaper.lock"
 function resize_screen(s, screens_table, shrink)
+  local diff
   if shrink then
       diff = -dpi(50)
   else
@@ -519,7 +515,7 @@ function resize_screen(s, screens_table, shrink)
         properties["parent"]["object"]:fake_resize(parent_geo.x + diff, parent_geo.y, parent_geo.width - diff, parent_geo.height)
       else
         local geo = s.geometry
-        child = get_child_of(s, screens_table)
+        local child = get_child_of(s, screens_table)
         if child == nil then
             -- this screen has no fake screen under it, noop
             goto nochange
@@ -595,12 +591,12 @@ local function get_tag_with_focused_window()
 end
 
 function save_current_tags(screens_table)
-  focused_tag = get_tag_with_focused_window()
+  local focused_tag = get_tag_with_focused_window()
 
   -- Ensure that the folder exists
   createFolder(tagsave_folder)
   for name, feat in pairs(screens_table) do
-    active_tags = {}
+    local active_tags = {}
     local filename = tagsave_folder .. "/tagsave-" .. name
     os.remove(filename)
     for _, tagobj in pairs(feat["object"].selected_tags) do
@@ -637,10 +633,10 @@ function get_latest_urgent_client()
 end
 
 function load_last_active_tags(screens_table, printmore)
-  focused_tag = nil
+  local focused_tag = nil
   for name, feat in pairs(screens_table) do
     local filename = tagsave_folder .. "/tagsave-" .. name
-    tag_list = my_utils.read_lines_from(filename)
+    local tag_list = my_utils.read_lines_from(filename)
     if next(tag_list) ~= nil then
       local previous_tags = {}
       for _, tag_name in pairs(tag_list) do
@@ -712,14 +708,14 @@ function get_screens()
   if xrandr then
     for line in xrandr:lines() do
       -- if no physical screen is found, skip this line
-      screen_obj = my_utils.find_screen_by_name(line:firstword())
+      local screen_obj = my_utils.find_screen_by_name(line:firstword())
       if screen_obj == nil then
           goto skipanother
       end
-      width, height = line:resolutions()
-      name = line:firstword() .. "_" .. width .. "x" .. height
+      local width, height = line:resolutions()
+      local name = line:firstword() .. "_" .. width .. "x" .. height
       output_tbl[name] = {}
-      primary = false
+      local primary = false
       if string.match(line, " primary ") then
           primary = true
       end
@@ -743,16 +739,16 @@ function get_screens()
         end
         local geo = properties["object"].geometry
         if (( geo.width / geo.height) > 2) or geo.width > 3000 then
-            fake_width = math.ceil(geo.width/2)
-            new_width = math.ceil(geo.width/2)
-            new_width2 = geo.width - new_width
+            local fake_width = math.ceil(geo.width/2)
+            local new_width = math.ceil(geo.width/2)
+            local new_width2 = geo.width - new_width
             if not (( geo.width / geo.height) > 2) then
                 -- this is not a wide screen, let's give more to the left side a bit more (web/mail)
                 fake_width = math.ceil(geo.width*0.55)
             end
             properties["object"]:fake_resize(geo.x + fake_width, geo.y, (geo.width - fake_width), geo.height)
-            fake_obj = screen.fake_add(geo.x, geo.y, fake_width, geo.height)
-            fake_screen_name = name .. "_sub_" .. tostring(fake_width) .. "x" .. tostring(geo.height)
+            local fake_obj = screen.fake_add(geo.x, geo.y, fake_width, geo.height)
+            local fake_screen_name = name .. "_sub_" .. tostring(fake_width) .. "x" .. tostring(geo.height)
             output_tbl[fake_screen_name] = {}
             output_tbl[fake_screen_name]["is_fake"] = true
             output_tbl[fake_screen_name]["name"] = fake_screen_name

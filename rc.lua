@@ -442,7 +442,7 @@ refresh_tag_name = function()
           clients_on_this_tag = clients_on_this_tag + 1
         end
       end
-      original_name = my_utils.get_first_word(t.name)
+      local original_name = my_utils.get_first_word(t.name)
       t.name = original_name .. ' ' .. string.rep('ॱ', clients_on_this_tag)
     end
   end
@@ -730,7 +730,7 @@ function process_screens(systray, screens_table, printmore)
 
   debug_print('Processing screens result: ' .. my_utils.dump(screens_table), printmore)
 
-  second_screen_already_processed = false
+  local second_screen_already_processed = false
   for name, properties in pairs(screens_table) do
     -- In case we have more than 2 screens, we will register first
     -- non-primary screen as 2nd, others won't get tags.
@@ -1110,7 +1110,7 @@ end)
 -- alerting chat etc. but at least hovers the app itself
 -- https://github.com/awesomeWM/awesome/issues/3182 waiting for proper fix
 naughty.connect_signal('destroyed', function(n, reason)
-  client_to_jump = nil
+  local client_to_jump = nil
   if reason == require('naughty.constants').notification_closed_reason.dismissed_by_user then
     if n.clients then
       -- notification thingy (maybe) gave us some client names, use them
@@ -1133,7 +1133,7 @@ naughty.connect_signal('destroyed', function(n, reason)
     end
   end
   if client_to_jump then
-    x, y, prev_scr = save_mouse_location()
+    local x, y, prev_scr = save_mouse_location()
     client_to_jump:jump_to()
     restore_mouse_location(x, y, prev_scr, printmore, true)
   end
