@@ -46,29 +46,27 @@ end
 
 -- Used from xidlehook to notify we're about to lock the screen
 function flash_toggle(c)
-  old_opacity = c.opacity
+  local old_opacity = c.opacity
+  -- Each step: {delay_from_previous_step_in_seconds, target_opacity}
+  local steps = {
+    { 0.03, 0.3 },
+    { 0.02, 0.4 },
+    { 0.04, 0.5 },
+    { 0.04, 0.6 },
+    { 0.03, 0.7 },
+    { 0.04, 0.8 },
+    { 0.05, old_opacity },
+  }
   c.opacity = 0.2
-  awful.spawn.easy_async("sleep 0.03", function()
-    c.opacity = 0.3
-  end)
-  awful.spawn.easy_async("sleep 0.05", function()
-    c.opacity = 0.4
-  end)
-  awful.spawn.easy_async("sleep 0.09", function()
-    c.opacity = 0.5
-  end)
-  awful.spawn.easy_async("sleep 0.13", function()
-    c.opacity = 0.6
-  end)
-  awful.spawn.easy_async("sleep 0.16", function()
-    c.opacity = 0.7
-  end)
-  awful.spawn.easy_async("sleep 0.20", function()
-    c.opacity = 0.8
-  end)
-  awful.spawn.easy_async("sleep 0.25", function()
-    c.opacity = old_opacity
-  end)
+  local function run_step(i)
+    if i > #steps then return end
+    gears.timer.start_new(steps[i][1], function()
+      if c.valid then c.opacity = steps[i][2] end
+      run_step(i + 1)
+      return false
+    end)
+  end
+  run_step(1)
 end
 
 function sticky_toggle(c)
