@@ -4,6 +4,21 @@ local my_utils = require('my_modules/my_utils')
 local xresources = require('beautiful.xresources')
 local dpi = xresources.apply_dpi
 
+local function safe_no_overlap_func(c, args)
+    local s = c.screen
+    if not s or not s.selected_tag then return end
+    return awful.placement.no_overlap(c, args)
+end
+
+-- hacky no_overlap definition for some edge cases, limited usage, might be removed later
+local safe_no_overlap = setmetatable(
+    { is_placement = true },
+    {
+        __call = function(_, ...) return safe_no_overlap_func(...) end,
+        __add  = getmetatable(awful.placement.no_offscreen).__add,
+    }
+)
+
 function set_rules(clientkeys)
   -- {{{ Rules
   -- Rules to apply to new clients (through the "manage" signal).
@@ -22,7 +37,7 @@ function set_rules(clientkeys)
         maximized_horizontal = false,
         maximized_vertical = false,
         maximized = false,
-        placement = awful.placement.no_overlap + awful.placement.no_offscreen,
+        placement = safe_no_overlap + awful.placement.no_offscreen,
       },
     },
     -- Floating clients.
