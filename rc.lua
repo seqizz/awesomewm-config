@@ -32,7 +32,8 @@ local config_path = gears.filesystem.get_configuration_dir()
 local cache_path = gears.filesystem.get_cache_dir()
 
 -- debug stuff if needed
-local printmore = false
+-- global (not local) so required modules can honor it as a master debug switch
+printmore = false
 
 -- my theme
 beautiful.init(config_path .. "my_modules/my_theme.lua")
@@ -472,12 +473,8 @@ psi_timer = gears.timer({
   callback = function() psi_widget:check() end,
 })
 
-spotify_timer = gears.timer({
-  timeout = 15,
-  autostart = true,
-  call_now = true,
-  callback = function() spotify:check() end,
-})
+-- spotify is now event-driven via `playerctl --follow` inside my_modules/spotify.lua;
+-- no polling timer needed.
 
 nextthing_timer = gears.timer({
   timeout = 30,

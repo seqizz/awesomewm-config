@@ -14,11 +14,17 @@ local my_theme = require('my_modules/my_theme')
 local my_utils = require('my_modules/my_utils')
 local dpi = require('beautiful').xresources.apply_dpi
 
+-- flip to true to trace the follow stream + fetch decisions
+local debug = false
+-- debug print: fires on the module-local flag OR the global printmore master switch
+local function dbg(msg)
+  if debug or printmore then debug_print(msg, true) end
+end
+
 -- ─── config ───────────────────────────────────────────────────────────────────
 local CONFIG = {
   player        = 'spotify',
-  poll_playing  = 0.5,         -- seconds between position polls while playing
-  poll_paused   = 5,           -- seconds between polls while paused/stopped
+  poll_playing  = 0.5,         -- local clock tick + redraw interval while playing
   no_lyric_text = '…',         -- shown before first timestamped line
   max_width     = dpi(500),    -- max widget width, sizes down to text width
   disable_on_battery = true,   -- stop polling when on battery power
@@ -276,12 +282,17 @@ end
 
 -- Try /api/get first, fall back to /api/search
 local function fetch_lyrics(artist, title, album, duration)
-  if state.fetching then return end
+  if state.fetching then
+    dbg('[lyrics] fetch SKIPPED (already fetching) for [' .. artist .. ' - ' .. title .. ']')
+    return
+  end
   state.fetching = true
   local key = make_cache_key(artist, title, duration)
+  dbg('[lyrics] fetch START key=[' .. key .. ']')
 
   -- check memory cache first
   if lyrics_cache[key] ~= nil then
+    dbg('[lyrics] mem cache hit, has_lyrics=' .. tostring(lyrics_cache[key] ~= false))
     if lyrics_cache[key] == false then
       state.lines = nil -- no lyrics available
     else
@@ -294,6 +305,7 @@ local function fetch_lyrics(artist, title, album, duration)
   -- check disk cache before hitting network
   local cached_lrc = cache_read(key)
   if cached_lrc ~= nil then
+    dbg('[lyrics] disk cache hit, empty=' .. tostring(cached_lrc == ''))
     if cached_lrc == '' then
       lyrics_cache[key] = false
       state.lines = nil
@@ -312,13 +324,18 @@ local function fetch_lyrics(artist, title, album, duration)
     .. '&album_name=' .. url_encode(album)
     .. '&duration=' .. dur_s
 
-  local cmd = "curl -sf --max-time 5 -H 'User-Agent: awesome-lyrics/1.0' '" .. url .. "'"
+  local cmd = "curl -sf --connect-timeout 5 --max-time 30 -H 'User-Agent: awesome-lyrics/1.0' '" .. url .. "'"
+  dbg('[lyrics] GET ' .. url)
 
   awful.spawn.easy_async_with_shell(cmd, function(stdout, stderr, reason, exit_code)
+    dbg('[lyrics] GET result exit=' .. tostring(exit_code) .. ' len=' ..
+      tostring(stdout and #stdout or 0) .. ' has_synced=' ..
+      tostring(stdout and json_has_synced_lyrics(stdout) or false))
     if exit_code == 0 and stdout and #stdout > 0 and json_has_synced_lyrics(stdout) then
       local synced = json_extract_string(stdout, 'syncedLyrics')
       if synced and #synced > 0 then
         local parsed = split_long_lines(parse_lrc(synced), CONFIG.max_width)
+        dbg('[lyrics] GET parsed ' .. #parsed .. ' lines')
         if #parsed > 0 then
           lyrics_cache[key] = parsed
           cache_write(key, synced)
@@ -332,9 +349,13 @@ local function fetch_lyrics(artist, title, album, duration)
     -- /api/get failed or no synced lyrics → try /api/search
     local search_url = 'https://lrclib.net/api/search?track_name=' .. url_encode(title)
       .. '&artist_name=' .. url_encode(artist)
-    local search_cmd = "curl -sf --max-time 5 -H 'User-Agent: awesome-lyrics/1.0' '" .. search_url .. "'"
+    local search_cmd = "curl -sf --connect-timeout 5 --max-time 30 -H 'User-Agent: awesome-lyrics/1.0' '" .. search_url .. "'"
 
+    dbg('[lyrics] SEARCH ' .. search_url)
     awful.spawn.easy_async_with_shell(search_cmd, function(out2, _, _, exit2)
+      dbg('[lyrics] SEARCH result exit=' .. tostring(exit2) .. ' len=' ..
+        tostring(out2 and #out2 or 0) .. ' has_synced=' ..
+        tostring(out2 and json_has_synced_lyrics(out2) or false))
       if exit2 == 0 and out2 and #out2 > 0 and json_has_synced_lyrics(out2) then
         -- search returns an array; find first entry with syncedLyrics
         local synced2 = json_extract_string(out2, 'syncedLyrics')
@@ -349,9 +370,17 @@ local function fetch_lyrics(artist, title, album, duration)
           end
         end
       end
-      -- no lyrics found at all
-      lyrics_cache[key] = false
-      cache_write(key, '') -- negative cache on disk too
+      -- Distinguish "server confirmed no lyrics" from "request failed". curl
+      -- exit 0 means we got a real answer; anything else (28=timeout, DNS, etc.)
+      -- is transient and must NOT be negative-cached, or one blip poisons the
+      -- track forever.
+      if exit2 == 0 then
+        dbg('[lyrics] NO LYRICS (server confirmed) key=[' .. key .. '], negative-caching')
+        lyrics_cache[key] = false
+        cache_write(key, '') -- negative cache on disk too
+      else
+        dbg('[lyrics] fetch FAILED (curl exit=' .. tostring(exit2) .. ') key=[' .. key .. '], NOT caching')
+      end
       state.lines = nil
       state.fetching = false
     end)
@@ -360,53 +389,55 @@ end
 
 -- ─── playerctl queries ────────────────────────────────────────────────────────
 
--- Fetch metadata + status in one shot
-local function update_metadata(callback)
-  local cmd = "playerctl -p " .. CONFIG.player .. " metadata --format "
-    .. "'{{artist}}|||{{title}}|||{{album}}|||{{mpris:length}}|||{{status}}' 2>/dev/null"
+-- Parse one line from the `playerctl metadata --follow` stream and update state.
+-- Format: artist|||title|||album|||length(us)|||status . An empty line means the
+-- player went away. Does not redraw; the caller does that.
+local function parse_metadata_line(line)
+  dbg('[lyrics] follow line: [' .. tostring(line) .. ']')
+  if not line or #line == 0 then
+    state.status = 'Stopped'
+    state.lines = nil
+    return
+  end
 
-  awful.spawn.easy_async_with_shell(cmd, function(stdout, stderr, reason, exit_code)
-    if exit_code ~= 0 or not stdout or #stdout == 0 then
-      state.status = 'Stopped'
-      state.lines = nil
-      if callback then callback() end
-      return
-    end
+  local parts = my_utils.split_string(line, '|||')
 
-    local parts = my_utils.split_string(stdout, '|||')
+  -- trim whitespace and newlines from each field
+  local function trim(s) return (s or ''):match('^%s*(.-)%s*$') end
+  local artist   = trim(parts[1])
+  local title    = trim(parts[2])
+  local album    = trim(parts[3])
+  local length   = tonumber(trim(parts[4])) or 0 -- microseconds
+  local status   = trim(parts[5])
+  if status == '' then status = 'Stopped' end
 
-    -- trim whitespace and newlines from each field
-    local function trim(s) return (s or ''):match('^%s*(.-)%s*$') end
-    local artist   = trim(parts[1])
-    local title    = trim(parts[2])
-    local album    = trim(parts[3])
-    local length   = tonumber(trim(parts[4])) or 0 -- microseconds
-    local status   = trim(parts[5])
-    if status == '' then status = 'Stopped' end
+  local duration = length / 1000000 -- convert to seconds
+  local new_key  = make_cache_key(artist, title, duration)
 
-    local duration = length / 1000000 -- convert to seconds
-    local new_key  = make_cache_key(artist, title, duration)
+  dbg('[lyrics] parsed key=[' .. new_key .. '] status=[' .. status ..
+    '] changed=' .. tostring(new_key ~= state.cache_key) .. ' fetching=' .. tostring(state.fetching))
 
-    -- detect track change
-    if new_key ~= state.cache_key then
-      state.artist    = artist
-      state.title     = title
-      state.album     = album
-      state.duration  = duration
-      state.cache_key = new_key
-      state.lines     = nil
-      state.current_line_text = CONFIG.no_lyric_text
-      -- fetch lyrics for new track
-      fetch_lyrics(artist, title, album, duration)
-    end
+  -- detect track change
+  if new_key ~= state.cache_key then
+    state.artist    = artist
+    state.title     = title
+    state.album     = album
+    state.duration  = duration
+    state.cache_key = new_key
+    state.lines     = nil
+    state.current_line_text = CONFIG.no_lyric_text
+    state.position  = 0 -- new track starts at 0; resync will correct
+    -- fetch lyrics for new track
+    fetch_lyrics(artist, title, album, duration)
+  end
 
-    state.status = status
-    if callback then callback() end
-  end)
+  state.status = status
 end
 
--- Fetch current playback position
-local function update_position(callback)
+-- One-shot playback position query, used to anchor/correct the local clock.
+-- Position advances continuously with no MPRIS change signal, so it can't be
+-- event-driven; we integrate it locally and resync from here occasionally.
+local function resync_position(callback)
   -- LC_NUMERIC=C forces period as decimal separator
   local cmd = "LC_NUMERIC=C playerctl -p " .. CONFIG.player .. " position 2>/dev/null"
   awful.spawn.easy_async_with_shell(cmd, function(stdout, stderr, reason, exit_code)
@@ -467,29 +498,6 @@ local function is_on_battery()
   return false -- no AC sysfs found, assume plugged in
 end
 
--- ─── main poll loop ───────────────────────────────────────────────────────────
-
-local poll_timer
-local vis_timer
-
-local function poll()
-  update_metadata(function()
-    update_position(function()
-      update_display()
-    end)
-  end)
-end
-
--- adaptive timer: fast while playing, slow while paused
-local function adjust_timer()
-  if not poll_timer then return end
-  local target = state.status == 'Playing' and CONFIG.poll_playing or CONFIG.poll_paused
-  if poll_timer.timeout ~= target then
-    poll_timer.timeout = target
-    poll_timer:again()
-  end
-end
-
 -- ─── widget visibility ───────────────────────────────────────────────────────
 -- hide when no lyrics (complements existing spotify widget)
 function lyrics_widget:set_visible_state(visible)
@@ -500,31 +508,75 @@ function lyrics_widget:set_visible_state(visible)
   end
 end
 
--- start/stop all lyrics timers
-local function start_timers()
-  if poll_timer and not poll_timer.started then
-    poll_timer:start()
-    poll() -- immediate first poll
+-- ─── timers & metadata event stream ─────────────────────────────────────────────
+-- Event-driven: `playerctl metadata --follow` pushes track/status changes, so we
+-- never poll for them. Position has no change signal, so we integrate it locally
+-- in a fork-free tick timer and resync from playerctl every RESYNC seconds to
+-- correct drift and seeks.
+
+local RESYNC = 5 -- seconds between position resyncs (seek/drift correction)
+
+local display_timer -- local position clock + redraw, no fork
+local resync_timer  -- periodic position correction
+local vis_timer
+local follow_pid = nil
+local prev_status = 'Stopped'
+
+-- advance the local position clock and redraw
+local function tick()
+  if state.status == 'Playing' and not state.lyrics_paused then
+    state.position = state.position + CONFIG.poll_playing
   end
-  if vis_timer and not vis_timer.started then
-    vis_timer:start()
+  update_display()
+end
+
+-- handle one line from the metadata follow stream
+local function on_metadata(line)
+  parse_metadata_line(line)
+  -- anchor the local clock to reality whenever playback (re)starts
+  if state.status == 'Playing' and prev_status ~= 'Playing' then
+    resync_position(update_display)
+  end
+  prev_status = state.status
+  update_display()
+end
+
+local function start_follow()
+  if follow_pid then return end
+  local cmd = { 'playerctl', '-p', CONFIG.player, 'metadata', '--follow',
+                '--format', '{{artist}}|||{{title}}|||{{album}}|||{{mpris:length}}|||{{status}}' }
+  follow_pid = awful.spawn.with_line_callback(cmd, {
+    stdout = on_metadata,
+    exit = function()
+      follow_pid = nil
+      -- respawn only if we are still meant to be running (e.g. dbus drop)
+      if display_timer and display_timer.started then
+        gears.timer.start_new(2, function() start_follow() return false end)
+      end
+    end,
+  })
+end
+
+local function stop_follow()
+  if follow_pid then
+    -- SIGTERM (15); matches the `kill -N pid` convention used elsewhere in config
+    awful.spawn('kill -15 ' .. tostring(follow_pid))
+    follow_pid = nil
   end
 end
 
-local function stop_timers()
-  if poll_timer and poll_timer.started then poll_timer:stop() end
-  if vis_timer and vis_timer.started then vis_timer:stop() end
-  -- clear display
-  lyrictext:set_markup_silently('')
-  lyrics_widget:set_visible_state(false)
-end
-
-poll_timer = gears.timer({
+display_timer = gears.timer({
   timeout = CONFIG.poll_playing,
   autostart = false, -- managed by battery watcher
+  callback = tick,
+})
+
+resync_timer = gears.timer({
+  timeout = RESYNC,
+  autostart = false, -- managed by battery watcher
   callback = function()
-    poll()
-    adjust_timer()
+    -- only worth a fork while actually playing
+    if state.status == 'Playing' then resync_position() end
   end,
 })
 
@@ -539,9 +591,29 @@ vis_timer = gears.timer({
   end,
 })
 
+-- start/stop all lyrics machinery
+local function start_timers()
+  if display_timer.started then return end
+  start_follow()
+  display_timer:start()
+  resync_timer:start()
+  vis_timer:start()
+  resync_position(update_display) -- immediate anchor
+end
+
+local function stop_timers()
+  if display_timer.started then display_timer:stop() end
+  if resync_timer.started then resync_timer:stop() end
+  if vis_timer.started then vis_timer:stop() end
+  stop_follow()
+  -- clear display
+  lyrictext:set_markup_silently('')
+  lyrics_widget:set_visible_state(false)
+end
+
 -- ─── battery watcher ─────────────────────────────────────────────────────────
--- checks power state every 30s, starts/stops poll timers accordingly
--- when disable_on_battery is false, just start timers immediately
+-- checks power state every 30s, starts/stops the lyrics machinery accordingly
+-- when disable_on_battery is false, just start immediately
 if CONFIG.disable_on_battery then
   gears.timer({
     timeout = 30,
@@ -573,10 +645,15 @@ lyrics_widget:buttons(awful.util.table.join(
 
 -- ─── public interface ─────────────────────────────────────────────────────────
 
--- force re-check (e.g. on track skip)
+-- force a refetch of the current track's lyrics. Track changes are auto-detected
+-- by the metadata follow stream, so this is mainly used by clear_cache.
 function lyrics_widget:check()
-  state.cache_key = '' -- force refetch on next poll
-  poll()
+  if state.title ~= '' then
+    state.lines = nil
+    state.current_line_text = CONFIG.no_lyric_text
+    fetch_lyrics(state.artist, state.title, state.album, state.duration)
+  end
+  resync_position(update_display)
 end
 
 -- clear cache (e.g. if lyrics were wrong)

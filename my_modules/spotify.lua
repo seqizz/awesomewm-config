@@ -78,30 +78,110 @@ function spotifywidget:raise_toggle()
   spotifywidget:check()
 end
 
-function spotifywidget:check()
-  awful.spawn.with_line_callback('bash -c \'sleep 1 && playerctl -p spotify status\'', {
-    stderr = function(line)
-      if line == 'No players found' then
-        self.forced_width = dpi(0)
-        awesome.emit_signal("widget::spotify::visible", false)
-      end
-    end,
-    stdout = function(line)
-      is_playing = true
-      if line == 'Paused' then
-        is_playing = false
-      end
-      awful.spawn.easy_async(
-        'bash -c "playerctl -p spotify metadata | grep -w \'xesam:title\' | sed \'s/.*xesam:title\\s*//;s/$/ /\'"',
-        function(stdout, stderr, reason, exit_code) spotifywidget:set(stdout, is_playing) end
-      )
-      self.forced_width = nil
-      awesome.emit_signal("widget::spotify::visible", true)
-    end,
-  })
+-- Event-driven: one long-running `playerctl --follow` pushes a line on every
+-- track/status change instead of polling+forking every 15s. The follower is the
+-- single source of truth for widget state.
+local follow_pid = nil
+-- ASCII Unit Separator (0x1f): never appears in a track title, so it is a safe
+-- field delimiter between status and title in the playerctl format template.
+local SEP = '\31'
+
+local debug = false       -- flip to true to trace the playerctl follow stream
+-- debug print: fires on the module-local flag OR the global printmore master switch
+local function dbg(msg)
+  if debug or printmore then debug_print(msg, true) end
 end
 
-spotifywidget:check()
+local visible_state = nil -- last emitted visibility, so we only signal on change
+local hide_timer = nil    -- debounces hiding to ride out transient empty lines
+local last_title = ''     -- keep song text stable across empty-metadata blips
+
+-- Emit the visibility signal only when it actually changes. Spotify pushes many
+-- property updates while playing; re-signalling every time makes the widget flicker.
+local function set_visible(v)
+  if visible_state == v then return end
+  visible_state = v
+  awesome.emit_signal("widget::spotify::visible", v)
+end
+
+local function cancel_hide()
+  if hide_timer then
+    hide_timer:stop()
+    hide_timer = nil
+  end
+end
+
+local function apply_line(line)
+  local sep = line:find(SEP, 1, true)
+  local status, title
+  if sep then
+    status = line:sub(1, sep - 1)
+    title = line:sub(sep + 1)
+  else
+    -- playerctl emits an empty line when the player goes away
+    status = line
+    title = ''
+  end
+
+  dbg('[spotify] parsed status=[' .. status .. '] title=[' .. title .. ']')
+
+  if status == '' then
+    -- Empty lines also appear transiently during track changes / dbus churn.
+    -- Debounce the hide so the widget stays put unless spotify is really gone.
+    if not hide_timer then
+      hide_timer = gears.timer.start_new(2, function()
+        hide_timer = nil
+        spotifywidget.forced_width = dpi(0)
+        set_visible(false)
+        return false
+      end)
+    end
+    return
+  end
+
+  cancel_hide()
+  -- metadata can momentarily arrive empty mid-track; reuse the last good title
+  if title ~= '' then last_title = title end
+  -- keep the previous semantics: only 'Paused' shows the paused icon
+  local is_playing = status ~= 'Paused'
+  spotifywidget:set(last_title, is_playing)
+  spotifywidget.forced_width = nil
+  set_visible(true)
+end
+
+local function start_follow()
+  -- argv table (no shell), so the 0x1f delimiter and titles pass through verbatim.
+  -- NOTE: `metadata` is the required subcommand; --follow makes it stream.
+  local cmd = { 'playerctl', '-p', 'spotify', 'metadata', '--follow',
+                '--format', '{{status}}' .. SEP .. '{{title}}' }
+  dbg('[spotify] start_follow: ' .. table.concat(cmd, ' '))
+  follow_pid = awful.spawn.with_line_callback(cmd, {
+    stdout = function(line)
+      dbg('[spotify] stdout: [' .. line .. ']')
+      apply_line(line)
+    end,
+    stderr = function(line)
+      dbg('[spotify] stderr: [' .. line .. ']')
+    end,
+    exit = function(reason, code)
+      dbg('[spotify] exit: ' .. tostring(reason) .. ' ' .. tostring(code))
+      follow_pid = nil
+      -- playerctl exits if the dbus session drops; respawn after a short delay
+      gears.timer.start_new(2, function() start_follow() return false end)
+    end,
+  })
+  dbg('[spotify] follow_pid = ' .. tostring(follow_pid))
+end
+
+-- Cheap idempotent nudge: media keybindings/buttons call this to guarantee the
+-- follower is alive. Track/status updates themselves arrive via --follow.
+function spotifywidget:check()
+  if not follow_pid then start_follow() end
+end
+
+-- Start hidden; the follower reveals the widget once spotify appears.
+set_visible(false)
+start_follow()
 
 spotifywidget:buttons(awful.util.table.join(
   awful.button({}, 1, function() -- left click
