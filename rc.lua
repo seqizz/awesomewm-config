@@ -2,6 +2,9 @@ pcall(require, "luarocks.loader")
 
 local gears = require("gears")
 local awful = require("awful")
+awful.input.tap_to_click = 1
+awful.input.natural_scrolling = 1
+awful.input.disable_while_typing = 1
 require("awful.autofocus")
 local wibox = require("wibox")
 local menubar = require("menubar")
@@ -254,14 +257,14 @@ function build_dynamic_widgets_layout()
   local sc = screens_table and get_total_screen_count(screens_table) or 1
   layout:add(separator_reverse)
   if sc == 1 and (hostname == 'bebop' or hostname == 'splinter') then
-    layout:add(touch_widget)
+    if touch_widget then layout:add(touch_widget) end
     if hostname == 'bebop' then
-      layout:add(rotate_widget)
+      if rotate_widget then layout:add(rotate_widget) end
     end
   end
-  layout:add(autolock_widget)
-  layout:add(spotify_separator)
-  layout:add(spotify)
+  if autolock_widget then layout:add(autolock_widget) end
+  if spotify_separator then layout:add(spotify_separator) end
+  if spotify then layout:add(spotify) end
   return layout
 end
 
@@ -420,16 +423,16 @@ mytextclock = wibox.widget{
    format = " %d %b %H:%M (%a) ",
    refresh = 30
 }
-calendarwidget = lain.widget.cal({
-  followtag = true,
-  week_number = "left",
-  attach_to = { mytextclock },
-  notification_preset = {
-    font = beautiful.font_big,
-    fg = beautiful.fg_normal,
-    bg = beautiful.bg_focus
-  }
-})
+-- calendarwidget = lain.widget.cal({
+--   followtag = true,
+--   week_number = "left",
+--   attach_to = { mytextclock },
+--   notification_preset = {
+--     font = beautiful.font_big,
+--     fg = beautiful.fg_normal,
+--     bg = beautiful.bg_focus
+--   }
+-- })
 
 -- change tag names dynamically
 refresh_tag_name = function()
@@ -507,6 +510,7 @@ local function screen_organizer(s, screen_count, primary, is_extra)
     taglist_width = dpi(350)
     wibar_height = dpi(23)
   end
+  if not wibar_height or wibar_height == 0 then wibar_height = 24 end
 
   if not is_extra then
     -- Create a taglist widget
@@ -753,7 +757,7 @@ function process_screens(systray, screens_table, printmore)
 
   clientkeys, globalkeys = set_keys_after_screen_new(clientkeys, globalkeys, screens_table, printmore)
   dofile(config_path .. "my_modules/rc_clientbuttons.lua")
-  root.keys(globalkeys)
+  root.keys = globalkeys
   set_rules(clientkeys)
 
   -- Set initial spotify placement based on screen sizes
@@ -885,11 +889,9 @@ end
 gears.table.merge(globalkeys, capslock.possible_combinations)
 
 -- Signal function to execute when a new client appears.
-client.connect_signal("manage", function (c)
+client.connect_signal("request::manage", function (c)
   refresh_tag_name()
-  -- Set the windows at the slave,
-  -- i.e. put it at the end of others instead of setting it master.
-  if not awesome.startup then awful.client.setslave(c) end
+  -- put it at the end of others instead of setting it master.
 
   if awesome.startup
     and not c.size_hints.user_position
@@ -968,19 +970,27 @@ screen.connect_signal('list', function()
   end)
 end)
 
--- Configure systray size based on total screen count (including fake screens)
-debug_print('Total screen count: ' .. get_total_screen_count(screens_table), printmore)
-if get_total_screen_count(screens_table) > 1 then
-  my_systray.widget:set_base_size(dpi(20))
-else
-  my_systray.widget:set_base_size(dpi(24))
-end
+screen.connect_signal("request::desktop_decoration", function(s)
+  debug_print('request::desktop_decoration received for ' .. tostring(s), printmore)
+  screens_table = get_screens()
 
-process_screens(my_systray, screens_table, printmore)
+  if get_total_screen_count(screens_table) > 1 then
+    my_systray.widget:set_base_size(dpi(20))
+  else
+    my_systray.widget:set_base_size(dpi(24))
+  end
+
+  process_screens(my_systray, screens_table, printmore)
+end)
+
+-- Fallback: also try direct setup in case the signal already fired
+if #screen > 0 then
+  process_screens(my_systray, get_screens(), printmore)
+end
 
 tag.connect_signal('request::screen', function(t)
   -- recover tags on a removed screen
-  naughty.notify({ text = 'Recovering tag: ' .. t.name })
+  naughty.notification({ text = 'Recovering tag: ' .. t.name })
   for s in screen do
     t.screen = s
     my_dropdown.screen = s
@@ -1174,7 +1184,7 @@ end)
 
 -- When switching to a tag with urgent clients, raise them.
 awful.tag.attached_connect_signal(s, 'property::selected', function()
-  local urgent_clients = function(c) return awful.rules.match(c, { urgent = true }) end
+  local urgent_clients = function(c) return c.urgent end
   for c in awful.client.iterate(urgent_clients) do
     if c.first_tag == mouse.screen.selected_tag then
       client.focus = c
