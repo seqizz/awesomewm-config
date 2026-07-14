@@ -2,9 +2,7 @@ pcall(require, "luarocks.loader")
 
 local gears = require("gears")
 local awful = require("awful")
-awful.input.tap_to_click = 1
-awful.input.natural_scrolling = 1
-awful.input.disable_while_typing = 1
+require("my_modules/compositor")
 require("awful.autofocus")
 local wibox = require("wibox")
 local menubar = require("menubar")
