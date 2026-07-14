@@ -378,7 +378,7 @@ battery_widget = wibox.widget({
   battery_widget_text,
   layout = wibox.layout.fixed.horizontal,
 })
-battery_widget:buttons(awful.util.table.join(
+battery_widget:buttons(gears.table.join(
   -- Update battery widget with click, if we're not patient enough
   awful.button({}, 1, function() battery_widget_text:update() end)
 ))
@@ -832,8 +832,8 @@ globalkeys = gears.table.join(
     end
     my_dropdown:toggle()
   end),
-  awful.key({              }, "Print",                 nil, function() awful.spawn("flameshot gui") end),
-  awful.key({ "Shift"      }, "Print",                      function() awful.spawn("flameshot full -c") end),
+  -- awful.key({              }, "Print",                 nil, function() awful.spawn("flameshot gui") end),
+  -- awful.key({ "Shift"      }, "Print",                      function() awful.spawn("flameshot full -c") end),
   awful.key({ ctrl         }, "space",                      function() awful.spawn(rofi_cmd) end),
   awful.key({              }, "F9",                    nil, function() awful.spawn(rofi_emoji_cmd) end),
   awful.key({ ctrl         }, "F9",                    nil, function() awful.spawn(rofi_calc_cmd) end),
@@ -1106,35 +1106,35 @@ end)
 -- Git version workaround, shit is not complete (e.g. slack does not switch to)
 -- alerting chat etc. but at least hovers the app itself
 -- https://github.com/awesomeWM/awesome/issues/3182 waiting for proper fix
-naughty.connect_signal('destroyed', function(n, reason)
-  local client_to_jump = nil
-  if reason == require('naughty.constants').notification_closed_reason.dismissed_by_user then
-    if n.clients then
-      -- notification thingy (maybe) gave us some client names, use them
-      for _, notification_client in ipairs(n.clients) do
-        if not notification_client then
-          -- Means this is nothingburger
-          goto noclient
-        end
-        client_to_jump = notification_client
-        debug_print('Jumping to notification-client: ' .. client_to_jump.name, printmore)
-        break
-        ::noclient::
-      end
-    else
-      -- no notification client is here
-      -- we will just assume when we clicked the pop-up, we have created
-      -- an urgent client. So we will be optimistic, will just jump to it
-      client_to_jump = get_latest_urgent_client()
-      debug_print('Jumping to latest urgent one: ' .. client_to_jump.name, printmore)
-    end
-  end
-  if client_to_jump then
-    local x, y, prev_scr = save_mouse_location()
-    client_to_jump:jump_to()
-    restore_mouse_location(x, y, prev_scr, printmore, true)
-  end
-end)
+-- naughty.connect_signal('destroyed', function(n, reason)
+--   local client_to_jump = nil
+--   if reason == require('naughty.constants').notification_closed_reason.dismissed_by_user then
+--     if n.clients then
+--       -- notification thingy (maybe) gave us some client names, use them
+--       for _, notification_client in ipairs(n.clients) do
+--         if not notification_client then
+--           -- Means this is nothingburger
+--           goto noclient
+--         end
+--         client_to_jump = notification_client
+--         debug_print('Jumping to notification-client: ' .. client_to_jump.name, printmore)
+--         break
+--         ::noclient::
+--       end
+--     else
+--       -- no notification client is here
+--       -- we will just assume when we clicked the pop-up, we have created
+--       -- an urgent client. So we will be optimistic, will just jump to it
+--       client_to_jump = get_latest_urgent_client()
+--       debug_print('Jumping to latest urgent one: ' .. client_to_jump.name, printmore)
+--     end
+--   end
+--   if client_to_jump then
+--     local x, y, prev_scr = save_mouse_location()
+--     client_to_jump:jump_to()
+--     restore_mouse_location(x, y, prev_scr, printmore, true)
+--   end
+-- end)
 
 client.connect_signal('property::urgent', function(c)
     if c.urgent then
@@ -1198,7 +1198,7 @@ awesome.connect_signal('startup', function(s, state)
   run_once('pasystray')
   run_once("wezterm-mux-server --daemonize", "wezterm-mux-server")
   run_once("wezterm connect default --class mainqterm", "mainqterm", "term")
-  run_once('picom')
+  -- run_once('picom')
 
   -- standard alt+tab
   run_once(
