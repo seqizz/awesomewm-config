@@ -139,7 +139,7 @@ function my_utils.xor(a, b)
 end
 
 function my_utils.find_screen_by_name(name)
-  for s in screen do
+  for _, s in ipairs(all_screens()) do
     if my_utils.table_length(s.outputs) == 0 and name == "fake_screen" then
         return s
     end

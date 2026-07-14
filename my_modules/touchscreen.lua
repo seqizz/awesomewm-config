@@ -1,3 +1,10 @@
+-- Wayland has no xinput, so there is nothing to toggle here on somewm.
+-- `false` and not `nil`: require() replaces a nil module result with `true`,
+-- which then looks like a real widget to every caller.
+if awesome.release == "somewm" then
+  return false
+end
+
 local my_theme = require('my_modules/my_theme')
 local create_toggle_widget = require('my_modules/toggle_widget')
 
@@ -9,7 +16,7 @@ elseif hostname == 'splinter' then
 end
 
 local touchwidget = create_toggle_widget({
-  check_cmd = "xinput-toggle query '" .. fingerdevice .. "'",
+  check_cmd = "xinput-toggle query '" .. fingerdevice .. "'", -- somewm:ignore (not reached on somewm)
   enabled_pattern = "on",
   toggle_cmd = "xinput-toggle '" .. fingerdevice .. "'",
   icon = my_theme.touch_icon,

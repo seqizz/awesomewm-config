@@ -2,6 +2,7 @@ pcall(require, "luarocks.loader")
 
 local gears = require("gears")
 local awful = require("awful")
+require("my_modules/compositor")
 require("awful.autofocus")
 local wibox = require("wibox")
 local menubar = require("menubar")
@@ -33,7 +34,7 @@ local cache_path = gears.filesystem.get_cache_dir()
 
 -- debug stuff if needed
 -- global (not local) so required modules can honor it as a master debug switch
-printmore = false
+printmore = true
 
 -- my theme
 beautiful.init(config_path .. "my_modules/my_theme.lua")
@@ -54,6 +55,21 @@ ruled.notification.connect_signal('request::rules', function()
     },
   }
 end)
+
+awful.input.rules = {
+    {
+        rule = { type = "touchpad" },
+        properties = {
+            natural_scrolling = 1,
+        },
+    },
+    {
+        rule = { type = "pointer" },
+        properties = {
+            natural_scrolling = 0,
+        },
+    },
+}
 
 -- print errors as naughty notifications
 dofile(config_path .. "my_modules/rc_errorhandling.lua")
@@ -265,65 +281,61 @@ mpris_separator = dynamic_separator.create({
 -- Containers that can hold dynamic widgets, keyed by screen object
 dynamic_widget_containers = {}
 
--- Build the dynamic widgets layout (touch, rotate, autolock, spotify)
+-- Build the dynamic widgets layout (touch, rotate, autolock, mpris)
 function build_dynamic_widgets_layout()
   local layout = wibox.layout.fixed.horizontal()
   local sc = screens_table and get_total_screen_count(screens_table) or 1
-  layout:add(separator_reverse)
-  if sc == 1 and (hostname == 'bebop' or hostname == 'splinter') then
-    layout:add(touch_widget)
-    if hostname == 'bebop' then
-      layout:add(rotate_widget)
+  -- Guard every add: the X11-only widgets return `false` on somewm, and adding
+  -- a non-widget raises "Type should be table, but is nil" deep inside wibox,
+  -- which takes the whole config down (somewm then has no config at all).
+  local function add(widget)
+    if type(widget) == 'table' and widget.is_widget then
+      layout:add(widget)
     end
   end
-  layout:add(autolock_widget)
-  layout:add(mpris_separator)
-  layout:add(mpris)
+  add(separator_reverse)
+  if sc == 1 and (hostname == 'bebop' or hostname == 'splinter') then
+    add(touch_widget)
+    if hostname == 'bebop' then
+      add(rotate_widget)
+    end
+  end
+  add(autolock_widget)
+  add(mpris_separator)
+  add(mpris)
   return layout
 end
 
--- Update which screen shows dynamic widgets based on which is larger in fake screen pairs
+-- The dynamic widgets (touch, rotate, autolock, mpris) live on the roomiest
+-- screen: the wider half of a split pair, the non-primary screen on a
+-- multi-monitor setup, the only screen when there is just one.
+local function hosts_dynamic_widgets(entry, screens_table)
+  local sibling = split_sibling(entry, screens_table)
+  if sibling then
+    -- a tie goes to the fake (left) half, so the widgets do not jump around
+    -- while the boundary is moved with win+F7/F8
+    return entry.width > sibling.width
+      or (entry.width == sibling.width and entry.is_fake)
+  end
+  if #screens_table == 1 then
+    return entry.primary
+  end
+  return not entry.primary
+end
+
 function update_dynamic_widgets()
   if not screens_table then return end
 
-  -- Find which screen should have the widgets (larger one in fake pairs, or primary)
   local target_screen = nil
   local largest_width = 0
 
-  for name, props in pairs(screens_table) do
-    local dominated_area = false
-    local dominated_by_itself = false
-
-    local dominated_parent_name = nil
-    if props['is_fake'] then
-      dominated_parent_name = props['parent']['name']
-    else
-      for n2, p2 in pairs(screens_table) do
-        if p2['is_fake'] and p2['parent'] and p2['parent']['object'] == props['object'] then
-          dominated_parent_name = n2
-          break
-        end
-      end
-    end
-
-    if dominated_parent_name then
-      -- we have fake screens
-      local dominated_parent_props = screens_table[dominated_parent_name]
-      if props['is_fake'] then
-        dominated_by_itself = props['object'].geometry.width >= props['parent']['object'].geometry.width
-      else
-        dominated_by_itself = props['object'].geometry.width > dominated_parent_props['object'].geometry.width
-      end
-      dominated_area = dominated_by_itself
-    else
-      -- No fake screens: single screen → primary gets it,
-      -- dual physical screens → non-primary gets it
-      local sc = get_total_screen_count(screens_table)
-      dominated_area = (sc == 1) and props['primary'] or not props['primary']
-    end
-
-    if dominated_area and props['object'].geometry.width > largest_width then
-      largest_width = props['object'].geometry.width
+  for _, props in ipairs(screens_table) do
+    -- the screen can be gone already when an output change races the rebuild;
+    -- reading geometry off an invalid screen raises an error
+    if props['object'].valid
+      and hosts_dynamic_widgets(props, screens_table)
+      and props['width'] > largest_width then
+      largest_width = props['width']
       target_screen = props['object']
     end
   end
@@ -382,16 +394,16 @@ mytextclock = wibox.widget{
    format = " %d %b %H:%M (%a) ",
    refresh = 30
 }
-calendarwidget = lain.widget.cal({
-  followtag = true,
-  week_number = "left",
-  attach_to = { mytextclock },
-  notification_preset = {
-    font = beautiful.font_big,
-    fg = beautiful.fg_normal,
-    bg = beautiful.bg_focus
-  }
-})
+-- calendarwidget = lain.widget.cal({
+--   followtag = true,
+--   week_number = "left",
+--   attach_to = { mytextclock },
+--   notification_preset = {
+--     font = beautiful.font_big,
+--     fg = beautiful.fg_normal,
+--     bg = beautiful.bg_focus
+--   }
+-- })
 
 -- change tag names dynamically
 refresh_tag_name = function()
@@ -449,6 +461,15 @@ local function screen_organizer(s, screen_count, primary, is_extra)
 
   debug_print('Now organizing screen: ' .. s['name'], printmore)
 
+  -- This can run several times for the same screen (screen list changes, fake
+  -- screen creation, decoration requests), so drop the previous wibar first.
+  -- Without this every run stacks another wibar on top of the screen.
+  if s['object'].mywibox then
+    s['object'].mywibox:remove()
+    s['object'].mywibox = nil
+  end
+  dynamic_widget_containers[s['object']] = nil
+
   -- Create an imagebox widget which will contain an icon indicating which layout we're using.
   -- We need one layoutbox per screen.
   s['object'].mylayoutbox = awful.widget.layoutbox(s['object'])
@@ -469,6 +490,7 @@ local function screen_organizer(s, screen_count, primary, is_extra)
     taglist_width = dpi(350)
     wibar_height = dpi(23)
   end
+  if not wibar_height or wibar_height == 0 then wibar_height = 24 end
 
   if not is_extra then
     -- Create a taglist widget
@@ -625,89 +647,89 @@ local function screen_organizer(s, screen_count, primary, is_extra)
   end
 end
 
+-- Order the 4 permanent tags get in a taglist, left to right.
+local TAG_ORDER = { web = 1, mail = 2, term = 3, chat = 4 }
+
+-- Tags of the primary screen when there is more than one screen. The others
+-- (web, mail) go to the secondary screen, which on a split ultrawide is the
+-- fake left half.
+local PRIMARY_TAGS = { term = true, chat = true }
+
+-- awful.tag's index is per screen, so the global 1..4 order cannot be assigned
+-- directly: on a two-tag screen index 3 is out of range and silently ignored,
+-- and setting the index of a tag that does not live on the screen awful thinks
+-- it lives on raises "attempt to compare number with nil" inside awful.tag.
+-- So order each screen's own tags by the global preference instead.
+local function order_tags_of(s)
+  local own = {}
+  for _, t in ipairs(s.tags) do
+    table.insert(own, t)
+  end
+  table.sort(own, function(a, b)
+    return (TAG_ORDER[my_utils.get_first_word(a.name)] or 99)
+         < (TAG_ORDER[my_utils.get_first_word(b.name)] or 99)
+  end)
+  for i, t in ipairs(own) do
+    t.index = i
+  end
+end
+
 function place_tags(properties, primary, screens_table)
-  if my_utils.table_length(screens_table) == 1 then
-    -- Only 1 screen here, no need for drama
-    for _, tag in pairs(root.tags()) do
-      table.insert(screens_table[properties['name']]['tags'], tag)
+  local single_screen = #screens_table == 1
+  for _, tag in ipairs(root.tags()) do
+    local first_word = my_utils.get_first_word(tag.name)
+    -- with one screen everything lands there, otherwise term/chat go to the
+    -- primary screen and web/mail to the secondary one
+    if single_screen or (PRIMARY_TAGS[first_word] or false) == primary then
+      table.insert(properties['tags'], tag)
       if tag.screen ~= properties['object'] then
-        tag.screen = properties['object']
+        debug_print('Re-assigning ' .. first_word .. ' to ' .. properties['name'], printmore)
       end
-    end
-  else
-    for _, tag in pairs(root.tags()) do
-      local first_word = my_utils.get_first_word(tag.name)
-      if primary == false and (first_word == 'web' or first_word == 'mail') then
-        if tag.screen ~= properties['object'] then
-          debug_print('Re-assigning ' .. first_word, printmore)
-          tag.screen = properties['object']
-          table.insert(screens_table[properties['name']]['tags'], tag)
-        else
-          debug_print(first_word .. ' is already on correct screen', printmore)
-          table.insert(screens_table[properties['name']]['tags'], tag)
-        end
-      elseif primary == true and (first_word == 'term' or first_word == 'chat') then
-        if tag.screen ~= properties['object'] then
-          debug_print('Re-assigning ' .. first_word, printmore)
-          tag.screen = properties['object']
-          table.insert(screens_table[properties['name']]['tags'], tag)
-        else
-          debug_print(first_word .. ' is already on correct screen', printmore)
-          table.insert(screens_table[properties['name']]['tags'], tag)
-        end
-      end
+      set_tag_screen(tag, properties['object'])
     end
   end
 
-  -- ordering shit
-  for _, tag in pairs(root.tags()) do
-    if tag.name == 'term' then
-      tag.index = 3
-    elseif tag.name == 'mail' then
-      tag.index = 2
-    elseif tag.name == 'web' then
-      tag.index = 1
-    else -- chat
-      tag.index = 4
-    end
-  end
+  order_tags_of(properties['object'])
 end
 
-screens_table = get_screens()
+-- Filled by the first screen rebuild, see schedule_screen_rebuild() below.
+screens_table = {}
 
--- Fucking hacks we have to do
-if get_total_screen_count(screens_table) > 1 then
-  systray_top_margin = dpi(3)
-else
-  systray_top_margin = 0
-end
-my_systray = wibox.container.margin(wibox.widget.systray(), 0 , 0, systray_top_margin, 0)
+my_systray = wibox.container.margin(wibox.widget.systray(), 0, 0, 0, 0)
 
 function process_screens(systray, screens_table, printmore)
 
-  systray = systray or nil
-
   debug_print('Processing screens result: ' .. my_utils.dump(screens_table), printmore)
 
-  local second_screen_already_processed = false
-  for name, properties in pairs(screens_table) do
-    -- In case we have more than 2 screens, we will register first
-    -- non-primary screen as 2nd, others won't get tags.
-    if properties['primary'] then
-      -- this is the "primary" screen so it should have the systray
-      systray.widget:set_screen(properties['object'])
-      screen_organizer(properties, get_total_screen_count(screens_table), true, false, false)
-      debug_print('Checking tags for: ' .. name .. ' (primary) ', printmore)
-      place_tags(properties, true, screens_table)
-    else
-      screen_organizer(properties, get_total_screen_count(screens_table), false, second_screen_already_processed)
-      if second_screen_already_processed then
-        debug_print('Extra screen found: ' .. my_utils.dump(properties['object']), printmore)
-      else
-        debug_print('Checking tags for: ' .. name .. ' (not primary) ', printmore)
-        place_tags(properties, false, screens_table)
-        second_screen_already_processed = true
+  -- forget containers of screens that no longer exist (removed monitor, fake_remove)
+  for scr, _ in pairs(dynamic_widget_containers) do
+    if not scr.valid then
+      dynamic_widget_containers[scr] = nil
+    end
+  end
+
+  local screen_count = #screens_table
+  -- systray icons have to shrink on the smaller wibar of a multi-screen setup
+  systray.top = screen_count > 1 and dpi(3) or 0
+  my_systray.widget:set_base_size(screen_count > 1 and dpi(20) or dpi(24))
+
+  -- Roles come from get_screens(); see assign_roles() there.
+  for _, properties in ipairs(screens_table) do
+    -- skip screens that died between building the table and now
+    if properties['object'].valid then
+      local role = properties['role']
+
+      debug_print('Screen ' .. properties['name'] .. ' is ' .. tostring(role), printmore)
+      if role == 'primary' then
+        -- the primary screen carries the systray
+        systray.widget:set_screen(properties['object'])
       end
+      screen_organizer(properties, screen_count, role == 'primary', role == 'extra')
+      if role ~= 'extra' then
+        place_tags(properties, role == 'primary', screens_table)
+      end
+    else
+      debug_print('Skipping gone screen: ' .. properties['name'], printmore)
     end
   end
   -- define rules since we have filled the screen table
@@ -715,7 +737,7 @@ function process_screens(systray, screens_table, printmore)
 
   clientkeys, globalkeys = set_keys_after_screen_new(clientkeys, globalkeys, screens_table, printmore)
   dofile(config_path .. "my_modules/rc_clientbuttons.lua")
-  root.keys(globalkeys)
+  root.keys = globalkeys
   set_rules(clientkeys)
 
   -- Set initial spotify placement based on screen sizes
@@ -794,8 +816,10 @@ globalkeys = gears.table.join(
     end
     my_dropdown:toggle()
   end),
-  awful.key({              }, "Print",                 nil, function() awful.spawn("flameshot gui") end),
-  awful.key({ "Shift"      }, "Print",                      function() awful.spawn("flameshot full -c") end),
+  -- flameshot has no working Wayland capture path, but somewm can take the
+  -- screenshot itself. No clipboard copy here: that would need wl-clipboard.
+  awful.key({              }, "Print",                 nil, function() screenshot('interactive') end),
+  awful.key({ "Shift"      }, "Print",                      function() screenshot('save') end),
   awful.key({ ctrl         }, "space",                      function() awful.spawn(rofi_cmd) end),
   awful.key({              }, "F9",                    nil, function() awful.spawn(rofi_emoji_cmd) end),
   awful.key({ ctrl         }, "F9",                    nil, function() awful.spawn(rofi_calc_cmd) end),
@@ -846,12 +870,23 @@ end
 -- needed for capslock helper
 gears.table.merge(globalkeys, capslock.possible_combinations)
 
+-- Put a new client at the end of the tiling order instead of making it the
+-- master. somewm has no awful.client.setslave, so swap it past every other
+-- tiled client on its tag, which ends up in the same place.
+local function set_slave(c)
+  for _, other in ipairs(awful.client.tiled(c.screen)) do
+    if other ~= c then
+      c:swap(other)
+    end
+  end
+end
+
 -- Signal function to execute when a new client appears.
-client.connect_signal("manage", function (c)
+client.connect_signal("request::manage", function (c)
   refresh_tag_name()
-  -- Set the windows at the slave,
-  -- i.e. put it at the end of others instead of setting it master.
-  if not awesome.startup then awful.client.setslave(c) end
+  if not awesome.startup and not c.floating then
+    set_slave(c)
+  end
 
   if awesome.startup
     and not c.size_hints.user_position
@@ -908,63 +943,195 @@ client.connect_signal('focus', function(c)
 end)
 
 -- Screen handling
-local screen_change_in_progress = false
-local screen_change_timer = nil
+--
+-- Every output change produces a burst of signals: `list`, one
+-- `request::desktop_decoration` per screen (including the ones the split
+-- creates), plus the somewm-specific `output` class signals. They all funnel
+-- into a single debounced rebuild; running one rebuild per signal stacks
+-- duplicate wibars and re-shuffles the tags several times per change.
+local REBUILD_DELAY = 0.5
 
-screen.connect_signal('list', function()
-  debug_print('List signal received', printmore)
+screen_rebuild_timer = nil  -- global: a local upvalue timer can be collected
+local screen_rebuild_running = false
+local initial_tags_loaded = false
 
-  if screen_change_in_progress then
-    debug_print('Screen change already in progress, skipping this signal', printmore)
+-- Geometry of all screens as of the last completed rebuild, so a rebuild that
+-- would change nothing can be skipped.
+local last_rebuilt_signature = nil
+
+function screen_signature()
+  local parts = {}
+  for _, s in ipairs(all_screens()) do
+    local geo = s.geometry
+    -- A fake half has no output of its own, and get_output_name() would fall
+    -- back to its index, which shifts around when screens are added or removed.
+    -- Identify it by the output it was split off instead, so the signature also
+    -- changes when a fake screen is orphaned.
+    local id = s.split_parent_output and ('fake@' .. s.split_parent_output)
+               or get_output_name(s)
+    table.insert(parts, string.format('%s:%dx%d+%d+%d',
+      id, geo.width, geo.height, geo.x, geo.y))
+  end
+  table.sort(parts)
+  return table.concat(parts, ' ')
+end
+
+function schedule_screen_rebuild(reason)
+  debug_print('Screen rebuild requested (' .. tostring(reason) .. ')', printmore)
+
+  -- fake_add()/fake_resize() emit screen signals synchronously from inside the
+  -- rebuild, ignore those instead of recursing
+  if screen_rebuild_running or screen_split_in_progress() then
+    debug_print('Screen rebuild already running, ignoring', printmore)
     return
   end
 
-  screen_change_in_progress = true
-  debug_print('Starting screen change timer (2 secs)', printmore)
+  if not screen_rebuild_timer then
+    screen_rebuild_timer = gears.timer({
+      timeout     = REBUILD_DELAY,
+      single_shot = true,
+      callback    = do_screen_rebuild,
+    })
+  end
+  -- restart on every request, so a burst collapses into one run
+  screen_rebuild_timer:again()
+end
 
-  -- Cancel any existing timer
-  if screen_change_timer then
-    screen_change_timer:stop()
+function do_screen_rebuild()
+  if screen_rebuild_running then
+    debug_print('Screen rebuild re-entered, ignoring', printmore)
+    return
   end
 
-  screen_change_timer = gears.timer.start_new(2, function()
-    screens_table = get_screens()
+  local signature = screen_signature()
+  if signature == last_rebuilt_signature then
+    debug_print('Screen rebuild skipped, outputs unchanged: ' .. signature, printmore)
+    return
+  end
+  debug_print('Screen rebuild starting', printmore)
 
-    -- Reconfigure systray size when screens change
-    debug_print('Total screen count after screen change: ' .. get_total_screen_count(screens_table), printmore)
-    if get_total_screen_count(screens_table) > 1 then
-      my_systray.widget:set_base_size(dpi(20))
-    else
-      my_systray.widget:set_base_size(dpi(24))
-    end
+  screen_rebuild_running = true
+  -- Everything in here runs under pcall: get_screens() adds and removes fake
+  -- screens and awful's handlers for that can throw (e.g. awful.tag's
+  -- relocation when a screen disappears). An error escaping here used to leave
+  -- screen_rebuild_running set, and every later rebuild request was then
+  -- silently dropped for the rest of the session: no wibars, no tags, stale
+  -- layout, and tags left pointing at destroyed screens.
+  local ok, err = pcall(function()
+    local screens = get_screens()
+    if screens then screens_table = screens end
 
     process_screens(my_systray, screens_table, printmore)
 
-    screen_change_in_progress = false
-    screen_change_timer = nil
-    return false  -- don't repeat
+    -- Tag restore needs the tags already placed on their screens, so it runs
+    -- after the first rebuild, not at the end of rc.lua. Only once: later
+    -- rebuilds would throw away whatever tags are currently in view.
+    if not initial_tags_loaded and #screens_table > 0 then
+      initial_tags_loaded = true
+      load_last_active_tags(screens_table, printmore)
+    end
   end)
-end)
+  screen_rebuild_running = false
 
--- Configure systray size based on total screen count (including fake screens)
-debug_print('Total screen count: ' .. get_total_screen_count(screens_table), printmore)
-if get_total_screen_count(screens_table) > 1 then
-  my_systray.widget:set_base_size(dpi(20))
-else
-  my_systray.widget:set_base_size(dpi(24))
-end
-
-process_screens(my_systray, screens_table, printmore)
-
-tag.connect_signal('request::screen', function(t)
-  -- recover tags on a removed screen
-  naughty.notification({ text = 'Recovering tag: ' .. t.name })
-  for s in screen do
-    t.screen = s
-    my_dropdown.screen = s
-    my_dropdown.visible = false
+  if not ok then
+    debug_print('Screen rebuild FAILED: ' .. tostring(err), true)
+    -- do not record the signature, so the next request retries instead of
+    -- deciding there is nothing to do
     return
   end
+
+  -- signature of what we actually ended up with (the split changed it)
+  last_rebuilt_signature = screen_signature()
+  debug_print('Screen rebuild done, outputs: ' .. last_rebuilt_signature, printmore)
+end
+
+screen.connect_signal('list', function()
+  schedule_screen_rebuild('list signal')
+end)
+
+screen.connect_signal('request::desktop_decoration', function(s)
+  schedule_screen_rebuild('desktop decoration for ' .. tostring(s))
+end)
+
+-- Output changes are also announced on the output class, which is somewm
+-- specific. Cheap to listen to and independent of the screen class signals.
+if output and output.connect_signal then
+  for _, signal_name in ipairs({ 'added', 'removed' }) do
+    output.connect_signal(signal_name, function(o)
+      schedule_screen_rebuild('output ' .. signal_name .. ' ' .. tostring(o))
+    end)
+  end
+end
+
+-- Safety net for output changes that produce no signal we listen to (mode
+-- changes, DPMS wake). Cheap: it only compares geometry strings.
+screen_watch_timer = gears.timer({
+  timeout = 5,
+  autostart = true,
+  callback = function()
+    if screen_rebuild_running or screen_split_in_progress() then return end
+    if screen_signature() == last_rebuilt_signature then return end
+    schedule_screen_rebuild('screen watcher')
+  end,
+})
+
+-- First rebuild. Synchronous, so the session has wibars and tags before the
+-- startup applications show up.
+-- screen.count(), not #screen: somewm's screen module has no __len metamethod,
+-- so the length operator always reports 0 and this would never run.
+if screen.count() > 0 then
+  debug_print('Initial screen setup for ' .. screen.count() .. ' screens', printmore)
+  do_screen_rebuild()
+end
+
+-- Recover a tag whose screen is being removed.
+--
+-- This has to succeed no matter what: a tag left on a destroyed screen makes
+-- every later client rule fail with "invalid object" (ruled.client assigns
+-- c.screen = tag.screen), and the tag is unreachable until the next restart.
+-- So it is deliberately dumb, guarded, and does not depend on anything else in
+-- the config being in a sane state at that moment.
+tag.connect_signal('request::screen', function(t)
+  local target = nil
+  for _, s in ipairs(all_screens()) do
+    -- not the screen going away, and not a fake half of it either
+    if s.valid and s ~= t.screen then
+      target = s
+      break
+    end
+  end
+  if not target then
+    debug_print('request::screen: no screen left to recover ' .. tostring(t.name), true)
+    return
+  end
+
+  debug_print('request::screen: recovering ' .. tostring(t.name) .. ' onto ' ..
+    get_output_name(target), true)
+  set_tag_screen(t, target)
+
+  -- the dropdown terminal follows, it is bound to a screen too
+  if my_dropdown then
+    my_dropdown.screen = target
+    my_dropdown.visible = false
+  end
+end)
+
+-- A removed screen also invalidates the wibar and the widget container we keep
+-- per screen, and it needs a rebuild to reassign roles and tags. The `list`
+-- signal covers the rebuild, this only drops the stale references early so
+-- nothing reads them in between.
+screen.connect_signal('removed', function(s)
+  dynamic_widget_containers[s] = nil
+  schedule_screen_rebuild('screen removed')
+end)
+
+-- A mode change (loose/wlr-randr) does not add or remove a screen, so `list`
+-- never fires, but it does invalidate a split: somewm drops the fake_resize
+-- override and gives the real screen its full geometry back, leaving the fake
+-- half overlapping it (objects/screen.c:721). Rebuild so the pair is repaired.
+screen.connect_signal('property::geometry', function(s)
+  if screen_split_in_progress() then return end
+  schedule_screen_rebuild('geometry change on ' .. tostring(get_output_name(s)))
 end)
 
 -- I only need 2 of these though 😬 max, tile or bust.
@@ -1084,35 +1251,35 @@ end)
 -- Git version workaround, shit is not complete (e.g. slack does not switch to)
 -- alerting chat etc. but at least hovers the app itself
 -- https://github.com/awesomeWM/awesome/issues/3182 waiting for proper fix
-naughty.connect_signal('destroyed', function(n, reason)
-  local client_to_jump = nil
-  if reason == require('naughty.constants').notification_closed_reason.dismissed_by_user then
-    if n.clients then
-      -- notification thingy (maybe) gave us some client names, use them
-      for _, notification_client in ipairs(n.clients) do
-        if not notification_client then
-          -- Means this is nothingburger
-          goto noclient
-        end
-        client_to_jump = notification_client
-        debug_print('Jumping to notification-client: ' .. client_to_jump.name, printmore)
-        break
-        ::noclient::
-      end
-    else
-      -- no notification client is here
-      -- we will just assume when we clicked the pop-up, we have created
-      -- an urgent client. So we will be optimistic, will just jump to it
-      client_to_jump = get_latest_urgent_client()
-      debug_print('Jumping to latest urgent one: ' .. client_to_jump.name, printmore)
-    end
-  end
-  if client_to_jump then
-    local x, y, prev_scr = save_mouse_location()
-    client_to_jump:jump_to()
-    restore_mouse_location(x, y, prev_scr, printmore, true)
-  end
-end)
+-- naughty.connect_signal('destroyed', function(n, reason)
+--   local client_to_jump = nil
+--   if reason == require('naughty.constants').notification_closed_reason.dismissed_by_user then
+--     if n.clients then
+--       -- notification thingy (maybe) gave us some client names, use them
+--       for _, notification_client in ipairs(n.clients) do
+--         if not notification_client then
+--           -- Means this is nothingburger
+--           goto noclient
+--         end
+--         client_to_jump = notification_client
+--         debug_print('Jumping to notification-client: ' .. client_to_jump.name, printmore)
+--         break
+--         ::noclient::
+--       end
+--     else
+--       -- no notification client is here
+--       -- we will just assume when we clicked the pop-up, we have created
+--       -- an urgent client. So we will be optimistic, will just jump to it
+--       client_to_jump = get_latest_urgent_client()
+--       debug_print('Jumping to latest urgent one: ' .. client_to_jump.name, printmore)
+--     end
+--   end
+--   if client_to_jump then
+--     local x, y, prev_scr = save_mouse_location()
+--     client_to_jump:jump_to()
+--     restore_mouse_location(x, y, prev_scr, printmore, true)
+--   end
+-- end)
 
 client.connect_signal('property::urgent', function(c)
     if c.urgent then
@@ -1164,9 +1331,9 @@ end)
 awesome.connect_signal('startup', function(s, state)
   run_once('sleep 3 && firefox', 'firefox')
   -- only makes sense on this laptop
-  if ( hostname == 'splinter' ) then
-    run_once('sleep 5 && slack -s', 'slack')
-  end
+  -- if ( hostname == 'splinter' ) then
+    -- run_once('sleep 5 && slack -s', 'slack')
+  -- end
   -- on-screen keyboard
   if ( hostname == 'bebop' ) then
     run_once('onboard')
@@ -1176,24 +1343,26 @@ awesome.connect_signal('startup', function(s, state)
   run_once('pasystray')
   run_once("wezterm-mux-server --daemonize", "wezterm-mux-server")
   run_once("wezterm connect default --class mainqterm", "mainqterm", "term")
-  run_once('picom')
+  -- run_once('picom')
 
   -- standard alt+tab
-  run_once(
-    'alttab -w 1 -t 400x300 -frame "'
-      .. string.upper(beautiful.fg_normal)
-      .. '" -i 100x100 -font xft:firacode-20',
-      '400x300'
-  )
-  -- Alt+Tab for switching all windows
-  run_once(
-    'alttab -w 1 -t 250x100 -frame "'
-      .. string.upper(beautiful.fg_normal)
-      .. '" -d 1 -kk 0x1008ff49 -mk Super_L -i 50x50 -font xft:firacode-10 -vertical -p none',
-    '0x1008ff49'
-  )
+  -- run_once(
+  --   'alttab -w 1 -t 400x300 -frame "'
+  --     .. string.upper(beautiful.fg_normal)
+  --     .. '" -i 100x100 -font xft:firacode-20',
+  --     '400x300'
+  -- )
+  -- -- Alt+Tab for switching all windows
+  -- run_once(
+  --   'alttab -w 1 -t 250x100 -frame "'
+  --     .. string.upper(beautiful.fg_normal)
+  --     .. '" -d 1 -kk 0x1008ff49 -mk Super_L -i 50x50 -font xft:firacode-10 -vertical -p none',
+  --   '0x1008ff49'
+  -- )
 end)
 
 debug_print("Last state of the screens table is: \n" .. my_utils.dump(screens_table), printmore)
-load_last_active_tags(screens_table, printmore)
+-- load_last_active_tags() runs from schedule_screen_rebuild() instead: the
+-- screens are processed from a timer now, so at this point no tag has been
+-- placed on a screen yet and the restore would have nothing to work with.
 -- vim: set ts=2 sw=2 tw=0 :
