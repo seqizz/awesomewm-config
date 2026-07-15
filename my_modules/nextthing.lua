@@ -66,7 +66,7 @@ function nextthingwidget:set(thing, exists)
     right_image_base:set_image(nil)
   end
 
-  nextthingtext:set_markup_silently(awful.util.escape(thing))
+  nextthingtext:set_markup_silently(thing:gsub('&', '&amp;'):gsub('<', '&lt;'):gsub('>', '&gt;'))
 end
 
 function nextthingwidget:check()

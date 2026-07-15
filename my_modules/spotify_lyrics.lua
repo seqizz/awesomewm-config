@@ -454,7 +454,7 @@ end
 
 local function update_display()
   if state.lyrics_paused then
-    lyrictext:set_markup_silently(' ' .. awful.util.escape('(lyrics paused)'))
+    lyrictext:set_markup_silently(' ' .. '(lyrics paused)')
     return
   end
 
@@ -464,7 +464,7 @@ local function update_display()
       -- no lyrics available for this track (fetch completed, confirmed missing)
       display_text = '(no lyrics)'
     end
-    lyrictext:set_markup_silently(' ' .. awful.util.escape(display_text))
+    lyrictext:set_markup_silently(' ' .. display_text)
     lyrics_tooltip.text = state.artist ~= '' and (state.artist .. ' - ' .. state.title) or ''
     return
   end
@@ -472,7 +472,7 @@ local function update_display()
   local current = find_current_line(state.lines, state.position)
   local line_text = current and current.text or CONFIG.no_lyric_text
   state.current_line_text = line_text
-  lyrictext:set_markup_silently(' ' .. awful.util.escape(line_text))
+  lyrictext:set_markup_silently(' ' .. line_text:gsub('&', '&amp;'):gsub('<', '&lt;'):gsub('>', '&gt;'))
 
   -- tooltip: artist - title + next line preview
   local tip = state.artist .. ' - ' .. state.title
@@ -633,7 +633,7 @@ end
 
 -- ─── click handlers ───────────────────────────────────────────────────────────
 local spotify_main = require('my_modules/spotify')
-lyrics_widget:buttons(awful.util.table.join(
+lyrics_widget:buttons(gears.table.join(
   awful.button({}, 2, function() -- middle click: toggle lyrics pause
     state.lyrics_paused = not state.lyrics_paused
     update_display()

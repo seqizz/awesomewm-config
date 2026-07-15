@@ -62,7 +62,7 @@ function psiwidget:check()
   })
 end
 
-psiwidget:buttons(awful.util.table.join(
+psiwidget:buttons(gears.table.join(
   -- Update PSI widget with click, if we're not patient enough
   awful.button({}, 1, function() psiwidget:check() end)
 ))

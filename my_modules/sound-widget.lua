@@ -139,7 +139,7 @@ function refresh_sound_popup()
 
         -- Mouse click handler
         row:buttons(
-            awful.util.table.join(
+            gears.table.join(
                 awful.button({}, 1, function()
                     sound_popup.visible = not sound_popup.visible
                     awful.spawn.with_shell('paoutput -s ' .. item)
@@ -158,7 +158,7 @@ end
 
 refresh_sound_popup()
 
-volume_widget.widget:buttons(awful.util.table.join(
+volume_widget.widget:buttons(gears.table.join(
     awful.button({}, 1, function()
         if sound_popup.visible then
             sound_popup.visible = not sound_popup.visible

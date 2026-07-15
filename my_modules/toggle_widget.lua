@@ -158,7 +158,7 @@ local function create_toggle_widget(opts)
   widget:check()
 
   -- Left click to toggle
-  widget:buttons(awful.util.table.join(
+  widget:buttons(gears.table.join(
     awful.button({}, 1, function()
       widget:toggle()
     end)

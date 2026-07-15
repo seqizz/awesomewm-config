@@ -46,7 +46,7 @@ function spotifywidget:set(state, is_playing)
     spotifyimage:set_image(gears.color.recolor_image(my_theme.music_icon_paused, my_theme.fg_normal))
   end
 
-  spotifytext.widget:set_markup_silently(' ' .. awful.util.escape(state))
+  spotifytext.widget:set_markup_silently(' ' .. state)
 end
 
 _raise_tag_of_client = function(c)
@@ -183,7 +183,7 @@ end
 set_visible(false)
 start_follow()
 
-spotifywidget:buttons(awful.util.table.join(
+spotifywidget:buttons(gears.table.join(
   awful.button({}, 1, function() -- left click
     fn_process_action('media', 'pausetoggle', 'spotify')
     spotifywidget:check()
