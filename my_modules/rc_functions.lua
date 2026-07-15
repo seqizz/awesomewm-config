@@ -27,7 +27,7 @@ function suspend_toggle(c)
       c.border_color = beautiful.border_normal
       c.border_width = beautiful.border_width
       c.opacity = 1
-      naughty.notify {
+      naughty.notification {
         text = "waking up client: " .. c.class .. " (" .. c.pid .. ")"
       }
       awful.spawn("kill -18 " .. c.pid)
@@ -36,7 +36,7 @@ function suspend_toggle(c)
       c.border_color = '#ff0000'
       c.border_width = 10
       c.opacity = 0.8
-      naughty.notify {
+      naughty.notification {
         text = "suspending client: " .. c.class .. " (" .. c.pid .. ")"
       }
       awful.spawn("kill -19 " .. c.pid)
@@ -77,13 +77,13 @@ function sticky_toggle(c)
     c.ontop = true
     c.sticky = true
   end
-  naughty.notify {
+  naughty.notification {
     text = "Sticky set to " .. tostring(c.sticky)
   }
 end
 
 function float_toggle(c)
-  awful.client.floating.toggle()
+  c.floating = not c.floating
   if c.floating then
     c.ontop = true
     c.sticky = true
@@ -268,7 +268,8 @@ end
 
 function switch_to_tag(tag_name, printmore)
   debug_print('switch_to_tag: Switching to tag ' .. tag_name, printmore)
-  t = find_tag_by_first_word(tag_name, printmore)
+  local t = find_tag_by_first_word(tag_name, printmore)
+  if not t then return end
   awful.tag.viewmore({t}, t.screen)
   awful.screen.focus(t.screen)
   -- Shoo any lingering Thunderbird tooltip windows (they bypass WM) buggy as fuck
@@ -394,7 +395,7 @@ function hide_stickies()
   end
   if my_utils.table_length(stickies) == 0 then
     -- no sticky found
-    naughty.notify {text = "Can't find a damn sticky window", timeout = 1}
+    naughty.notification {text = "Can't find a damn sticky window", timeout = 1}
     return
   end
   for idx, c in ipairs(stickies) do
@@ -432,7 +433,7 @@ function run_once(program, grep_for, on_tag)
     "pgrep -f " .. grep_for,
     function(stdout, stderr, reason, exit_code)
       if exit_code ~= 0 then
-        naughty.notify { text = "starting " .. program .. " once" }
+        naughty.notification { text = "starting " .. program .. " once" }
         if on_tag ~= nil then
           awful.spawn.with_shell(program, {tag = on_tag})
         else
@@ -700,6 +701,25 @@ end
 
 
 function get_screens()
+  if awesome.release == "somewm" then
+    local output_tbl = {}
+    for s in screen do
+      local name = s.outputs and next(s.outputs) or "screen"
+      local geo = s.geometry
+      local key = name .. "_" .. geo.width .. "x" .. geo.height
+      output_tbl[key] = {
+        name    = key,
+        primary = (s == screen.primary),
+        width   = geo.width,
+        height  = geo.height,
+        object  = s,
+        parent  = nil,
+        tags    = {},
+      }
+    end
+    return output_tbl
+  end
+
   local output_tbl = {}
   local xrandr = io.popen("xrandr -q --current | grep -E ' connected (primary )?[0-9]'")
 
