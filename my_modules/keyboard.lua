@@ -1,4 +1,5 @@
 local awful = require("awful")
+local gears = require("gears")
 local wibox = require("wibox")
 local my_utils = require('my_modules/my_utils')
 local my_theme = require('my_modules/my_theme')
@@ -80,7 +81,7 @@ end
 
 keyboardwidget:check()
 
-keyboardwidget:buttons(awful.util.table.join(
+keyboardwidget:buttons(gears.table.join(
   awful.button({}, 1, function() -- left click
       keyboardwidget:toggle()
   end)

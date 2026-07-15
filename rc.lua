@@ -378,7 +378,7 @@ battery_widget = wibox.widget({
   battery_widget_text,
   layout = wibox.layout.fixed.horizontal,
 })
-battery_widget:buttons(awful.util.table.join(
+battery_widget:buttons(gears.table.join(
   -- Update battery widget with click, if we're not patient enough
   awful.button({}, 1, function() battery_widget_text:update() end)
 ))
@@ -980,7 +980,7 @@ process_screens(my_systray, screens_table, printmore)
 
 tag.connect_signal('request::screen', function(t)
   -- recover tags on a removed screen
-  naughty.notify({ text = 'Recovering tag: ' .. t.name })
+  naughty.notification({ text = 'Recovering tag: ' .. t.name })
   for s in screen do
     t.screen = s
     my_dropdown.screen = s
@@ -1174,7 +1174,7 @@ end)
 
 -- When switching to a tag with urgent clients, raise them.
 awful.tag.attached_connect_signal(s, 'property::selected', function()
-  local urgent_clients = function(c) return awful.rules.match(c, { urgent = true }) end
+  local urgent_clients = function(c) return c.urgent end
   for c in awful.client.iterate(urgent_clients) do
     if c.first_tag == mouse.screen.selected_tag then
       client.focus = c
