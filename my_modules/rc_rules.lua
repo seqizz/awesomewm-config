@@ -1,5 +1,6 @@
 local awful = require('awful')
 local beautiful = require('beautiful')
+local ruled = require('ruled.client')
 local my_utils = require('my_modules/my_utils')
 local xresources = require('beautiful.xresources')
 local dpi = xresources.apply_dpi
@@ -22,7 +23,8 @@ local safe_no_overlap = setmetatable(
 function set_rules(clientkeys)
   -- {{{ Rules
   -- Rules to apply to new clients (through the "manage" signal).
-  awful.rules.rules = {
+  ruled.append_rules {
+
     -- All clients will match this rule.
     {
       rule = {},
@@ -243,16 +245,17 @@ function set_rules(clientkeys)
         class = {
           'Slack',
           'TelegramDesktop',
+          'org.telegram.desktop',
           'Microsoft Teams - Preview',
           'discord',
           '.zoom ',
         },
+        name = {
+          'Zoom - Free Account',
+        },
       },
       except = {
         name = 'Media viewer',
-      },
-      name_any = {
-        'Zoom - Free Account',
       },
       properties = {
         tag = awful.tag.find_by_name(nil, 'chat'),
@@ -277,6 +280,17 @@ function set_rules(clientkeys)
         tag = awful.tag.find_by_name(nil, 'mail'),
         maximized = true,
       },
+    },
+
+    -- Disable shadows on specific clients (same as picom rules)
+    {
+      id = "compositor_no_shadow",
+      rule_any = {
+        class = { "firefox", "thunderbird", "TelegramDesktop", "org.telegram.desktop" },
+        type  = { "menu", "dropdown_menu", "popup_menu" },
+        name  = { "", },
+      },
+      properties = { shadow = false },
     },
   }
 end
