@@ -1,5 +1,6 @@
 local awful = require('awful')
 local beautiful = require('beautiful')
+local gears = require('gears')
 local ruled = require('ruled.client')
 local my_utils = require('my_modules/my_utils')
 local xresources = require('beautiful.xresources')
@@ -40,6 +41,19 @@ function set_rules(clientkeys)
         maximized_vertical = false,
         maximized = false,
         placement = safe_no_overlap + awful.placement.no_offscreen,
+        -- Chamfered (cut) top corners only, bottom stays square. No builtin for
+        -- this, so hand-draw the cairo path. Set picom corner-radius = 0 or it
+        -- re-rounds over this shape.
+        shape = function(cr, w, h)
+          local s = dpi(12) -- cut size
+          cr:move_to(s, 0)
+          cr:line_to(w - s, 0)
+          cr:line_to(w, s)
+          cr:line_to(w, h)
+          cr:line_to(0, h)
+          cr:line_to(0, s)
+          cr:close_path()
+        end,
       },
     },
     -- Floating clients.
