@@ -903,6 +903,22 @@ end)
 client.connect_signal("property::fullscreen", function(c)
   if c.class == "TelegramDesktop" and c.name == "Media viewer" and c.fullscreen then
     c.fullscreen = false
+    return
+  end
+  -- Remove cut corners in fullscreen, restore when leaving
+  if c.fullscreen then
+    c.shape = gears.shape.rectangle
+  else
+    local s = dpi(12)
+    c.shape = function(cr, w, h)
+      cr:move_to(s, 0)
+      cr:line_to(w - s, 0)
+      cr:line_to(w, s)
+      cr:line_to(w, h)
+      cr:line_to(0, h)
+      cr:line_to(0, s)
+      cr:close_path()
+    end
   end
 end)
 
