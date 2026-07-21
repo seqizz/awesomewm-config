@@ -19,18 +19,13 @@ local spotifytext = wibox.widget({
   },
 })
 
-local spotifyimage = wibox.widget({
-  resize = true,
-  widget = wibox.widget.imagebox,
+-- inner imagebox (for :set_image) + lifted container (for the layout);
+-- lift = 1px bottom margin to match visually
+local spotifyimage, spotifyimage_lifted = my_utils.svg_icon({
+  image = my_theme.music_icon,
+  size = dpi(25),
+  color = my_theme.fg_normal,
 })
-
-local spotifyimage_lifted = wibox.container.margin(
-  spotifyimage,
-  nil,
-  nil,
-  nil,
-  dpi(2) -- bottom margin to match visually
-)
 
 local spotifywidget = wibox.widget({
   spotifyimage_lifted,
@@ -40,16 +35,18 @@ local spotifywidget = wibox.widget({
 
 -- set text of spotify widget
 function spotifywidget:set(state, is_playing)
+  -- Do not use gears.color.recolor_image() here: it rasterizes the SVG first,
+  -- then imagebox scales that raster, which can look terrible.
   if is_playing then
-    spotifyimage:set_image(gears.color.recolor_image(my_theme.music_icon, my_theme.fg_normal))
+    spotifyimage:set_image(my_theme.music_icon)
   else
-    spotifyimage:set_image(gears.color.recolor_image(my_theme.music_icon_paused, my_theme.fg_normal))
+    spotifyimage:set_image(my_theme.music_icon_paused)
   end
 
   spotifytext.widget:set_markup_silently(' ' .. state)
 end
 
-_raise_tag_of_client = function(c)
+local _raise_tag_of_client = function(c)
   local tags = root.tags()
   for _, t in ipairs(tags) do
     if my_utils.table_contains(t:clients(), c, false) then
@@ -82,26 +79,32 @@ end
 -- track/status change instead of polling+forking every 15s. The follower is the
 -- single source of truth for widget state.
 local follow_pid = nil
+
 -- ASCII Unit Separator (0x1f): never appears in a track title, so it is a safe
 -- field delimiter between status and title in the playerctl format template.
 local SEP = '\31'
 
-local debug = false       -- flip to true to trace the playerctl follow stream
+local debug = false -- flip to true to trace the playerctl follow stream
+
 -- debug print: fires on the module-local flag OR the global printmore master switch
 local function dbg(msg)
-  if debug or printmore then debug_print(msg, true) end
+  if debug or printmore then
+    debug_print(msg, true)
+  end
 end
 
 local visible_state = nil -- last emitted visibility, so we only signal on change
-local hide_timer = nil    -- debounces hiding to ride out transient empty lines
-local last_title = ''     -- keep song text stable across empty-metadata blips
+local hide_timer = nil -- debounces hiding to ride out transient empty lines
+local last_title = '' -- keep song text stable across empty-metadata blips
 
 -- Emit the visibility signal only when it actually changes. Spotify pushes many
 -- property updates while playing; re-signalling every time makes the widget flicker.
 local function set_visible(v)
-  if visible_state == v then return end
+  if visible_state == v then
+    return
+  end
   visible_state = v
-  awesome.emit_signal("widget::spotify::visible", v)
+  awesome.emit_signal('widget::spotify::visible', v)
 end
 
 local function cancel_hide()
@@ -114,6 +117,7 @@ end
 local function apply_line(line)
   local sep = line:find(SEP, 1, true)
   local status, title
+
   if sep then
     status = line:sub(1, sep - 1)
     title = line:sub(sep + 1)
@@ -140,10 +144,15 @@ local function apply_line(line)
   end
 
   cancel_hide()
+
   -- metadata can momentarily arrive empty mid-track; reuse the last good title
-  if title ~= '' then last_title = title end
+  if title ~= '' then
+    last_title = title
+  end
+
   -- keep the previous semantics: only 'Paused' shows the paused icon
   local is_playing = status ~= 'Paused'
+
   spotifywidget:set(last_title, is_playing)
   spotifywidget.forced_width = nil
   set_visible(true)
@@ -152,31 +161,47 @@ end
 local function start_follow()
   -- argv table (no shell), so the 0x1f delimiter and titles pass through verbatim.
   -- NOTE: `metadata` is the required subcommand; --follow makes it stream.
-  local cmd = { 'playerctl', '-p', 'spotify', 'metadata', '--follow',
-                '--format', '{{status}}' .. SEP .. '{{title}}' }
+  local cmd = {
+    'playerctl',
+    '-p',
+    'spotify',
+    'metadata',
+    '--follow',
+    '--format',
+    '{{status}}' .. SEP .. '{{title}}',
+  }
+
   dbg('[spotify] start_follow: ' .. table.concat(cmd, ' '))
+
   follow_pid = awful.spawn.with_line_callback(cmd, {
     stdout = function(line)
       dbg('[spotify] stdout: [' .. line .. ']')
       apply_line(line)
     end,
-    stderr = function(line)
-      dbg('[spotify] stderr: [' .. line .. ']')
-    end,
+
+    stderr = function(line) dbg('[spotify] stderr: [' .. line .. ']') end,
+
     exit = function(reason, code)
       dbg('[spotify] exit: ' .. tostring(reason) .. ' ' .. tostring(code))
       follow_pid = nil
+
       -- playerctl exits if the dbus session drops; respawn after a short delay
-      gears.timer.start_new(2, function() start_follow() return false end)
+      gears.timer.start_new(2, function()
+        start_follow()
+        return false
+      end)
     end,
   })
+
   dbg('[spotify] follow_pid = ' .. tostring(follow_pid))
 end
 
 -- Cheap idempotent nudge: media keybindings/buttons call this to guarantee the
 -- follower is alive. Track/status updates themselves arrive via --follow.
 function spotifywidget:check()
-  if not follow_pid then start_follow() end
+  if not follow_pid then
+    start_follow()
+  end
 end
 
 -- Start hidden; the follower reveals the widget once spotify appears.
@@ -188,16 +213,20 @@ spotifywidget:buttons(gears.table.join(
     fn_process_action('media', 'pausetoggle', 'spotify')
     spotifywidget:check()
   end),
+
   awful.button({}, 2, function() -- middle click
     awful.spawn('systemctl --user restart updatesong.service')
   end),
+
   awful.button({}, 3, function() -- right click
     spotifywidget:raise_toggle()
   end),
+
   awful.button({}, 4, function() -- scroll up
     fn_process_action('media', 'previous', 'spotify')
     spotifywidget:check()
   end),
+
   awful.button({}, 5, function() -- scroll down
     fn_process_action('media', 'next', 'spotify')
     spotifywidget:check()

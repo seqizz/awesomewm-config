@@ -92,6 +92,30 @@ local lyrics_widget = wibox.widget({
   width = CONFIG.max_width,
 })
 
+-- paused indicator: show lyrics.svg icon instead of "(lyrics paused)" text.
+-- right-aligned via a place container to match lyrictext's align = 'right'.
+local paused_icon = my_utils.svg_icon({
+  image = my_theme.lyrics_icon,
+  size = dpi(25),
+  color = my_theme.fg_normal,
+})
+local paused_widget = wibox.widget({
+  paused_icon,
+  halign = 'right',
+  valign = 'center',
+  widget = wibox.container.place,
+})
+
+-- swap the constraint's child, only when it actually changes (update_display
+-- runs every tick, so avoid needless relayouts)
+local current_child = lyrictext
+local function show_child(w)
+  if current_child ~= w then
+    lyrics_widget:set_widget(w)
+    current_child = w
+  end
+end
+
 -- no-op tooltip stub (keeps rest of code simple, just discards text)
 local lyrics_tooltip = { text = '' }
 
@@ -454,9 +478,10 @@ end
 
 local function update_display()
   if state.lyrics_paused then
-    lyrictext:set_markup_silently(' ' .. '(lyrics paused)')
+    show_child(paused_widget)
     return
   end
+  show_child(lyrictext)
 
   if state.status == 'Stopped' or not state.lines then
     local display_text = CONFIG.no_lyric_text
