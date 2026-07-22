@@ -324,64 +324,9 @@ function update_dynamic_widgets()
   end
 end
 
-adapter_name = "BAT0"
-if my_utils.file_exists('/sys/class/power_supply/BAT1/status') then
-  adapter_name = "BAT1"
-end
-battery_image_widget = wibox.widget {
-  image = beautiful.battery_icon_empty,
-  resize = true,
-  widget = wibox.widget.imagebox,
-}
-
-bat_tooltip = get_tooltip(battery_image_widget)
-
-local battery_widget_text = lain.widget.bat({
-  battery = adapter_name,
-  full_notify = 'off',
-  settings = function()
-    if bat_now.status == 'Charging' then
-      battery_widget_color = beautiful.fg_normal_alt
-      battery_image = beautiful.battery_icon_charging
-    elseif bat_now.status == 'Full' then
-      perc = ''
-      battery_widget_color = beautiful.fg_normal
-      battery_image = beautiful.battery_icon_full
-    else
-      battery_widget_color = beautiful.fg_normal_alt
-      if bat_now.perc > 80 then
-        battery_image = beautiful.battery_icon_full
-      elseif bat_now.perc > 40 then
-        battery_image = beautiful.battery_icon_medium
-      elseif bat_now.perc > 20 then
-        battery_image = beautiful.battery_icon_low
-      else
-        battery_image = beautiful.battery_icon_empty
-      end
-    end
-
-    if bat_now.perc > 90 then
-      perc = ''
-    elseif bat_now.perc == 'N/A' then
-      perc = ''
-    else
-      perc = bat_now.perc .. '%'
-    end
-
-    bat_tooltip.text = bat_now.status .. ' (' .. bat_now.perc .. '%)'
-    widget:set_markup(lain.util.markup.fontfg(beautiful.font, beautiful.fg_normal, perc))
-    battery_image_widget:set_image(gears.color.recolor_image(battery_image, battery_widget_color))
-  end,
-})
-battery_widget = wibox.widget({
-  battery_image_widget,
-  battery_widget_text,
-  layout = wibox.layout.fixed.horizontal,
-})
-battery_widget:buttons(gears.table.join(
-  -- Update battery widget with click, if we're not patient enough
-  awful.button({}, 1, function() battery_widget_text:update() end)
-))
+-- battery widget: required here (not with the top requires) because it reads
+-- beautiful.* at load time, which is only populated after beautiful.init() above
+local battery_widget = require("my_modules/battery")
 
 -- @Reference
 -- When a new sound device is added/removed,

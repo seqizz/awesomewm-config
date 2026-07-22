@@ -182,16 +182,43 @@ function my_utils.random_string(length)
     return my_utils.random_string(length - 1) .. charset[math.random(1, #charset)]
 end
 
--- Build a recolored SVG imagebox. Recolors filled SVG icons via stylesheet
--- (fill only, no stroke) instead of gears.color.recolor_image(), which
--- rasterizes the SVG first and then scales the raster, looking terrible.
--- Optionally wraps the icon in a bottom margin to lift it a hair for visual
--- baseline alignment next to text.
+-- Build the CSS stylesheet that recolors an SVG icon, used by svg_icon and by
+-- callers that recolor an existing imagebox dynamically (e.g. the battery
+-- widget). Preferred over gears.color.recolor_image(), which rasterizes the SVG
+-- first and then scales the raster, looking terrible.
+--
+-- mode:
+--   'fill'   (default) filled icons: set fill, force stroke off so the icon
+--            does not gain a bold outline. Matches feather-style filled glyphs.
+--   'stroke' outline icons (fill="none" stroke="currentColor", e.g. the feather
+--            battery icons): recolor the stroke instead. `line` is included
+--            because those icons use it for the battery terminal.
+function my_utils.svg_stylesheet(color, mode)
+  local beautiful = require('beautiful')
+  color = color or beautiful.fg_normal
+
+  if mode == 'stroke' then
+    return string.format(
+      'path, polygon, rect, circle, line { stroke: %s; }',
+      color
+    )
+  end
+
+  return string.format(
+    'path, polygon, rect, circle { fill: %s; stroke: none; }',
+    color
+  )
+end
+
+-- Build a recolored SVG imagebox using svg_stylesheet(). Optionally wraps the
+-- icon in a bottom margin to lift it a hair for visual baseline alignment next
+-- to text.
 --
 -- opts:
 --   image  path to the svg
 --   size   forced width/height (already dpi-adjusted by caller)
---   color  fill color (default beautiful.fg_normal)
+--   color  recolor color (default beautiful.fg_normal)
+--   mode   'fill' (default) or 'stroke', see svg_stylesheet()
 --   lift   optional bottom margin in raw px (dpi applied here); when set, the
 --          lifted container is returned as the second value
 --
@@ -211,19 +238,7 @@ function my_utils.svg_icon(opts)
     forced_width = opts.size,
     forced_height = opts.size,
     scaling_quality = 'best',
-
-    -- Recolor filled SVG icons without adding an outline/stroke.
-    -- Setting stroke too makes many icons look too bold.
-    stylesheet = string.format(
-      [[
-    path, polygon, rect, circle {
-      fill: %s;
-      stroke: none;
-    }
-  ]],
-      opts.color or beautiful.fg_normal
-    ),
-
+    stylesheet = my_utils.svg_stylesheet(opts.color, opts.mode),
     widget = wibox.widget.imagebox,
   })
 

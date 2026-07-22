@@ -24,8 +24,12 @@ local COLOR_ERROR = '#FF0000'
     enable_cmd = "command to enable",
     disable_cmd = "command to disable",
 
-    -- Icon (SVG/PNG image path)
+    -- Icon (SVG/PNG image path). Use `icon` for a single icon recolored per
+    -- state, or icon_enabled/icon_disabled for a different icon per state.
+    -- icon_enabled/icon_disabled fall back to `icon` when omitted.
     icon = "/path/to/icon.svg",
+    icon_enabled = "/path/to/enabled.svg",
+    icon_disabled = "/path/to/disabled.svg",
 
     -- Tooltips
     tooltip_on = "Tooltip when enabled",
@@ -50,8 +54,13 @@ local function create_toggle_widget(opts)
   local color_error = opts.color_error or COLOR_ERROR
   local visible_when_disabled = opts.visible_when_disabled ~= false  -- default true
 
+  -- per-state icons; fall back to the single `icon` when only one is given
+  local icon_enabled = opts.icon_enabled or opts.icon
+  local icon_disabled = opts.icon_disabled or opts.icon
+  local current_icon = icon_disabled  -- tracks the last icon shown, for error recolor
+
   local inner_widget = wibox.widget({
-    image = opts.icon,
+    image = icon_disabled,
     resize = true,
     widget = wibox.widget.imagebox,
   })
@@ -76,9 +85,11 @@ local function create_toggle_widget(opts)
     local fg = enabled and color_enabled or color_disabled
     local tip = enabled and opts.tooltip_on or opts.tooltip_off
     local bg = enabled and opts.background_enabled or opts.background_disabled
+    local icon = enabled and icon_enabled or icon_disabled
 
-    if opts.icon and opts.icon ~= '' then
-      inner_widget.image = gears.color.recolor_image(opts.icon, fg)
+    if icon and icon ~= '' then
+      current_icon = icon
+      inner_widget.image = gears.color.recolor_image(icon, fg)
     end
     background_container.bg = bg
     tooltip.text = tip
@@ -90,8 +101,8 @@ local function create_toggle_widget(opts)
   end
 
   local function update_visual_error()
-    if opts.icon and opts.icon ~= '' then
-      inner_widget.image = gears.color.recolor_image(opts.icon, color_error)
+    if current_icon and current_icon ~= '' then
+      inner_widget.image = gears.color.recolor_image(current_icon, color_error)
     end
     background_container.bg = nil
     tooltip.text = opts.tooltip_error or 'Error checking state'

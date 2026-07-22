@@ -4,12 +4,11 @@
 -- Dependencies:
 --   playerctl  (MPRIS client)
 --   curl       (HTTP requests to lrclib.net)
---   awesome libs: awful, wibox, gears, naughty
+--   awesome libs: awful, wibox, gears
 
 local awful = require('awful')
 local wibox = require('wibox')
 local gears = require('gears')
-local naughty = require('naughty')
 local my_theme = require('my_modules/my_theme')
 local my_utils = require('my_modules/my_utils')
 local dpi = require('beautiful').xresources.apply_dpi
@@ -28,12 +27,19 @@ local CONFIG = {
   no_lyric_text = '…',         -- shown before first timestamped line
   max_width     = dpi(500),    -- max widget width, sizes down to text width
   disable_on_battery = true,   -- stop polling when on battery power
+  -- LRCLIB requires a UA identifying the client with a link or email
+  user_agent    = 'AwesomeWM wibar plugin by https://git.gurkan.in/gurkan/awesomewm-config/',
 }
 
 -- ─── lyrics cache ─────────────────────────────────────────────────────────────
 -- key: "artist - title (duration_s)" → { lines = {{t=seconds, text=string}, ...} }
 -- nil value means "tried, no lyrics available"
 local lyrics_cache = {}
+
+-- parallel cache of unsynced plainLyrics for tracks that have no syncedLyrics.
+-- key -> plain string, or false = "tried, no plain either". Shown in the tooltip
+-- only; the main widget stays synced-only.
+local plain_cache = {}
 
 -- disk cache dir for persisting lyrics across restarts
 local cache_dir = os.getenv('HOME') .. '/.cache/awesome-lyrics'
@@ -73,6 +79,7 @@ local state = {
   status    = 'Stopped', -- Playing / Paused / Stopped
   cache_key = '',
   lines     = nil,      -- parsed LRC lines for current track (sorted)
+  plain     = nil,      -- unsynced plainLyrics for current track (tooltip only)
   current_line_text = CONFIG.no_lyric_text,
   fetching  = false,    -- prevent duplicate fetches
   lyrics_paused = true, -- lyrics display paused (starts paused)
@@ -116,18 +123,42 @@ local function show_child(w)
   end
 end
 
--- no-op tooltip stub (keeps rest of code simple, just discards text)
-local lyrics_tooltip = { text = '' }
+-- tooltip: shows the full unsynced plainLyrics on hover, ONLY for tracks that
+-- have no synced lyrics. Not attached to any object at creation; we attach it
+-- to the widget only while there is plain text to show (see set_tooltip below),
+-- so synced tracks get no hover tooltip at all.
+local lyrics_tooltip = awful.tooltip({
+  mode = 'outside',
+  align = 'bottom',
+  margins = dpi(6),
+})
+
+-- attach/detach the tooltip on demand. Passing nil/'' detaches it entirely.
+local tooltip_attached = false
+local function set_tooltip(text)
+  if text and text ~= '' then
+    lyrics_tooltip:set_text(text)
+    if not tooltip_attached then
+      lyrics_tooltip:add_to_object(lyrics_widget)
+      tooltip_attached = true
+    end
+  elseif tooltip_attached then
+    lyrics_tooltip:remove_from_object(lyrics_widget)
+    tooltip_attached = false
+  end
+end
 
 -- ─── helpers ──────────────────────────────────────────────────────────────────
 
 -- URL-encode a string for use in query params
 local function url_encode(str)
   str = str:gsub('\n', '\r\n')
-  str = str:gsub('([^%w _~%.%-])', function(c)
+  -- RFC 3986: percent-encode everything except unreserved chars. Space must be
+  -- %20, NOT '+' -- LRCLIB's router treats '+' literally so 'A+B' != 'A B'
+  -- and /api/get 404s (curl -sf then returns empty, looking like "no lyrics").
+  str = str:gsub('([^%w_~%.%-])', function(c)
     return string.format('%%%02X', string.byte(c))
   end)
-  str = str:gsub(' ', '+')
   return str
 end
 
@@ -233,17 +264,6 @@ local function find_current_line(lines, pos)
   return result
 end
 
--- Find next lyric line after current position
-local function find_next_line(lines, pos)
-  if not lines or #lines == 0 then return nil end
-  for _, entry in ipairs(lines) do
-    if entry.t > pos then
-      return entry
-    end
-  end
-  return nil
-end
-
 -- Truncate string to max_chars
 local function truncate(str, max)
   if not str then return '' end
@@ -295,11 +315,13 @@ local function json_extract_string(json_str, key)
   return table.concat(result)
 end
 
--- Check if JSON has "syncedLyrics": null (no synced lyrics)
+-- True if the JSON contains at least one non-null syncedLyrics. Must NOT bail on
+-- the first "syncedLyrics":null -- /api/search returns an array of ~20 records
+-- and many are null; we only care whether ANY record has a quoted (non-null)
+-- value. The quote-after-colon pattern already skips nulls, and
+-- json_extract_string finds that same first non-null one.
 local function json_has_synced_lyrics(json_str)
-  if json_str:find('"syncedLyrics"%s*:%s*null') then return false end
-  if json_str:find('"syncedLyrics"%s*:%s*"') then return true end
-  return false
+  return json_str:find('"syncedLyrics"%s*:%s*"') ~= nil
 end
 
 -- ─── LRCLIB fetch ─────────────────────────────────────────────────────────────
@@ -317,26 +339,36 @@ local function fetch_lyrics(artist, title, album, duration)
   -- check memory cache first
   if lyrics_cache[key] ~= nil then
     dbg('[lyrics] mem cache hit, has_lyrics=' .. tostring(lyrics_cache[key] ~= false))
-    if lyrics_cache[key] == false then
-      state.lines = nil -- no lyrics available
-    else
-      state.lines = lyrics_cache[key]
-    end
+    state.lines = lyrics_cache[key] or nil -- false → nil (no synced)
+    state.plain = plain_cache[key] or nil  -- false/nil → nil (no plain)
     state.fetching = false
     return
   end
 
-  -- check disk cache before hitting network
+  -- check disk cache before hitting network. Three on-disk shapes:
+  --   ''            → negative cache (no lyrics at all)
+  --   '#PLAIN\n...'  → unsynced plainLyrics only
+  --   otherwise      → raw synced LRC
   local cached_lrc = cache_read(key)
   if cached_lrc ~= nil then
     dbg('[lyrics] disk cache hit, empty=' .. tostring(cached_lrc == ''))
     if cached_lrc == '' then
       lyrics_cache[key] = false
+      plain_cache[key] = false
       state.lines = nil
+      state.plain = nil
+    elseif cached_lrc:sub(1, 7) == '#PLAIN\n' then
+      local plain = cached_lrc:sub(8)
+      lyrics_cache[key] = false
+      plain_cache[key] = plain
+      state.lines = nil
+      state.plain = plain
     else
       local parsed = split_long_lines(parse_lrc(cached_lrc), CONFIG.max_width)
       lyrics_cache[key] = (#parsed > 0) and parsed or false
+      plain_cache[key] = false
       state.lines = lyrics_cache[key] or nil
+      state.plain = nil
     end
     state.fetching = false
     return
@@ -348,13 +380,23 @@ local function fetch_lyrics(artist, title, album, duration)
     .. '&album_name=' .. url_encode(album)
     .. '&duration=' .. dur_s
 
-  local cmd = "curl -sf --connect-timeout 5 --max-time 30 -H 'User-Agent: awesome-lyrics/1.0' '" .. url .. "'"
+  local cmd = "curl -sf --connect-timeout 5 --max-time 30 -H 'User-Agent: " .. CONFIG.user_agent .. "' '" .. url .. "'"
   dbg('[lyrics] GET ' .. url)
+
+  -- helper: extract non-empty plainLyrics from a response, or nil
+  local function extract_plain(body)
+    if not body or #body == 0 then return nil end
+    local p = json_extract_string(body, 'plainLyrics')
+    if p and #p > 0 then return p end
+    return nil
+  end
 
   awful.spawn.easy_async_with_shell(cmd, function(stdout, stderr, reason, exit_code)
     dbg('[lyrics] GET result exit=' .. tostring(exit_code) .. ' len=' ..
       tostring(stdout and #stdout or 0) .. ' has_synced=' ..
       tostring(stdout and json_has_synced_lyrics(stdout) or false))
+    -- stash this track's plainLyrics as a fallback for the search stage below
+    local get_plain = (exit_code == 0) and extract_plain(stdout) or nil
     if exit_code == 0 and stdout and #stdout > 0 and json_has_synced_lyrics(stdout) then
       local synced = json_extract_string(stdout, 'syncedLyrics')
       if synced and #synced > 0 then
@@ -362,8 +404,10 @@ local function fetch_lyrics(artist, title, album, duration)
         dbg('[lyrics] GET parsed ' .. #parsed .. ' lines')
         if #parsed > 0 then
           lyrics_cache[key] = parsed
+          plain_cache[key] = false
           cache_write(key, synced)
           state.lines = parsed
+          state.plain = nil
           state.fetching = false
           return
         end
@@ -373,7 +417,7 @@ local function fetch_lyrics(artist, title, album, duration)
     -- /api/get failed or no synced lyrics → try /api/search
     local search_url = 'https://lrclib.net/api/search?track_name=' .. url_encode(title)
       .. '&artist_name=' .. url_encode(artist)
-    local search_cmd = "curl -sf --connect-timeout 5 --max-time 30 -H 'User-Agent: awesome-lyrics/1.0' '" .. search_url .. "'"
+    local search_cmd = "curl -sf --connect-timeout 5 --max-time 30 -H 'User-Agent: " .. CONFIG.user_agent .. "' '" .. search_url .. "'"
 
     dbg('[lyrics] SEARCH ' .. search_url)
     awful.spawn.easy_async_with_shell(search_cmd, function(out2, _, _, exit2)
@@ -387,23 +431,42 @@ local function fetch_lyrics(artist, title, album, duration)
           local parsed2 = split_long_lines(parse_lrc(synced2), CONFIG.max_width)
           if #parsed2 > 0 then
             lyrics_cache[key] = parsed2
+            plain_cache[key] = false
             cache_write(key, synced2)
             state.lines = parsed2
+            state.plain = nil
             state.fetching = false
             return
           end
         end
       end
+
+      -- No synced lyrics anywhere. Fall back to plainLyrics (search's first
+      -- record, else the /api/get record) for the tooltip.
+      local plain = ((exit2 == 0) and extract_plain(out2)) or get_plain
+
       -- Distinguish "server confirmed no lyrics" from "request failed". curl
       -- exit 0 means we got a real answer; anything else (28=timeout, DNS, etc.)
       -- is transient and must NOT be negative-cached, or one blip poisons the
       -- track forever.
       if exit2 == 0 then
-        dbg('[lyrics] NO LYRICS (server confirmed) key=[' .. key .. '], negative-caching')
-        lyrics_cache[key] = false
-        cache_write(key, '') -- negative cache on disk too
+        if plain then
+          dbg('[lyrics] PLAIN ONLY (no synced) key=[' .. key .. '], caching plain')
+          lyrics_cache[key] = false
+          plain_cache[key] = plain
+          cache_write(key, '#PLAIN\n' .. plain)
+          state.plain = plain
+        else
+          dbg('[lyrics] NO LYRICS (server confirmed) key=[' .. key .. '], negative-caching')
+          lyrics_cache[key] = false
+          plain_cache[key] = false
+          cache_write(key, '') -- negative cache on disk too
+          state.plain = nil
+        end
       else
         dbg('[lyrics] fetch FAILED (curl exit=' .. tostring(exit2) .. ') key=[' .. key .. '], NOT caching')
+        -- transient failure: don't cache, but still surface get_plain if we got it
+        state.plain = get_plain
       end
       state.lines = nil
       state.fetching = false
@@ -449,6 +512,7 @@ local function parse_metadata_line(line)
     state.duration  = duration
     state.cache_key = new_key
     state.lines     = nil
+    state.plain     = nil
     state.current_line_text = CONFIG.no_lyric_text
     state.position  = 0 -- new track starts at 0; resync will correct
     -- fetch lyrics for new track
@@ -486,11 +550,18 @@ local function update_display()
   if state.status == 'Stopped' or not state.lines then
     local display_text = CONFIG.no_lyric_text
     if state.lines == nil and state.cache_key ~= '' and not state.fetching then
-      -- no lyrics available for this track (fetch completed, confirmed missing)
-      display_text = '(no lyrics)'
+      -- fetch done, no synced lyrics. '♪' hints that unsynced plain lyrics are
+      -- available in the tooltip; '(no lyrics)' means truly nothing was found.
+      display_text = state.plain and '♪' or '(no lyrics)'
     end
     lyrictext:set_markup_silently(' ' .. display_text)
-    lyrics_tooltip.text = state.artist ~= '' and (state.artist .. ' - ' .. state.title) or ''
+    -- tooltip only when we actually have unsynced plain lyrics to show
+    if state.plain then
+      local head = state.artist ~= '' and (state.artist .. ' - ' .. state.title .. '\n\n') or ''
+      set_tooltip(head .. state.plain)
+    else
+      set_tooltip(nil)
+    end
     return
   end
 
@@ -499,13 +570,8 @@ local function update_display()
   state.current_line_text = line_text
   lyrictext:set_markup_silently(' ' .. line_text:gsub('&', '&amp;'):gsub('<', '&lt;'):gsub('>', '&gt;'))
 
-  -- tooltip: artist - title + next line preview
-  local tip = state.artist .. ' - ' .. state.title
-  local next_line = find_next_line(state.lines, state.position)
-  if next_line and next_line.text ~= '' then
-    tip = tip .. '\n\nNext: ' .. next_line.text
-  end
-  lyrics_tooltip.text = tip
+  -- synced track: no tooltip (the scrolling line is the whole UI)
+  set_tooltip(nil)
 end
 
 -- ─── battery check ────────────────────────────────────────────────────────────
@@ -675,6 +741,7 @@ lyrics_widget:buttons(gears.table.join(
 function lyrics_widget:check()
   if state.title ~= '' then
     state.lines = nil
+    state.plain = nil
     state.current_line_text = CONFIG.no_lyric_text
     fetch_lyrics(state.artist, state.title, state.album, state.duration)
   end
@@ -684,6 +751,7 @@ end
 -- clear cache (e.g. if lyrics were wrong)
 function lyrics_widget:clear_cache()
   lyrics_cache = {}
+  plain_cache = {}
   os.execute('rm -f ' .. cache_dir .. '/*.lrc')
   self:check()
 end

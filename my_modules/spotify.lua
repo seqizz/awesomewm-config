@@ -205,6 +205,7 @@ function spotifywidget:check()
 end
 
 -- Start hidden; the follower reveals the widget once spotify appears.
+spotifywidget.forced_width = dpi(0)
 set_visible(false)
 start_follow()
 
