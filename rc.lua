@@ -38,6 +38,23 @@ printmore = false
 -- my theme
 beautiful.init(config_path .. "my_modules/my_theme.lua")
 
+-- WezTerm emits its toasts (e.g. the snippet-capture feedback) at critical
+-- urgency, which naughty renders with its bright-red critical preset. Recolor
+-- just wezterm's notifications to a calm gold-on-dark style with a real
+-- timeout. Appended after naughty's default rules so it wins for these.
+local ruled = require('ruled')
+ruled.notification.connect_signal('request::rules', function()
+  ruled.notification.append_rule {
+    rule       = { app_name = 'wezterm' },
+    properties = {
+      bg      = '#282828',
+      fg      = '#d79921',
+      timeout = 4,
+      urgency = 'normal',
+    },
+  }
+end)
+
 -- print errors as naughty notifications
 dofile(config_path .. "my_modules/rc_errorhandling.lua")
 
