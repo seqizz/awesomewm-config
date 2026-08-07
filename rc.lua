@@ -11,8 +11,8 @@ local naughty = require("naughty")
 local my_utils = require('my_modules/my_utils')
 local lain = require("lain")
 local capslock = require("my_modules/capslock")
-local spotify = require("my_modules/spotify")
-local spotify_lyrics= require("my_modules/spotify_lyrics")
+local mpris = require("my_modules/mpris")
+local mpris_lyrics = require("my_modules/mpris_lyrics")
 local nextthing = require("my_modules/nextthing")
 local psi_widget = require("my_modules/psi")
 local rotate_widget = require("my_modules/rotatescreen")
@@ -256,8 +256,8 @@ separator_faint = my_utils.create_separator({
   color = beautiful.bg_focus .. "70"
 })
 
-spotify_separator = dynamic_separator.create({
-  signal = "widget::spotify::visible",
+mpris_separator = dynamic_separator.create({
+  signal = "widget::mpris::visible",
   initial_visible = false
 })
 
@@ -277,8 +277,8 @@ function build_dynamic_widgets_layout()
     end
   end
   layout:add(autolock_widget)
-  layout:add(spotify_separator)
-  layout:add(spotify)
+  layout:add(mpris_separator)
+  layout:add(mpris)
   return layout
 end
 
@@ -583,7 +583,7 @@ local function screen_organizer(s, screen_count, primary, is_extra)
   else
     -- Not visible on single screen, by choice
     table.insert(systray_right_widgets, nextthing)
-    table.insert(systray_right_widgets, spotify_lyrics)
+    table.insert(systray_right_widgets, mpris_lyrics)
     table.insert(systray_right_widgets, separator_empty)
   end
   -- Multi-screen: dynamic container goes after other widgets (as before)
@@ -742,11 +742,11 @@ globalkeys = gears.table.join(
   awful.key({              }, "XF86AudioStop",         nil, function() fn_process_action('media', 'stop') end),
   awful.key({              }, "XF86AudioPrev",         nil, function()
                                                               fn_process_action('media', 'previous')
-                                                              spotify:check()
+                                                              mpris:check()
                                                             end),
   awful.key({              }, "XF86AudioNext",         nil, function()
                                                               fn_process_action('media', 'next')
-                                                              spotify:check()
+                                                              mpris:check()
                                                             end),
   -- Ctrl + sound knob switches between tmux panes and firefox tabs 🤯
   -- awful.key({ ctrl         }, "XF86AudioRaiseVolume",  nil, function()
@@ -779,11 +779,11 @@ globalkeys = gears.table.join(
   -- For laptop, which doesn't have next/prev buttons
   awful.key({ ctrl         }, "XF86AudioRaiseVolume",  nil, function()
                                                               fn_process_action('media', 'next')
-                                                              spotify:check()
+                                                              mpris:check()
                                                             end),
   awful.key({ ctrl         }, "XF86AudioLowerVolume",  nil, function()
                                                               fn_process_action('media', 'previous')
-                                                              spotify:check()
+                                                              mpris:check()
                                                             end),
   awful.key({ win          }, "F9",                    nil, function() awful.spawn("rofi-pulse-select sink") end),
   -- Dropdown terminal: F12
@@ -811,7 +811,7 @@ globalkeys = gears.table.join(
   awful.key({ win          }, "l",                          function() awful.spawn("sudo slock") end),
   -- awful.key({ win, "Shift" }, "l",                          function() awful.spawn("xdotool search --name \" Slack\" windowactivate &&  sleep 1 && xdotool key ctrl+k && sleep 0.8 && xdotool key g u r k a n Return && sleep 0.8 && xdotool key slash a w a y Return && sleep 0.8 && xdotool key slash s t a t u s space semicolon a y o o semicolon space l u n c h Return") end),
   -- If something goes wrong with loose setup
-  awful.key({ win          }, "r",                          function() awful.spawn("loose rotate") end),
+  awful.key({ win          }, "r",                          function() awful.spawn("loose rotate --interactive") end),
   -- Cycle between available layouts
   awful.key({ win          }, "space",                      function() awful.layout.inc(1) end),
   awful.key({ win          }, "x",                          function() awful.spawn("pcmanfm-qt") end),
