@@ -1,5 +1,5 @@
--- spotify_lyrics.lua - synced lyrics widget using LRCLIB + playerctl
--- Shows current lyric line for Spotify, non-blocking via async spawns.
+-- mpris_lyrics.lua - synced lyrics widget using LRCLIB + playerctl
+-- Shows current lyric line for the active MPRIS player, non-blocking via async spawns.
 --
 -- Dependencies:
 --   playerctl  (MPRIS client)
@@ -22,7 +22,9 @@ end
 
 -- ─── config ───────────────────────────────────────────────────────────────────
 local CONFIG = {
-  player        = 'spotify',
+  -- Same allowlist/priority as my_modules/mpris.lua so both widgets track the
+  -- same player. playerctl picks the first present one.
+  player        = 'spotify,jellyfin-tui',
   poll_playing  = 0.5,         -- local clock tick + redraw interval while playing
   no_lyric_text = '…',         -- shown before first timestamped line
   max_width     = dpi(500),    -- max widget width, sizes down to text width
@@ -590,7 +592,7 @@ local function is_on_battery()
 end
 
 -- ─── widget visibility ───────────────────────────────────────────────────────
--- hide when no lyrics (complements existing spotify widget)
+-- hide when no lyrics (complements the mpris widget)
 function lyrics_widget:set_visible_state(visible)
   if visible then
     self.forced_width = nil
@@ -723,14 +725,14 @@ else
 end
 
 -- ─── click handlers ───────────────────────────────────────────────────────────
-local spotify_main = require('my_modules/spotify')
+local mpris_main = require('my_modules/mpris')
 lyrics_widget:buttons(gears.table.join(
   awful.button({}, 2, function() -- middle click: toggle lyrics pause
     state.lyrics_paused = not state.lyrics_paused
     update_display()
   end),
-  awful.button({}, 3, function() -- right click: toggle spotify client visibility
-    spotify_main:raise_toggle()
+  awful.button({}, 3, function() -- right click: toggle Spotify client visibility (no-op for terminal players)
+    mpris_main:raise_toggle()
   end)
 ))
 

@@ -5,7 +5,12 @@ local my_theme = require('my_modules/my_theme')
 local dpi = require('beautiful').xresources.apply_dpi
 local gears = require('gears')
 
-local spotifytext = wibox.widget({
+-- Players we follow, in priority order. playerctl picks the first present one.
+-- Keeping an explicit allowlist stops browser video (firefox/chromium) from
+-- hijacking the widget when it starts playing an MPRIS stream.
+local PLAYERS = 'spotify,jellyfin-tui'
+
+local mpristext = wibox.widget({
   layout = wibox.container.scroll.horizontal,
   max_size = dpi(150),
   step_function = wibox.container.scroll.step_functions.linear_increase,
@@ -21,29 +26,29 @@ local spotifytext = wibox.widget({
 
 -- inner imagebox (for :set_image) + lifted container (for the layout);
 -- lift = 1px bottom margin to match visually
-local spotifyimage, spotifyimage_lifted = my_utils.svg_icon({
+local mprisimage, mprisimage_lifted = my_utils.svg_icon({
   image = my_theme.music_icon,
   size = dpi(25),
   color = my_theme.fg_normal,
 })
 
-local spotifywidget = wibox.widget({
-  spotifyimage_lifted,
-  spotifytext,
+local mpriswidget = wibox.widget({
+  mprisimage_lifted,
+  mpristext,
   layout = wibox.layout.fixed.horizontal,
 })
 
--- set text of spotify widget
-function spotifywidget:set(state, is_playing)
+-- set text of the widget
+function mpriswidget:set(state, is_playing)
   -- Do not use gears.color.recolor_image() here: it rasterizes the SVG first,
   -- then imagebox scales that raster, which can look terrible.
   if is_playing then
-    spotifyimage:set_image(my_theme.music_icon)
+    mprisimage:set_image(my_theme.music_icon)
   else
-    spotifyimage:set_image(my_theme.music_icon_paused)
+    mprisimage:set_image(my_theme.music_icon_paused)
   end
 
-  spotifytext.widget:set_markup_silently(' ' .. state)
+  mpristext.widget:set_markup_silently(' ' .. state)
 end
 
 local _raise_tag_of_client = function(c)
@@ -55,8 +60,9 @@ local _raise_tag_of_client = function(c)
   end
 end
 
--- Hide / show spotify
-function spotifywidget:raise_toggle()
+-- Hide / show the Spotify window. Only meaningful for spotify: jellyfin-tui runs
+-- inside a terminal with no dedicated window to raise, so this is a no-op there.
+function mpriswidget:raise_toggle()
   local cls = client.get()
   for _, c in ipairs(cls) do
     if c.class == 'Spotify' then
@@ -72,7 +78,7 @@ function spotifywidget:raise_toggle()
       end
     end
   end
-  spotifywidget:check()
+  mpriswidget:check()
 end
 
 -- Event-driven: one long-running `playerctl --follow` pushes a line on every
@@ -80,8 +86,12 @@ end
 -- single source of truth for widget state.
 local follow_pid = nil
 
--- ASCII Unit Separator (0x1f): never appears in a track title, so it is a safe
--- field delimiter between status and title in the playerctl format template.
+-- Name of the player that produced the last update. Media buttons act on this
+-- player explicitly so controls always hit whatever the widget is showing.
+local current_player = nil
+
+-- ASCII Unit Separator (0x1f): never appears in a track title or player name, so
+-- it is a safe field delimiter in the playerctl format template.
 local SEP = '\31'
 
 local debug = false -- flip to true to trace the playerctl follow stream
@@ -97,14 +107,14 @@ local visible_state = nil -- last emitted visibility, so we only signal on chang
 local hide_timer = nil -- debounces hiding to ride out transient empty lines
 local last_title = '' -- keep song text stable across empty-metadata blips
 
--- Emit the visibility signal only when it actually changes. Spotify pushes many
+-- Emit the visibility signal only when it actually changes. Players push many
 -- property updates while playing; re-signalling every time makes the widget flicker.
 local function set_visible(v)
   if visible_state == v then
     return
   end
   visible_state = v
-  awesome.emit_signal('widget::spotify::visible', v)
+  awesome.emit_signal('widget::mpris::visible', v)
 end
 
 local function cancel_hide()
@@ -115,27 +125,34 @@ local function cancel_hide()
 end
 
 local function apply_line(line)
-  local sep = line:find(SEP, 1, true)
-  local status, title
-
-  if sep then
-    status = line:sub(1, sep - 1)
-    title = line:sub(sep + 1)
+  -- format is: status \31 playerName \31 title
+  local status, player, title = '', nil, ''
+  local a = line:find(SEP, 1, true)
+  if a then
+    status = line:sub(1, a - 1)
+    local rest = line:sub(a + 1)
+    local b = rest:find(SEP, 1, true)
+    if b then
+      player = rest:sub(1, b - 1)
+      title = rest:sub(b + 1)
+    else
+      player = rest
+    end
   else
-    -- playerctl emits an empty line when the player goes away
+    -- playerctl emits an empty line when no followed player is present
     status = line
-    title = ''
   end
 
-  dbg('[spotify] parsed status=[' .. status .. '] title=[' .. title .. ']')
+  dbg('[mpris] parsed status=[' .. status .. '] player=[' .. tostring(player) .. '] title=[' .. title .. ']')
 
   if status == '' then
     -- Empty lines also appear transiently during track changes / dbus churn.
-    -- Debounce the hide so the widget stays put unless spotify is really gone.
+    -- Debounce the hide so the widget stays put unless the player is really gone.
     if not hide_timer then
       hide_timer = gears.timer.start_new(2, function()
         hide_timer = nil
-        spotifywidget.forced_width = dpi(0)
+        current_player = nil
+        mpriswidget.forced_width = dpi(0)
         set_visible(false)
         return false
       end)
@@ -144,6 +161,7 @@ local function apply_line(line)
   end
 
   cancel_hide()
+  current_player = player
 
   -- metadata can momentarily arrive empty mid-track; reuse the last good title
   if title ~= '' then
@@ -153,8 +171,8 @@ local function apply_line(line)
   -- keep the previous semantics: only 'Paused' shows the paused icon
   local is_playing = status ~= 'Paused'
 
-  spotifywidget:set(last_title, is_playing)
-  spotifywidget.forced_width = nil
+  mpriswidget:set(last_title, is_playing)
+  mpriswidget.forced_width = nil
   set_visible(true)
 end
 
@@ -164,25 +182,25 @@ local function start_follow()
   local cmd = {
     'playerctl',
     '-p',
-    'spotify',
+    PLAYERS,
     'metadata',
     '--follow',
     '--format',
-    '{{status}}' .. SEP .. '{{title}}',
+    '{{status}}' .. SEP .. '{{playerName}}' .. SEP .. '{{title}}',
   }
 
-  dbg('[spotify] start_follow: ' .. table.concat(cmd, ' '))
+  dbg('[mpris] start_follow: ' .. table.concat(cmd, ' '))
 
   follow_pid = awful.spawn.with_line_callback(cmd, {
     stdout = function(line)
-      dbg('[spotify] stdout: [' .. line .. ']')
+      dbg('[mpris] stdout: [' .. line .. ']')
       apply_line(line)
     end,
 
-    stderr = function(line) dbg('[spotify] stderr: [' .. line .. ']') end,
+    stderr = function(line) dbg('[mpris] stderr: [' .. line .. ']') end,
 
     exit = function(reason, code)
-      dbg('[spotify] exit: ' .. tostring(reason) .. ' ' .. tostring(code))
+      dbg('[mpris] exit: ' .. tostring(reason) .. ' ' .. tostring(code))
       follow_pid = nil
 
       -- playerctl exits if the dbus session drops; respawn after a short delay
@@ -193,26 +211,26 @@ local function start_follow()
     end,
   })
 
-  dbg('[spotify] follow_pid = ' .. tostring(follow_pid))
+  dbg('[mpris] follow_pid = ' .. tostring(follow_pid))
 end
 
 -- Cheap idempotent nudge: media keybindings/buttons call this to guarantee the
 -- follower is alive. Track/status updates themselves arrive via --follow.
-function spotifywidget:check()
+function mpriswidget:check()
   if not follow_pid then
     start_follow()
   end
 end
 
--- Start hidden; the follower reveals the widget once spotify appears.
-spotifywidget.forced_width = dpi(0)
+-- Start hidden; the follower reveals the widget once a player appears.
+mpriswidget.forced_width = dpi(0)
 set_visible(false)
 start_follow()
 
-spotifywidget:buttons(gears.table.join(
+mpriswidget:buttons(gears.table.join(
   awful.button({}, 1, function() -- left click
-    fn_process_action('media', 'pausetoggle', 'spotify')
-    spotifywidget:check()
+    fn_process_action('media', 'pausetoggle', current_player)
+    mpriswidget:check()
   end),
 
   awful.button({}, 2, function() -- middle click
@@ -220,18 +238,18 @@ spotifywidget:buttons(gears.table.join(
   end),
 
   awful.button({}, 3, function() -- right click
-    spotifywidget:raise_toggle()
+    mpriswidget:raise_toggle()
   end),
 
   awful.button({}, 4, function() -- scroll up
-    fn_process_action('media', 'previous', 'spotify')
-    spotifywidget:check()
+    fn_process_action('media', 'previous', current_player)
+    mpriswidget:check()
   end),
 
   awful.button({}, 5, function() -- scroll down
-    fn_process_action('media', 'next', 'spotify')
-    spotifywidget:check()
+    fn_process_action('media', 'next', current_player)
+    mpriswidget:check()
   end)
 ))
 
-return spotifywidget
+return mpriswidget
