@@ -451,6 +451,15 @@ local function screen_organizer(s, screen_count, primary, is_extra)
 
   debug_print('Now organizing screen: ' .. s['name'], printmore)
 
+  -- This can run several times for the same screen (screen list changes, fake
+  -- screen creation, decoration requests), so drop the previous wibar first.
+  -- Without this every run stacks another wibar on top of the screen.
+  if s['object'].mywibox then
+    s['object'].mywibox:remove()
+    s['object'].mywibox = nil
+  end
+  dynamic_widget_containers[s['object']] = nil
+
   -- Create an imagebox widget which will contain an icon indicating which layout we're using.
   -- We need one layoutbox per screen.
   s['object'].mylayoutbox = awful.widget.layoutbox(s['object'])
@@ -692,6 +701,13 @@ function process_screens(systray, screens_table, printmore)
 
   debug_print('Processing screens result: ' .. my_utils.dump(screens_table), printmore)
 
+  -- forget containers of screens that no longer exist (removed monitor, fake_remove)
+  for scr, _ in pairs(dynamic_widget_containers) do
+    if not scr.valid then
+      dynamic_widget_containers[scr] = nil
+    end
+  end
+
   local second_screen_already_processed = false
   for name, properties in pairs(screens_table) do
     -- In case we have more than 2 screens, we will register first
@@ -909,26 +925,35 @@ client.connect_signal('focus', function(c)
 end)
 
 -- Screen handling
-local screen_change_in_progress = false
-local screen_change_timer = nil
+--
+-- Several sources ask for a rebuild: the `list` signal, `request::desktop_decoration`
+-- (one per screen, and again for every screen created by get_screens()' fake screen
+-- split) and the startup fallback. They all funnel into one debounced rebuild, so a
+-- burst of signals results in a single pass. Anything else stacks duplicate wibars
+-- and re-shuffles the tags several times per screen change.
+local screen_rebuild_timer = nil
+local screen_rebuild_running = false
+local screen_rebuild_pending = false
 
-screen.connect_signal('list', function()
-  debug_print('List signal received', printmore)
+function schedule_screen_rebuild(delay, reason)
+  debug_print('Screen rebuild requested (' .. tostring(reason) .. ')', printmore)
 
-  if screen_change_in_progress then
-    debug_print('Screen change already in progress, skipping this signal', printmore)
+  -- Signals emitted from inside the rebuild itself (fake_add/fake_resize) would
+  -- otherwise queue an endless chain of rebuilds
+  if screen_rebuild_running or screen_split_in_progress() then
+    screen_rebuild_pending = true
     return
   end
 
-  screen_change_in_progress = true
-  debug_print('Starting screen change timer (2 secs)', printmore)
-
-  -- Cancel any existing timer
-  if screen_change_timer then
-    screen_change_timer:stop()
+  if screen_rebuild_timer then
+    screen_rebuild_timer:stop()
   end
 
-  screen_change_timer = gears.timer.start_new(2, function()
+  screen_rebuild_timer = gears.timer.start_new(delay, function()
+    screen_rebuild_timer = nil
+    screen_rebuild_running = true
+    screen_rebuild_pending = false
+
     screens_table = get_screens()
 
     -- Reconfigure systray size when screens change
@@ -941,28 +966,27 @@ screen.connect_signal('list', function()
 
     process_screens(my_systray, screens_table, printmore)
 
-    screen_change_in_progress = false
-    screen_change_timer = nil
+    screen_rebuild_running = false
+    -- a real screen change that arrived while we were rebuilding
+    if screen_rebuild_pending then
+      screen_rebuild_pending = false
+      schedule_screen_rebuild(2, 'pending change')
+    end
     return false  -- don't repeat
   end)
+end
+
+screen.connect_signal('list', function()
+  schedule_screen_rebuild(2, 'list signal')
 end)
 
-screen.connect_signal("request::desktop_decoration", function(s)
-  debug_print('request::desktop_decoration received for ' .. tostring(s), printmore)
-  screens_table = get_screens()
-
-  if get_total_screen_count(screens_table) > 1 then
-    my_systray.widget:set_base_size(dpi(20))
-  else
-    my_systray.widget:set_base_size(dpi(24))
-  end
-
-  process_screens(my_systray, screens_table, printmore)
+screen.connect_signal('request::desktop_decoration', function(s)
+  schedule_screen_rebuild(1, 'desktop decoration for ' .. tostring(s))
 end)
 
 -- Fallback: also try direct setup in case the signal already fired
 if #screen > 0 then
-  process_screens(my_systray, get_screens(), printmore)
+  schedule_screen_rebuild(1, 'startup fallback')
 end
 
 tag.connect_signal('request::screen', function(t)

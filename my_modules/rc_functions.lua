@@ -700,13 +700,128 @@ function unminimize_client()
 end
 
 
+-- Registry of the fake screens we created, keyed (weakly) by screen object.
+-- Needed on somewm: there the screen list is enumerated through the native
+-- `screen` iterator, which also returns fake screens, so they cannot be told
+-- apart from real outputs the way the xrandr output list does it on X11.
+local fake_screen_registry = setmetatable({}, { __mode = "k" })
+
+-- Names of the real screens, remembered from the first time we saw them.
+-- The key embeds the resolution and splitting shrinks the real screen, so
+-- recomputing it on every run would rename the screen (and with it its tagsave
+-- file) right after the split. On X11 this could not happen because xrandr
+-- always reports the full monitor mode.
+local real_screen_names = setmetatable({}, { __mode = "k" })
+
+-- screen.fake_add()/fake_resize() emit `list` and `request::desktop_decoration`
+-- synchronously, and those handlers call get_screens() again. Guard against
+-- re-entering the split logic with a half-built table.
+local splitting_screens = false
+
+function screen_split_in_progress()
+  return splitting_screens
+end
+
+-- Split screens that are too wide (ultrawide ratio, or a lot of pixels like 4K)
+-- into a real screen (right part) plus a fake screen (left part).
+local function split_wide_screens(output_tbl)
+  if splitting_screens then
+    return output_tbl
+  end
+  splitting_screens = true
+
+  -- which real screens already carry a fake child in this table
+  local existing_children = {}
+  for _, properties in pairs(output_tbl) do
+    if properties["is_fake"] and properties["parent"] then
+      existing_children[properties["parent"]["object"]] = properties
+    end
+  end
+
+  for name, properties in pairs(output_tbl) do
+    if properties["is_fake"] then
+      goto skip
+    end
+    local geo = properties["object"].geometry
+    if (( geo.width / geo.height) > 2) or geo.width > 3000 then
+      local fake_width = math.ceil(geo.width/2)
+      if not (( geo.width / geo.height) > 2) then
+        -- this is not a wide screen, let's give more to the left side a bit more (web/mail)
+        fake_width = math.ceil(geo.width*0.55)
+      end
+      local child = existing_children[properties["object"]]
+      if child then
+        -- the real screen went back to its full size (e.g. output mode change on
+        -- somewm resets the geometry from the monitor), so re-apply the split to
+        -- the existing pair instead of creating a second fake screen
+        local child_geo = child["object"].geometry
+        child["object"]:fake_resize(geo.x, geo.y, child_geo.width, geo.height)
+        properties["object"]:fake_resize(geo.x + child_geo.width, geo.y, (geo.width - child_geo.width), geo.height)
+        child["width"] = child_geo.width
+        child["height"] = geo.height
+        properties["width"] = geo.width - child_geo.width
+        goto skip
+      end
+      properties["object"]:fake_resize(geo.x + fake_width, geo.y, (geo.width - fake_width), geo.height)
+      local fake_obj = screen.fake_add(geo.x, geo.y, fake_width, geo.height)
+      local fake_screen_name = name .. "_sub_" .. tostring(fake_width) .. "x" .. tostring(geo.height)
+      output_tbl[fake_screen_name] = {}
+      output_tbl[fake_screen_name]["is_fake"] = true
+      output_tbl[fake_screen_name]["name"] = fake_screen_name
+      output_tbl[fake_screen_name]["parent"] = output_tbl[name]
+      output_tbl[fake_screen_name]["object"] = fake_obj
+      output_tbl[fake_screen_name]["primary"] = false
+      output_tbl[fake_screen_name]["tags"] = {}
+      fake_screen_registry[fake_obj] = {
+        name = fake_screen_name,
+        parent_object = properties["object"],
+      }
+    end
+    ::skip::
+  end
+
+  splitting_screens = false
+  return output_tbl
+end
+
+-- Output name of a screen, used to build the screens_table keys.
+-- somewm answers `outputs` from C with a numerically indexed table
+-- ({ [1] = { name = "DP-1", ... } }) instead of awful's name-keyed table, so
+-- plain next(s.outputs) returns the index 1 and all screens end up with the
+-- same key. Handle both shapes, fall back to the screen index to stay unique.
+function get_output_name(s)
+  for key, value in pairs(s.outputs or {}) do
+    if type(value) == "table" and value.name then
+      return value.name
+    end
+    if type(key) == "string" then
+      return key
+    end
+  end
+  if s.output and s.output.name then
+    return s.output.name
+  end
+  return "screen" .. tostring(s.index)
+end
+
 function get_screens()
   if awesome.release == "somewm" then
     local output_tbl = {}
+    local by_object = {}
     for s in screen do
-      local name = s.outputs and next(s.outputs) or "screen"
+      local registered = fake_screen_registry[s]
       local geo = s.geometry
-      local key = name .. "_" .. geo.width .. "x" .. geo.height
+      local key
+      -- names have to stay stable across re-runs, they are used for the tagsave files
+      if registered then
+        key = registered.name
+      else
+        key = real_screen_names[s]
+        if not key then
+          key = get_output_name(s) .. "_" .. geo.width .. "x" .. geo.height
+          real_screen_names[s] = key
+        end
+      end
       output_tbl[key] = {
         name    = key,
         primary = (s == screen.primary),
@@ -714,10 +829,19 @@ function get_screens()
         height  = geo.height,
         object  = s,
         parent  = nil,
+        is_fake = registered ~= nil,
         tags    = {},
       }
+      by_object[s] = output_tbl[key]
     end
-    return output_tbl
+    -- second pass, all entries exist now so fake screens can point at their parent
+    for _, properties in pairs(output_tbl) do
+      local registered = fake_screen_registry[properties["object"]]
+      if registered then
+        properties["parent"] = by_object[registered.parent_object]
+      end
+    end
+    return split_wide_screens(output_tbl)
   end
 
   local output_tbl = {}
@@ -749,35 +873,8 @@ function get_screens()
     xrandr:close()
   end
 
-    -- now check if there is any fake screens needed to be added
-    -- if the screen is too wide (or pixel count is too high, e.g. 4K), we will create a fake screen and add it to the table
-    for name, properties in pairs(output_tbl) do
-        if properties["is_fake"] then
-            goto skip
-        end
-        local geo = properties["object"].geometry
-        if (( geo.width / geo.height) > 2) or geo.width > 3000 then
-            local fake_width = math.ceil(geo.width/2)
-            local new_width = math.ceil(geo.width/2)
-            local new_width2 = geo.width - new_width
-            if not (( geo.width / geo.height) > 2) then
-                -- this is not a wide screen, let's give more to the left side a bit more (web/mail)
-                fake_width = math.ceil(geo.width*0.55)
-            end
-            properties["object"]:fake_resize(geo.x + fake_width, geo.y, (geo.width - fake_width), geo.height)
-            local fake_obj = screen.fake_add(geo.x, geo.y, fake_width, geo.height)
-            local fake_screen_name = name .. "_sub_" .. tostring(fake_width) .. "x" .. tostring(geo.height)
-            output_tbl[fake_screen_name] = {}
-            output_tbl[fake_screen_name]["is_fake"] = true
-            output_tbl[fake_screen_name]["name"] = fake_screen_name
-            output_tbl[fake_screen_name]["parent"] = output_tbl[name]
-            output_tbl[fake_screen_name]["object"] = fake_obj
-            output_tbl[fake_screen_name]["primary"] = false
-            output_tbl[fake_screen_name]["tags"] = {}
-        end
-        ::skip::
-    end
-	return output_tbl
+  -- now check if there is any fake screens needed to be added
+  return split_wide_screens(output_tbl)
 end
 
 function get_tooltip(object_to_attach)
@@ -798,12 +895,17 @@ function get_tooltip(object_to_attach)
 end
 
 function detect_external_monitor()
-  for name, _ in pairs(awful.screen.focused().outputs) do
-    if name ~= 'eDP-1' then
-      return true
+  local s = awful.screen.focused()
+  -- a fake screen carries a synthetic output, so ask the monitor it lives on
+  if screens_table then
+    for _, properties in pairs(screens_table) do
+      if properties['object'] == s and properties['is_fake'] and properties['parent'] then
+        s = properties['parent']['object']
+        break
+      end
     end
   end
-  return false
+  return get_output_name(s) ~= 'eDP-1'
 end
 
 function get_total_screen_count(screens_table)
