@@ -293,13 +293,19 @@ function update_dynamic_widgets()
   local largest_width = 0
 
   for name, props in pairs(screens_table) do
+    -- the screen can be gone already when an output change races the rebuild;
+    -- reading geometry off an invalid screen raises an error
+    if not props['object'].valid then
+      goto next_screen
+    end
+
     local dominated_area = false
     local dominated_by_itself = false
 
     local dominated_parent_name = nil
-    if props['is_fake'] then
+    if props['is_fake'] and props['parent'] then
       dominated_parent_name = props['parent']['name']
-    else
+    elseif not props['is_fake'] then
       for n2, p2 in pairs(screens_table) do
         if p2['is_fake'] and p2['parent'] and p2['parent']['object'] == props['object'] then
           dominated_parent_name = n2
@@ -328,6 +334,7 @@ function update_dynamic_widgets()
       largest_width = props['object'].geometry.width
       target_screen = props['object']
     end
+    ::next_screen::
   end
 
   -- Move dynamic widgets to the target screen's container
@@ -710,6 +717,11 @@ function process_screens(systray, screens_table, printmore)
 
   local second_screen_already_processed = false
   for name, properties in pairs(screens_table) do
+    -- skip screens that died between building the table and now
+    if not properties['object'].valid then
+      debug_print('Skipping gone screen: ' .. name, printmore)
+      goto next_screen
+    end
     -- In case we have more than 2 screens, we will register first
     -- non-primary screen as 2nd, others won't get tags.
     if properties['primary'] then
@@ -728,6 +740,7 @@ function process_screens(systray, screens_table, printmore)
         second_screen_already_processed = true
       end
     end
+    ::next_screen::
   end
   -- define rules since we have filled the screen table
   dofile(config_path .. "my_modules/rc_rules.lua")
@@ -934,6 +947,7 @@ end)
 local screen_rebuild_timer = nil
 local screen_rebuild_running = false
 local screen_rebuild_pending = false
+local initial_tags_loaded = false
 
 function schedule_screen_rebuild(delay, reason)
   debug_print('Screen rebuild requested (' .. tostring(reason) .. ')', printmore)
@@ -965,6 +979,14 @@ function schedule_screen_rebuild(delay, reason)
     end
 
     process_screens(my_systray, screens_table, printmore)
+
+    -- Tag restore needs the tags already placed on their screens, so it has to
+    -- run after the first rebuild, not at the end of rc.lua. Only once: later
+    -- rebuilds would throw away whatever tags are currently in view.
+    if not initial_tags_loaded then
+      initial_tags_loaded = true
+      load_last_active_tags(screens_table, printmore)
+    end
 
     screen_rebuild_running = false
     -- a real screen change that arrived while we were rebuilding
@@ -1228,5 +1250,7 @@ awesome.connect_signal('startup', function(s, state)
 end)
 
 debug_print("Last state of the screens table is: \n" .. my_utils.dump(screens_table), printmore)
-load_last_active_tags(screens_table, printmore)
+-- load_last_active_tags() runs from schedule_screen_rebuild() instead: the
+-- screens are processed from a timer now, so at this point no tag has been
+-- placed on a screen yet and the restore would have nothing to work with.
 -- vim: set ts=2 sw=2 tw=0 :

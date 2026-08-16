@@ -731,11 +731,15 @@ end
 --   AWESOME_FAKE_SCREEN_MIN_WIDTH=N -> pixel width that triggers a split
 --                                      (default 3000; lower it to exercise the
 --                                      split in a small nested compositor)
+--   AWESOME_FAKE_SCREEN_OUTPUTS=pat -> Lua pattern the output name must match
+--                                      (default "^DP", so the DP-* monitors get
+--                                      split but the internal eDP-1 panel does not)
 local function split_wide_screens(output_tbl)
   if splitting_screens or os.getenv("AWESOME_NO_FAKE_SCREEN") == "1" then
     return output_tbl
   end
   local split_min_width = tonumber(os.getenv("AWESOME_FAKE_SCREEN_MIN_WIDTH")) or 3000
+  local split_outputs = os.getenv("AWESOME_FAKE_SCREEN_OUTPUTS") or "^DP"
   splitting_screens = true
 
   -- which real screens already carry a fake child in this table
@@ -748,6 +752,11 @@ local function split_wide_screens(output_tbl)
 
   for name, properties in pairs(output_tbl) do
     if properties["is_fake"] then
+      goto skip
+    end
+    -- only the outputs we want to split (the internal panel is wide enough to
+    -- trigger the pixel rule, but splitting it is not useful)
+    if not get_output_name(properties["object"]):match(split_outputs) then
       goto skip
     end
     local geo = properties["object"].geometry
@@ -812,8 +821,30 @@ function get_output_name(s)
   return "screen" .. tostring(s.index)
 end
 
+-- Drop fake screens whose real screen is gone (monitor unplugged or switched
+-- off, e.g. by the wlr-randr line in the startup script). They would otherwise
+-- survive as ghost screens with a wibar and tags on an area nothing renders.
+local function drop_orphan_fake_screens()
+  local orphans = {}
+  for s in screen do
+    local registered = fake_screen_registry[s]
+    -- `valid` is the only property that stays readable on a torn-down screen
+    if registered and not (registered.parent_object and registered.parent_object.valid) then
+      table.insert(orphans, s)
+    end
+  end
+  for _, s in ipairs(orphans) do
+    fake_screen_registry[s] = nil
+    if s.valid then
+      s:fake_remove()
+    end
+  end
+end
+
 function get_screens()
   if awesome.release == "somewm" then
+    drop_orphan_fake_screens()
+
     local output_tbl = {}
     local by_object = {}
     for s in screen do
@@ -847,6 +878,12 @@ function get_screens()
       local registered = fake_screen_registry[properties["object"]]
       if registered then
         properties["parent"] = by_object[registered.parent_object]
+        -- parent is still around but did not make it into the table: treat the
+        -- screen as a normal one, everything downstream expects a fake screen
+        -- to always have a parent
+        if not properties["parent"] then
+          properties["is_fake"] = false
+        end
       end
     end
     return split_wide_screens(output_tbl)
