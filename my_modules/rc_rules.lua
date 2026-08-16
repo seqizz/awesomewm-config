@@ -260,6 +260,7 @@ function set_rules(clientkeys)
           'Slack',
           'slack',
           'TelegramDesktop',
+          'ZapZap',
           'org.telegram.desktop',
           'Microsoft Teams - Preview',
           'discord',
