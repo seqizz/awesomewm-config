@@ -34,7 +34,7 @@ local cache_path = gears.filesystem.get_cache_dir()
 
 -- debug stuff if needed
 -- global (not local) so required modules can honor it as a master debug switch
-printmore = false
+printmore = true
 
 -- my theme
 beautiful.init(config_path .. "my_modules/my_theme.lua")

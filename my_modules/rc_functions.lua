@@ -724,10 +724,18 @@ end
 
 -- Split screens that are too wide (ultrawide ratio, or a lot of pixels like 4K)
 -- into a real screen (right part) plus a fake screen (left part).
+--
+-- Recovery/debug switches (read from the environment so they can be set on the
+-- somewm/awesome command line without editing the config):
+--   AWESOME_NO_FAKE_SCREEN=1        -> never split, start with the plain outputs
+--   AWESOME_FAKE_SCREEN_MIN_WIDTH=N -> pixel width that triggers a split
+--                                      (default 3000; lower it to exercise the
+--                                      split in a small nested compositor)
 local function split_wide_screens(output_tbl)
-  if splitting_screens then
+  if splitting_screens or os.getenv("AWESOME_NO_FAKE_SCREEN") == "1" then
     return output_tbl
   end
+  local split_min_width = tonumber(os.getenv("AWESOME_FAKE_SCREEN_MIN_WIDTH")) or 3000
   splitting_screens = true
 
   -- which real screens already carry a fake child in this table
@@ -743,7 +751,7 @@ local function split_wide_screens(output_tbl)
       goto skip
     end
     local geo = properties["object"].geometry
-    if (( geo.width / geo.height) > 2) or geo.width > 3000 then
+    if (( geo.width / geo.height) > 2) or geo.width > split_min_width then
       local fake_width = math.ceil(geo.width/2)
       if not (( geo.width / geo.height) > 2) then
         -- this is not a wide screen, let's give more to the left side a bit more (web/mail)
