@@ -19,6 +19,7 @@ local rotate_widget = require("my_modules/rotatescreen")
 local touch_widget = require("my_modules/touchscreen")
 local autolock_widget = require("my_modules/autolock")
 local dynamic_separator = require("my_modules/dynamic_separator")
+local notification_history = require("my_modules/notification_history")
 -- local keyboard_widget = require("my_modules/keyboard")
 local helpers = require("my_modules/geo_helpers")
 local edid = require('my_modules/edid')
@@ -827,7 +828,9 @@ globalkeys = gears.table.join(
                                                                 save_current_tags(screens_table)
                                                                 awesome.restart()
                                                             end),
-  awful.key({ win, "Shift" }, "z",                          unminimize_client)
+  awful.key({ win, "Shift" }, "z",                          unminimize_client),
+  -- Re-read notifications that already timed out
+  awful.key({ win          }, "n",                          function() notification_history.toggle() end)
 )
 if ( hostname == "splinter" ) then
   gears.table.merge(globalkeys, gears.table.join(
