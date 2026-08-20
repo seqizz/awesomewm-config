@@ -87,6 +87,7 @@ function set_rules(clientkeys)
           'Gcr-prompter',
           'mpv',
           "No Man's Sky",
+          'Project Zomboid',
         },
         -- Note that the name property shown in xprop might be set slightly after creation of the client
         -- and the name shown there might not match defined rules here.

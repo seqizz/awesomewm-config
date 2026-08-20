@@ -785,7 +785,7 @@ globalkeys = gears.table.join(
                                                               fn_process_action('media', 'previous')
                                                               mpris:check()
                                                             end),
-  awful.key({ win          }, "F9",                    nil, function() awful.spawn("rofi-pulse-select sink") end),
+  awful.key({ win          }, "F9",                    nil, function() capslock.spawn_and_check("rofi-pulse-select sink") end),
   -- Dropdown terminal: F12
   awful.key({              }, "F12",                   nil, function()
     -- record focused client before showing, so we can restore on unmanage
@@ -796,12 +796,14 @@ globalkeys = gears.table.join(
   end),
   awful.key({              }, "Print",                 nil, function() awful.spawn("flameshot gui") end),
   awful.key({ "Shift"      }, "Print",                      function() awful.spawn("flameshot full -c") end),
-  awful.key({ ctrl         }, "space",                      function() awful.spawn(rofi_cmd) end),
-  awful.key({              }, "F9",                    nil, function() awful.spawn(rofi_emoji_cmd) end),
-  awful.key({ ctrl         }, "F9",                    nil, function() awful.spawn(rofi_calc_cmd) end),
-  awful.key({ "Shift"      }, "F9",                    nil, function() awful.spawn(rofi_subsuper) end),
-  awful.key({ ctrl, alt    }, "c",                          function() awful.spawn(greenclip_cmd) end),
-  awful.key({ win          }, "p",                          function() awful.spawn("rofi-rbw") end),
+  -- rofi grabs the keyboard, so awesome misses a Caps_Lock press inside it;
+  -- spawn_and_check resyncs the capslock widget when the popup exits
+  awful.key({ ctrl         }, "space",                      function() capslock.spawn_and_check(rofi_cmd) end),
+  awful.key({              }, "F9",                    nil, function() capslock.spawn_and_check(rofi_emoji_cmd) end),
+  awful.key({ ctrl         }, "F9",                    nil, function() capslock.spawn_and_check(rofi_calc_cmd) end),
+  awful.key({ "Shift"      }, "F9",                    nil, function() capslock.spawn_and_check(rofi_subsuper) end),
+  awful.key({ ctrl, alt    }, "c",                          function() capslock.spawn_and_check(greenclip_cmd) end),
+  awful.key({ win          }, "p",                          function() capslock.spawn_and_check("rofi-rbw") end),
   awful.key({ ctrl, alt    }, "t",                          function() awful.spawn(terminal) end),
   awful.key({ win          }, "XF86WakeUp",            nil, function() awful.spawn("sudo systemctl suspend") end),
   awful.key({ alt, "Shift" }, "t",                          function() awful.spawn("wezterm --config-file /home/gurkan/.config/wezterm/old-nomux.lua start") end),

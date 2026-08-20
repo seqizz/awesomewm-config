@@ -16,6 +16,19 @@ local capslock = create_toggle_widget({
   visible_when_disabled = false,
 })
 
+-- Keyboard-grabbing popups (rofi, greenclip, ...) hold an active grab, which
+-- beats the passive root grabs below, so a Caps_Lock press inside them is
+-- invisible to awesome. Re-check on focus changes to resync afterwards.
+-- Covers managed grabbers, including on their death (unmanage refocuses).
+client.connect_signal('focus', function() capslock:check() end)
+
+-- Rofi is override-redirect unless started with -normal-window, so awesome
+-- never manages it and no client signal fires around it. Launch such grabbers
+-- through this helper instead of awful.spawn to get a re-check when they exit.
+function capslock.spawn_and_check(cmd)
+  awful.spawn.easy_async(cmd, function() capslock:check() end)
+end
+
 -- keybindings (these need to be global for rc.lua to merge them)
 win = 'Mod4'
 alt = 'Mod1'
