@@ -92,41 +92,53 @@ slider_timer = gears.timer({
   end,
 })
 
+-- awful.popup only re-runs its placement callback after the popup is redrawn,
+-- so a popup revived on a different screen first appears at its old
+-- coordinates and then visibly slides to the new spot. Move it while it is
+-- still hidden, then show it.
+local function show_popup(popup, s)
+  popup.screen = s
+  awful.placement.top_right(popup, {
+    margins = widget_margins,
+    bounding_rect = s.geometry,
+  })
+  popup.visible = true
+end
+
 triggerwibox = function(action)
-  vb_slider.screen = awful.screen.focused()
-  vb_textinfo.screen = awful.screen.focused()
+  local s = awful.screen.focused()
   if action == 'volume' then
     vb_slider.widget = sound_slider
     vb_textinfo.visible = false
-    vb_slider.visible = true
+    show_popup(vb_slider, s)
   elseif action == 'brightness' then
     vb_slider.widget = brightness_slider
     vb_textinfo.visible = false
-    vb_slider.visible = true
+    show_popup(vb_slider, s)
   elseif action == 'mute' then
     textwidget.widget.markup = '  🔇 <i>Sound muted</i>'
     vb_slider.visible = false
-    vb_textinfo.visible = true
+    show_popup(vb_textinfo, s)
   elseif string.match(action, 'Stopped') then
     textwidget.widget.markup = '⬛ <i>Stopped</i>'
     vb_slider.visible = false
-    vb_textinfo.visible = true
+    show_popup(vb_textinfo, s)
   elseif string.match(action, 'Playing') then
     textwidget.widget.markup = '▶️ <i>Playing</i>'
     vb_slider.visible = false
-    vb_textinfo.visible = true
+    show_popup(vb_textinfo, s)
   elseif string.match(action, 'Paused') then
     textwidget.widget.markup = '⏸️ <i>Paused</i>'
     vb_slider.visible = false
-    vb_textinfo.visible = true
+    show_popup(vb_textinfo, s)
   elseif action == 'micmute' then
     textwidget.widget.markup = '🎙️🟥 <i>Mic Muted</i>'
     vb_slider.visible = false
-    vb_textinfo.visible = true
+    show_popup(vb_textinfo, s)
   elseif action == 'micunmute' then
     textwidget.widget.markup = '🎙️🟩 <i>Mic Unmuted</i>'
     vb_slider.visible = false
-    vb_textinfo.visible = true
+    show_popup(vb_textinfo, s)
   end
   slider_timer:again()
 end

@@ -830,7 +830,13 @@ globalkeys = gears.table.join(
                                                             end),
   awful.key({ win, "Shift" }, "z",                          unminimize_client),
   -- Re-read notifications that already timed out
-  awful.key({ win          }, "n",                          function() notification_history.toggle() end)
+  awful.key({ win          }, "n",                          function() notification_history.toggle() end),
+  -- Step the fake screen boundary through the split presets. Global rather than
+  -- a clientkey like F7/F8 so it also works on an empty tag.
+  awful.key({ win          }, "F6",                    nil, function()
+                                                              cycle_screen_split(awful.screen.focused(), screens_table)
+                                                              update_dynamic_widgets()
+                                                            end)
 )
 if ( hostname == "splinter" ) then
   gears.table.merge(globalkeys, gears.table.join(

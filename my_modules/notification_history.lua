@@ -62,7 +62,9 @@ local IGNORE_PATTERNS = {
 -- Senders to drop entirely, matched against a lowercased app_name. Knob for
 -- chatty apps whose toasts are never worth re-reading (e.g. a music player
 -- announcing every track change).
-local IGNORE_APPS = {}
+local IGNORE_APPS = {
+  '^screen_split$', -- Win+F6 split ratio readout, transient by design
+}
 
 -- Dimmed gruvbox gray for secondary text (timestamps, hints, low urgency).
 local DIM = '#928374'

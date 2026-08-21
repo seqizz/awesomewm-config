@@ -490,44 +490,126 @@ function get_child_of(s, screens_table)
 end
 
 local lock_file = "/tmp/awesome_wallpaper.lock"
-function resize_screen(s, screens_table, shrink)
-  local diff
-  if shrink then
-      diff = -dpi(50)
-  else
-      diff = dpi(50)
-  end
-
-  for name, properties in pairs(screens_table) do
+-- Resolve the fake screen pair that `s` belongs to.
+-- Returns left, right (left is always the fake screen, right always the real
+-- parent, matching how get_screens builds them), or nil when `s` is not part of
+-- a split. Shared by the F7/F8 nudge, the Win+Alt-right-drag boundary handle
+-- and the split presets, which all used to re-derive this independently.
+function get_fake_pair(s, screens_table)
+  for _, properties in pairs(screens_table) do
     if properties["object"] == s then
-        -- I found my screen
       if properties["is_fake"] then
-        -- this is a fake screen which has a sibling (parent)
-        -- whatever you do here, do the reverse to the parent
-        -- first, we will reverse the action on the shrink variable
-        -- because we want to have a consistent shortcut, independent of our current screen
-        -- e.g. same key will always cause growth on the same screen, shrink on the other
-        diff = -diff
-        local geo = s.geometry
-        local parent_geo = properties["parent"]["object"].geometry
-        s:fake_resize(geo.x, geo.y, geo.width + diff, geo.height)
-        properties["parent"]["object"]:fake_resize(parent_geo.x + diff, parent_geo.y, parent_geo.width - diff, parent_geo.height)
-      else
-        local geo = s.geometry
-        local child = get_child_of(s, screens_table)
-        if child == nil then
-            -- this screen has no fake screen under it, noop
-            goto nochange
-        end
-        -- this is a screen which has a fake screen sibling
-        -- whatever you do here, do the reverse to the sibling
-        local fake_geo = child.geometry
-        s:fake_resize(geo.x - diff, geo.y, geo.width + diff, geo.height)
-        child:fake_resize(fake_geo.x,fake_geo.y, fake_geo.width - diff, fake_geo.height)
-        ::nochange::
+        return s, properties["parent"]["object"]
+      end
+      local child = get_child_of(s, screens_table)
+      if child == nil then return nil end
+      return child, s
+    end
+  end
+  return nil
+end
+
+-- Never let either half shrink past this: below it the wibar stops being
+-- usable and the tags on that screen become effectively unreachable.
+MIN_SPLIT_WIDTH = 300
+
+-- Move the boundary of a fake screen pair by a fixed step.
+-- The step always applies to the left (fake) screen regardless of which half is
+-- focused, so the same key grows the same side no matter where you are. The old
+-- implementation achieved that by flipping the sign per branch; expressed
+-- directly here, with the original key directions preserved:
+-- F7 (shrink=false) narrows the left screen, F8 (shrink=true) widens it.
+function resize_screen(s, screens_table, shrink)
+  local left, right = get_fake_pair(s, screens_table)
+  if not left then return end
+
+  local diff = shrink and dpi(50) or -dpi(50)
+  set_split_boundary(left, right, left.geometry.width + diff)
+end
+
+-- Tiled clients reflow by themselves on a screen geometry change, floating ones
+-- do not: they keep their absolute coords and end up straddling the seam or
+-- outside their screen entirely. Barely visible with the 50px nudge, very
+-- visible after a preset jump moves the boundary by a thousand pixels.
+function reflow_floating_clients(left, right)
+  for _, scr in ipairs({ left, right }) do
+    for _, c in ipairs(scr.clients) do
+      if c.floating and not c.fullscreen then
+        awful.placement.no_offscreen(c, { honor_workarea = true, screen = scr })
       end
     end
   end
+end
+
+-- Apply an absolute boundary: give the left screen `left_width` px and hand the
+-- rest of the pair's combined width to the right screen. Widths come from live
+-- geometry, so this composes with whatever the nudge keys already did.
+--
+-- Callers driving a continuous drag pass defer_reflow=true and call
+-- reflow_floating_clients() once on release; reflowing on every mousegrabber
+-- tick makes floating windows jitter under the cursor.
+function set_split_boundary(left, right, left_width, defer_reflow)
+  local left_geo = left.geometry
+  local right_geo = right.geometry
+  local total = left_geo.width + right_geo.width
+
+  local min = dpi(MIN_SPLIT_WIDTH)
+  left_width = math.floor(math.max(min, math.min(total - min, left_width)))
+  local right_width = total - left_width
+
+  left:fake_resize(left_geo.x, left_geo.y, left_width, left_geo.height)
+  right:fake_resize(left_geo.x + left_width, right_geo.y, right_width, right_geo.height)
+
+  if not defer_reflow then
+    reflow_floating_clients(left, right)
+  end
+
+  return left_width, right_width
+end
+
+-- Share of the pair width given to the left screen, in ascending order.
+-- 0.55 is the get_screens default for a non-ultrawide 4K output.
+SPLIT_PRESETS = { 0.34, 0.5, 0.55, 0.66 }
+
+-- Step to the next preset wider than the current left share, wrapping around.
+-- Picking "next larger" instead of an index means a boundary left in some
+-- arbitrary spot by F7/F8 or the mouse drag still lands on a sane preset.
+function cycle_screen_split(s, screens_table)
+  local left, right = get_fake_pair(s, screens_table)
+  if not left then
+    -- No fake screen here: get_screens only splits outputs wider than 3000px or
+    -- with an aspect ratio above 2, so on a laptop panel there is no boundary to
+    -- move. Say so, otherwise the key looks broken.
+    naughty.notification {
+      app_name = 'screen_split',
+      text = 'No fake screen split on this output',
+      timeout = 2,
+    }
+    return
+  end
+
+  local total = left.geometry.width + right.geometry.width
+  local current = left.geometry.width / total
+
+  local target = SPLIT_PRESETS[1]
+  for _, ratio in ipairs(SPLIT_PRESETS) do
+    -- Tolerance: fake_resize works in whole pixels, so a ratio never round-trips
+    -- exactly and an equality test would stick on the current preset.
+    if ratio > current + 0.01 then
+      target = ratio
+      break
+    end
+  end
+
+  local left_width, right_width = set_split_boundary(left, right, total * target)
+  naughty.notification {
+    app_name = 'screen_split',
+    text = string.format('split %d/%d  (%dpx / %dpx)',
+                         math.floor(left_width / total * 100 + 0.5),
+                         math.floor(right_width / total * 100 + 0.5),
+                         left_width, right_width),
+    timeout = 2,
+  }
 end
 
 local function set_wallpaper(s)
