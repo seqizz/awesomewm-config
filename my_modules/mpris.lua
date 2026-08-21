@@ -8,7 +8,7 @@ local gears = require('gears')
 -- Players we follow, in priority order. playerctl picks the first present one.
 -- Keeping an explicit allowlist stops browser video (firefox/chromium) from
 -- hijacking the widget when it starts playing an MPRIS stream.
-local PLAYERS = 'spotify,jellyfin-tui'
+local PLAYERS = 'spotify,trayplay,jellyfin-tui'
 
 local mpristext = wibox.widget({
   layout = wibox.container.scroll.horizontal,
@@ -61,7 +61,7 @@ local _raise_tag_of_client = function(c)
 end
 
 -- Hide / show the Spotify window. Only meaningful for spotify: jellyfin-tui runs
--- inside a terminal with no dedicated window to raise, so this is a no-op there.
+-- inside a terminal and trayplay has no toplevel window, so this is a no-op there.
 function mpriswidget:raise_toggle()
   local cls = client.get()
   for _, c in ipairs(cls) do
