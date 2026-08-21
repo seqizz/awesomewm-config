@@ -24,7 +24,7 @@ end
 local CONFIG = {
   -- Same allowlist/priority as my_modules/mpris.lua so both widgets track the
   -- same player. playerctl picks the first present one.
-  player        = 'spotify,jellyfin-tui',
+  player        = 'spotify,trayplay,jellyfin-tui',
   poll_playing  = 0.5,         -- local clock tick + redraw interval while playing
   no_lyric_text = '…',         -- shown before first timestamped line
   max_width     = dpi(500),    -- max widget width, sizes down to text width

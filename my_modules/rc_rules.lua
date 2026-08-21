@@ -182,6 +182,17 @@ function set_rules(clientkeys)
       },
     },
 
+    {
+      rule = {
+        class = 'trayplay',
+      },
+      properties = {
+        floating = true,
+        sticky = true,
+        callback = function(c) awful.placement.top_right(c, { honor_workarea = true }) end,
+      },
+    },
+
     -- Titlebars
     {
       rule_any = {
