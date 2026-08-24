@@ -189,6 +189,10 @@ function set_rules(clientkeys)
       properties = {
         floating = true,
         sticky = true,
+        -- Stated rather than relied on: the popup is unmanaged on every hide, so
+        -- anything that clears this at runtime keeps it in the tasklist until the
+        -- next map.
+        skip_taskbar = true,
         border_width = 0,
         shape = gears.shape.rectangle,
         shadow = false,

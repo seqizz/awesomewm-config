@@ -51,36 +51,6 @@ function mpriswidget:set(state, is_playing)
   mpristext.widget:set_markup_silently(' ' .. state)
 end
 
-local _raise_tag_of_client = function(c)
-  local tags = root.tags()
-  for _, t in ipairs(tags) do
-    if my_utils.table_contains(t:clients(), c, false) then
-      t:view_only()
-    end
-  end
-end
-
--- Hide / show the Spotify window. Only meaningful for spotify: jellyfin-tui runs
--- inside a terminal and trayplay has no toplevel window, so this is a no-op there.
-function mpriswidget:raise_toggle()
-  local cls = client.get()
-  for _, c in ipairs(cls) do
-    if c.class == 'Spotify' then
-      if c.skip_taskbar then
-        _raise_tag_of_client(c)
-        c.skip_taskbar = false
-        c.minimized = false
-        c:raise()
-        client.focus = c
-      else
-        c.skip_taskbar = true
-        c.minimized = true
-      end
-    end
-  end
-  mpriswidget:check()
-end
-
 -- Event-driven: one long-running `playerctl --follow` pushes a line on every
 -- track/status change instead of polling+forking every 15s. The follower is the
 -- single source of truth for widget state.
@@ -101,6 +71,148 @@ local function dbg(msg)
   if debug or printmore then
     debug_print(msg, true)
   end
+end
+
+-- Right-click behaviour is driven by whichever player the widget currently shows.
+-- Key is the playerctl player name with its dbus instance suffix stripped.
+--   class/instance -- match the player's toplevel window, if it has one
+--   action         -- entry in ACTIONS below, defaults to 'hide_toggle'
+--   spawn          -- argv used when no window is around (nil = nothing to launch)
+-- Players with no entry at all (jellyfin-tui lives inside a terminal) make
+-- right-click a no-op.
+local PLAYER_WINDOWS = {
+  spotify = {
+    class = 'Spotify',
+    -- the window keeps existing while hidden, so flip it in place
+    action = 'hide_toggle',
+  },
+
+  trayplay = {
+    class = 'trayplay',
+    -- systray player: running the binary again hands off to the instance that
+    -- is already up and toggles its popup, so the app owns show/hide entirely
+    -- and touching the client from here only fights it
+    action = 'spawn_only',
+    spawn = { 'trayplay' },
+  },
+}
+
+-- 'spotify.instance1234' -> 'spotify'
+local function player_base(name) return name and name:match('^[^.]+') or nil end
+
+-- Clients matching PLAYER_WINDOWS, kept up to date by the manage/unmanage
+-- signals so raise_toggle never has to walk the whole client list.
+local tracked_clients = {}
+
+local function spec_matches(spec, c)
+  return (not spec.class or c.class == spec.class) and (not spec.instance or c.instance == spec.instance)
+end
+
+local function track_client(c)
+  for player, spec in pairs(PLAYER_WINDOWS) do
+    if spec_matches(spec, c) then
+      tracked_clients[player] = c
+      return
+    end
+  end
+end
+
+-- somewm renamed the client-appears signal; the config runs on both.
+local manage_signal = awesome.release == 'somewm' and 'request::manage' or 'manage'
+client.connect_signal(manage_signal, track_client)
+
+client.connect_signal('unmanage', function(c)
+  for player, tracked in pairs(tracked_clients) do
+    if tracked == c then
+      tracked_clients[player] = nil
+    end
+  end
+end)
+
+-- Awesome restart keeps existing clients, so seed the cache once at load.
+for _, c in ipairs(client.get()) do
+  track_client(c)
+end
+
+local function raise_tag_of_client(c)
+  for _, t in ipairs(root.tags()) do
+    if my_utils.table_contains(t:clients(), c, false) then
+      t:view_only()
+    end
+  end
+end
+
+local function show_client(c)
+  -- sticky clients are on every tag already, so skip the tag switch for them
+  if not c.sticky then
+    raise_tag_of_client(c)
+  end
+  c.skip_taskbar = false
+  c.minimized = false
+  c:raise()
+  client.focus = c
+end
+
+local ACTIONS = {
+  -- window survives hiding: flip between hidden-from-taskbar/minimized and shown
+  hide_toggle = function(spec, c)
+    if not c then
+      if spec.spawn then
+        awful.spawn(spec.spawn)
+      end
+      return
+    end
+
+    if c.skip_taskbar then
+      show_client(c)
+    else
+      c.skip_taskbar = true
+      c.minimized = true
+    end
+  end,
+
+  -- the app itself decides what a relaunch means (show / raise / hide), so just
+  -- run it and stay out of the way. Deliberately does not touch the client:
+  -- show_client's skip_taskbar = false is what used to leave the window sitting
+  -- in the tasklist after a second click, since nothing sets it back.
+  spawn_only = function(spec, _)
+    if spec.spawn then
+      awful.spawn(spec.spawn)
+    end
+  end,
+
+  -- window is gone when hidden: launching the binary brings it back, and when it
+  -- is already mapped there is only ever something to raise
+  spawn_or_raise = function(spec, c)
+    if c then
+      show_client(c)
+    elseif spec.spawn then
+      awful.spawn(spec.spawn)
+    end
+  end,
+}
+
+-- Act on the window of the currently active MPRIS player, per its spec.
+function mpriswidget:raise_toggle()
+  local player = player_base(current_player)
+  local spec = player and PLAYER_WINDOWS[player]
+
+  if not spec then
+    dbg('[mpris] raise_toggle: no window spec for player=[' .. tostring(current_player) .. ']')
+    return
+  end
+
+  local c = tracked_clients[player]
+  if c and not c.valid then
+    tracked_clients[player] = nil
+    c = nil
+  end
+
+  local action_name = spec.action or 'hide_toggle'
+  dbg('[mpris] raise_toggle: player=[' .. player .. '] action=[' .. action_name .. '] client=[' .. tostring(c) .. ']')
+  ACTIONS[action_name](spec, c)
+
+  mpriswidget:check()
 end
 
 local visible_state = nil -- last emitted visibility, so we only signal on change
