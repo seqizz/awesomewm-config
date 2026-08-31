@@ -806,6 +806,7 @@ globalkeys = gears.table.join(
   awful.key({ ctrl, alt    }, "c",                          function() capslock.spawn_and_check(greenclip_cmd) end),
   awful.key({ win          }, "p",                          function() capslock.spawn_and_check("rofi-rbw") end),
   awful.key({ ctrl, alt    }, "t",                          function() awful.spawn(terminal) end),
+  awful.key({ win          }, "t",                          function() awful.spawn('trayplay') end),
   awful.key({ win          }, "XF86WakeUp",            nil, function() awful.spawn("sudo systemctl suspend") end),
   awful.key({ alt, "Shift" }, "t",                          function() awful.spawn("wezterm --config-file /home/gurkan/.config/wezterm/old-nomux.lua start") end),
   awful.key({ win          }, "c",                          function() awful.spawn("chromium-browser --password-store=basic") end),
