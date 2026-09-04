@@ -24,7 +24,7 @@ volume_widget = lain.widget.pulse {
 			soundlevel_emoji = my_utils.create_markup{
 				text="",
 				size="xx-large",
-				fg="#dc322f",
+				fg=beautiful.warning_bg,
 				font="LineIcons"
 			}
 		elseif tonumber(volume_now.left) > 70 then

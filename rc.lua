@@ -24,7 +24,9 @@ local notification_history = require("my_modules/notification_history")
 local helpers = require("my_modules/geo_helpers")
 local edid = require('my_modules/edid')
 local dpi = require('beautiful').xresources.apply_dpi
-hostname = io.popen("uname -n"):read()
+local hostname_fh = io.popen("uname -n")
+hostname = hostname_fh:read('*l')
+hostname_fh:close()
 -- wezterm mux socket path; needed when spawning wezterm CLI from outside a wezterm pane
 wezterm_sock = os.getenv("WEZTERM_UNIX_SOCKET") or (os.getenv("HOME") .. "/.wezterm.sock")
 
@@ -250,6 +252,27 @@ separator_reverse = my_utils.create_separator({
   set_shape = function(cr, width, height)
     gears.shape.parallelogram(cr, width, height)
     -- gears.shape.powerline(cr, width, height, (height / 2) * (-1))
+  end
+})
+
+-- separators flanking the battery widget; each fills the triangle gap facing
+-- the battery with the warning bg when the battery emits its low signal, so
+-- the red block reads as continuous between the two slanted separator lines
+-- instead of leaving transparent triangles against the battery's square edges
+battery_sep_left = my_utils.create_separator({
+  span_ratio = 0.7,
+  bg_signal = 'widget::battery::low',
+  bg_right = beautiful.warning_bg,
+  set_shape = function(cr, width, height)
+    gears.shape.parallelogram(cr, width, height)
+  end
+})
+battery_sep_right = my_utils.create_separator({
+  span_ratio = 0.7,
+  bg_signal = 'widget::battery::low',
+  bg_left = beautiful.warning_bg,
+  set_shape = function(cr, width, height)
+    gears.shape.parallelogram(cr, width, height)
   end
 })
 
@@ -568,9 +591,9 @@ local function screen_organizer(s, screen_count, primary, is_extra)
 
   if primary then
     -- table.insert(systray_right_widgets, keyboard_widget)
-    table.insert(systray_right_widgets, separator_reverse)
+    table.insert(systray_right_widgets, battery_sep_left)
     table.insert(systray_right_widgets, battery_widget)
-    table.insert(systray_right_widgets, separator_reverse)
+    table.insert(systray_right_widgets, battery_sep_right)
     table.insert(systray_right_widgets, psi_widget)
     table.insert(systray_right_widgets, separator_reverse)
     table.insert(systray_right_widgets, my_systray)

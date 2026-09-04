@@ -250,6 +250,29 @@ function my_utils.svg_icon(opts)
   return image, display
 end
 
+-- triangle shape matching the transparent gap of gears.shape.parallelogram
+-- (default base_width = width/3), so a bg color can fill just that gap and
+-- bridge the separator to a colored neighbor (e.g. the low-battery red block)
+-- instead of the slanted line leaving a transparent triangle against the
+-- neighbor's square vertical edge.
+local function parallelogram_gap_shape(side)
+  return function(cr, width, height)
+    local base = width / 3
+    if side == 'left' then
+      -- top-left triangle, left of the parallelogram's `/` left edge
+      cr:move_to(0, 0)
+      cr:line_to(width - base, 0)
+      cr:line_to(0, height)
+    else
+      -- bottom-right triangle, right of the parallelogram's `\` right edge
+      cr:move_to(width, 0)
+      cr:line_to(width, height)
+      cr:line_to(base, height)
+    end
+    cr:close_path()
+  end
+end
+
 function my_utils.create_separator(opts)
   local wibox = require('wibox')
   local gears = require('gears')
@@ -257,7 +280,7 @@ function my_utils.create_separator(opts)
 
   opts = opts or {}
 
-  local separator = {
+  local separator = wibox.widget {
     widget = wibox.widget.separator,
     orientation = opts.orientation or "horizontal",
     forced_width = opts.width or 30,
@@ -265,16 +288,58 @@ function my_utils.create_separator(opts)
     span_ratio = opts.span_ratio,
   }
 
-  -- Handle shape - either custom set_shape function or standard shape
+  -- Handle shape - either custom set_shape function or standard shape.
+  -- Must call the setter (not assign the method), otherwise the separator
+  -- method is shadowed and _private.shape stays nil, falling back to draw_line
   if opts.set_shape then
-    separator.set_shape = opts.set_shape
+    separator:set_shape(opts.set_shape)
   elseif opts.shape then
     separator.shape = opts.shape
   else
     separator.shape = gears.shape.powerline
   end
 
-  return wibox.widget(separator)
+  -- Optional side fill: color the transparent triangle gap on one side of the
+  -- separator's parallelogram so it visually merges with a colored neighbor.
+  -- Driven by a boolean signal (e.g. "widget::battery::low") so the fill only
+  -- appears while the neighbor is actually in its colored state.
+  if opts.bg_signal and (opts.bg_left or opts.bg_right) then
+    local transparent = "#00000000"
+    local sep_width = opts.width or 30
+
+    -- wibox.widget.separator fills its shape with `color`; toggling between
+    -- the real color and fully-transparent hides/shows the triangle fill
+    local function make_fill(side, color)
+      return wibox.widget {
+        widget = wibox.widget.separator,
+        orientation = opts.orientation or "horizontal",
+        forced_width = sep_width,
+        color = transparent,
+        set_shape = parallelogram_gap_shape(side),
+      }
+    end
+
+    local left_fill = opts.bg_left and make_fill('left', opts.bg_left) or nil
+    local right_fill = opts.bg_right and make_fill('right', opts.bg_right) or nil
+
+    local function apply(on)
+      if left_fill then left_fill.color = on and opts.bg_left or transparent end
+      if right_fill then right_fill.color = on and opts.bg_right or transparent end
+    end
+    awesome.connect_signal(opts.bg_signal, apply)
+    -- start transparent; the signal source (e.g. battery) may re-emit on update
+    apply(false)
+
+    -- separator line is last so it draws on top of the side fills
+    local children = {}
+    if left_fill then table.insert(children, left_fill) end
+    if right_fill then table.insert(children, right_fill) end
+    table.insert(children, separator)
+    children.layout = wibox.layout.stack
+    return wibox.widget(children)
+  end
+
+  return separator
 end
 
 return my_utils

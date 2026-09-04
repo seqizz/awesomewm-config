@@ -48,6 +48,9 @@ theme.tooltip_fg = "#ffffff"
 theme.border_normal = "#252525"
 -- theme.separator     = theme.bg_focus
 theme.separator     = theme.bg_focus
+-- shared warning bg (capslock enabled state, low-battery block); kept in one place
+-- so the separators that bridge into the low-battery block match exactly
+theme.warning_bg    = "#dc322f"
 
 theme.slider_bg            = "#e3e3e3"
 theme.slider_sound_fg      = theme.fg_normal
