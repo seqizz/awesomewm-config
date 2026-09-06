@@ -1,5 +1,9 @@
 pcall(require, "luarocks.loader")
 
+-- lain symlinked under ~/.local/awesome-lain
+local lain_base = os.getenv("HOME") .. "/.local"
+package.path = package.path .. ";" .. lain_base .. "/awesome-?.lua;" .. lain_base .. "/awesome-?/init.lua"
+
 local gears = require("gears")
 local awful = require("awful")
 require("awful.autofocus")
