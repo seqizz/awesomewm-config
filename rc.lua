@@ -305,6 +305,8 @@ function build_dynamic_widgets_layout()
     end
   end
   layout:add(autolock_widget)
+  -- Notification buffer badge; hides itself while the buffer is empty.
+  layout:add(notification_history.widget())
   layout:add(mpris_separator)
   layout:add(mpris)
   return layout

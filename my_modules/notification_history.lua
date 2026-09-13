@@ -12,6 +12,7 @@ local wibox = require('wibox')
 local gears = require('gears')
 local naughty = require('naughty')
 local beautiful = require('beautiful')
+local my_utils = require('my_modules/my_utils')
 local dpi = beautiful.xresources.apply_dpi
 
 local notification_history = {}
@@ -36,6 +37,12 @@ local COL_BODY    = POPUP_WIDTH - COL_TIME - COL_APP - COL_MARK
                     - (3 * ROW_SPACING) - (2 * ROW_PADDING)
 
 local CACHE_FILE = gears.filesystem.get_cache_dir() .. 'notification_history'
+
+-- Per-count SVG icons for the wibar badge (numbers/1-square.svg ..
+-- numbers/9-square.svg, numbers/plus-square.svg past nine). Icons are dropped
+-- in by hand; a missing file just renders as an empty slot until it exists.
+local COUNT_ICON_DIR = gears.filesystem.get_configuration_dir()
+  .. 'my_modules/assets/numbers/'
 
 -- app_name stamped on this module's own feedback toasts. Recorded notifications
 -- carrying it are dropped, otherwise every "No live client" toast would land in
@@ -130,6 +137,55 @@ local function shquote(s)
 end
 
 --------------------------------------------------------------------------------
+-- count widget
+--------------------------------------------------------------------------------
+
+-- Wibar badge with the current buffer size. Swaps an SVG per count, hides
+-- itself while the buffer is empty, and toggles the history popup on click.
+-- Built lazily: beautiful.init() has not run when this module is required.
+local count_widget
+local count_image
+local count_tooltip
+
+local function ensure_count_widget()
+  if count_widget then return count_widget end
+
+  count_image = wibox.widget.imagebox()
+  count_image.resize = true
+  count_image.forced_height = dpi(20)
+  -- Recolor the hand-dropped icons to the wibar foreground instead of showing
+  -- their raw black fills, matching the other SVG widgets. Outline art, so
+  -- tint the stroke rather than flooding the silhouette.
+  count_image.stylesheet = my_utils.svg_stylesheet(beautiful.fg_normal, 'stroke')
+
+  count_widget = wibox.container.margin(
+    count_image, dpi(1), nil, nil, dpi(2)
+  )
+  count_tooltip = awful.tooltip { objects = { count_widget }, text = '' }
+
+  count_widget:buttons(gears.table.join(
+    awful.button({}, 1, function() notification_history.toggle() end)
+  ))
+  return count_widget
+end
+
+local function refresh_count_widget()
+  if not count_widget then return end
+
+  local n = #entries
+  if n == 0 then
+    count_widget.visible = false
+    return
+  end
+
+  local icon = (n <= 9) and (n .. '-square') or 'plus-square'
+  count_image.image = COUNT_ICON_DIR .. icon .. '.svg'
+  count_tooltip.text = n .. ' notification' .. (n == 1 and '' or 's')
+    .. ' in history, click to browse'
+  count_widget.visible = true
+end
+
+--------------------------------------------------------------------------------
 -- persistence
 --------------------------------------------------------------------------------
 
@@ -213,6 +269,7 @@ local function load_cache()
   while #entries > MAX_ENTRIES do table.remove(entries) end
   -- Trim the file back down; without this it grows forever across restarts.
   flush_cache()
+  refresh_count_widget()
 end
 
 --------------------------------------------------------------------------------
@@ -222,9 +279,11 @@ end
 local popup
 local grabber
 
--- Top right, the same corner naughty itself uses, so re-reading history lands
--- where the notifications originally appeared. honor_workarea keeps it below
--- the wibar instead of behind it.
+-- Top right, below the wibar, same corner naughty itself uses, so
+-- re-reading history lands where the notifications originally appeared.
+-- honor_workarea keeps it in the workarea; the top margin then pushes it one
+-- wibar height below the bar so the popup floats clear of it (wibar height
+-- read from the workarea delta, so it tracks each screen's bar size).
 --
 -- Handed to awful.popup as its `placement` property rather than being called
 -- manually after showing the popup: awful.popup only learns its real size
@@ -232,10 +291,17 @@ local grabber
 -- `visible = true` computes x from a stale width and lands the window off the
 -- right edge. As a property, the popup reapplies it on every resize.
 local function place_top_right(d)
+  local s = awful.screen.focused()
+  local wibar_h = s.geometry.height - s.workarea.height
   awful.placement.top_right(d, {
-    parent         = awful.screen.focused(),
+    parent         = s,
     honor_workarea = true,
-    margins        = dpi(EDGE_MARGIN),
+    margins        = {
+      top    = wibar_h + dpi(5),
+      right  = dpi(EDGE_MARGIN),
+      bottom = dpi(EDGE_MARGIN),
+      left   = dpi(EDGE_MARGIN),
+    },
   })
 end
 
@@ -395,6 +461,7 @@ act_delete = function()
   if not entries[selected] then return end
   table.remove(entries, selected)
   flush_cache()
+  refresh_count_widget()
   if #entries == 0 then
     notification_history.hide()
     return toast_empty()
@@ -405,6 +472,7 @@ end
 local function act_clear()
   entries = {}
   flush_cache()
+  refresh_count_widget()
   notification_history.hide()
   toast_empty()
 end
@@ -447,6 +515,7 @@ local function record(n)
   while #entries > MAX_ENTRIES do table.remove(entries) end
 
   append_cache(entries[1])
+  refresh_count_widget()
 
   if popup and popup.visible then
     -- A new entry shifts everything down; follow the selection so the popup
@@ -525,6 +594,14 @@ function notification_history.toggle()
   else
     notification_history.show()
   end
+end
+
+-- Wibar badge for the buffer size. Add it to a dynamic layout; it hides
+-- itself while the buffer is empty.
+function notification_history.widget()
+  local w = ensure_count_widget()
+  refresh_count_widget()
+  return w
 end
 
 -- Exposed for other widgets/scripts that may want the raw list.
