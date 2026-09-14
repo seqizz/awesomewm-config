@@ -19,22 +19,22 @@ local notification_history = {}
 
 -- Tunables
 local MAX_ENTRIES = 200 -- ring buffer size, also the on-disk trim target
-local VIEWPORT    = 14  -- rows rendered at once; list scrolls inside this
+local VIEWPORT    = 5   -- rows rendered at once; list scrolls inside this
 local TEXT_LIMIT  = 140 -- chars before the message column gets truncated
-local POPUP_WIDTH = 900
-local EDGE_MARGIN = 8   -- gap from the screen edge when placed top right
+local EDGE_MARGIN = dpi(8)   -- gap from the screen edge when placed top right
 
 -- Row geometry. Every column is forced, and the message column is whatever is
 -- left over, so the popup width is fixed no matter what a notification
 -- contains. Without this a long message makes the textbox request its natural
 -- width and the popup grows off the screen edge.
-local COL_TIME    = 45
-local COL_APP     = 130
-local COL_MARK    = 20  -- the '⏎' raise-target marker
-local ROW_SPACING = 8
-local ROW_PADDING = 10  -- left/right margin inside a row
-local COL_BODY    = POPUP_WIDTH - COL_TIME - COL_APP - COL_MARK
-                    - (3 * ROW_SPACING) - (2 * ROW_PADDING)
+local POPUP_WIDTH  = dpi(540)
+local COL_TIME     = dpi(45)
+local COL_APP      = dpi(130)
+local COL_MARK     = dpi(20)  -- the '⏎' raise-target marker
+local ROW_SPACING  = dpi(8)
+local ROW_PADDING  = dpi(10)  -- left/right margin inside a row
+local COL_BODY     = POPUP_WIDTH - COL_TIME - COL_APP - COL_MARK
+                     - (3 * ROW_SPACING) - (2 * ROW_PADDING)
 
 local CACHE_FILE = gears.filesystem.get_cache_dir() .. 'notification_history'
 
@@ -48,6 +48,13 @@ local COUNT_ICON_DIR = gears.filesystem.get_configuration_dir()
 -- carrying it are dropped, otherwise every "No live client" toast would land in
 -- the buffer and the popup would fill with its own output.
 local SELF_APP = 'notification_history'
+
+-- app_name that config-internal toasts must carry to be recorded. dbus is the
+-- only source that stamps freedesktop_hints on a notification (see
+-- naughty/dbus.lua), so it is the discriminator between real notifications and
+-- naughty-as-popup misuse (lain calendar on hover, OSD-style widgets). Anything
+-- without it is dropped unless it opts in under this app_name.
+local INTERNAL_APP = 'awesome_internal'
 
 -- Apps whose notification payload is a plaintext secret. Their entries stay in
 -- the in-memory list for the session but are never written to the cache file.
@@ -158,8 +165,13 @@ local function ensure_count_widget()
   -- tint the stroke rather than flooding the silhouette.
   count_image.stylesheet = my_utils.svg_stylesheet(beautiful.fg_normal, 'stroke')
 
+  local background_container = wibox.container.background(count_image)
+  background_container.shape = function(cr, width, height)
+    gears.shape.rounded_rect(cr, width, height, dpi(4))
+  end
+
   count_widget = wibox.container.margin(
-    count_image, dpi(1), nil, nil, dpi(2)
+    background_container, dpi(1), nil, nil, dpi(2)
   )
   count_tooltip = awful.tooltip { objects = { count_widget }, text = '' }
 
@@ -180,8 +192,27 @@ local function refresh_count_widget()
 
   local icon = (n <= 9) and (n .. '-square') or 'plus-square'
   count_image.image = COUNT_ICON_DIR .. icon .. '.svg'
-  count_tooltip.text = n .. ' notification' .. (n == 1 and '' or 's')
-    .. ' in history, click to browse'
+
+  -- Check for unread notifications (any entry with seen = false)
+  local has_unseen = false
+  for i = 1, #entries do
+    if not entries[i].seen then
+      has_unseen = true
+      break
+    end
+  end
+
+  -- Update tooltip based on unread state
+  if has_unseen then
+    count_tooltip.text = n .. ' notification' .. (n == 1 and '' or 's')
+      .. ' (including unread) in history'
+    count_widget.widget.bg = beautiful.warning_bg
+  else
+    count_tooltip.text = n .. ' notification' .. (n == 1 and '' or 's')
+      .. ' in history'
+    count_widget.widget.bg = nil
+  end
+
   count_widget.visible = true
 end
 
@@ -219,6 +250,7 @@ end
 local function serialize(e)
   return table.concat({
     tostring(e.time), esc(e.urgency), esc(e.app), esc(e.title), esc(e.text),
+    tostring(e.seen or false),
   }, '\t')
 end
 
@@ -260,6 +292,7 @@ local function load_cache()
         app     = unesc(fields[3]),
         title   = unesc(fields[4]),
         text    = unesc(fields[5]),
+        seen    = (fields[6] or 'false') == 'true',
       })
     end
   end
@@ -277,7 +310,8 @@ end
 --------------------------------------------------------------------------------
 
 local popup
-local grabber
+local grabber_func   -- installed raw keygrabber callback, nil while not grabbing
+local focus_handler  -- client::focus signal, connected on show, disconnected on hide
 
 -- Top right, below the wibar, same corner naughty itself uses, so
 -- re-reading history lands where the notifications originally appeared.
@@ -298,9 +332,9 @@ local function place_top_right(d)
     honor_workarea = true,
     margins        = {
       top    = wibar_h + dpi(5),
-      right  = dpi(EDGE_MARGIN),
-      bottom = dpi(EDGE_MARGIN),
-      left   = dpi(EDGE_MARGIN),
+      right  = EDGE_MARGIN,
+      bottom = EDGE_MARGIN,
+      left   = EDGE_MARGIN,
     },
   })
 end
@@ -316,8 +350,8 @@ local function ensure_popup()
     border_width  = dpi(1),
     border_color  = beautiful.border_focus,
     bg            = beautiful.bg_normal,
-    maximum_width = dpi(POPUP_WIDTH),
-    minimum_width = dpi(POPUP_WIDTH),
+    maximum_width = POPUP_WIDTH,
+    minimum_width = POPUP_WIDTH,
     placement     = place_top_right,
     widget        = wibox.widget.textbox(''),
   }
@@ -347,15 +381,15 @@ local function make_row(e, index)
   local row = wibox.widget {
     {
       {
-        label(relative_time(e.time), is_sel and beautiful.fg_normal_alt or DIM, dpi(COL_TIME)),
-        label(e.app, is_sel and beautiful.fg_normal_alt or beautiful.fg_normal, dpi(COL_APP)),
-        label(body, is_sel and beautiful.fg_focus or fg, dpi(COL_BODY)),
+        label(relative_time(e.time), is_sel and beautiful.fg_normal_alt or DIM, COL_TIME),
+        label(e.app, is_sel and beautiful.fg_normal_alt or beautiful.fg_normal, COL_APP),
+        label(body, is_sel and beautiful.fg_focus or fg, COL_BODY),
         -- Marker for entries that can still raise their source window.
-        label((e.client and e.client.valid) and '⏎' or '', DIM, dpi(COL_MARK)),
-        spacing = dpi(ROW_SPACING),
+        label((e.client and e.client.valid) and '⏎' or '', DIM, COL_MARK),
+        spacing = ROW_SPACING,
         layout  = wibox.layout.fixed.horizontal,
       },
-      left = dpi(ROW_PADDING), right = dpi(ROW_PADDING), top = dpi(3), bottom = dpi(3),
+      left = ROW_PADDING, right = ROW_PADDING, top = dpi(3), bottom = dpi(3),
       widget = wibox.container.margin,
     },
     bg     = is_sel and beautiful.bg_focus or beautiful.bg_normal,
@@ -398,7 +432,7 @@ render = function()
   end
 
   local header = string.format('Notifications  %d/%d', selected, #entries)
-  local footer = 'j/k move  ⏎ raise  y yank  d drop  C clear  q close'
+  local footer = 'j/k move · ⏎ raise · y yank · d drop · C clear · click row · Esc/q close'
 
   ensure_popup():setup {
     {
@@ -429,13 +463,22 @@ end
 --------------------------------------------------------------------------------
 
 function notification_history.hide()
-  if grabber then grabber:stop() end
+  if grabber_func then
+    keygrabber.stop(grabber_func)
+    grabber_func = nil
+  end
+  if focus_handler then
+    client.disconnect_signal("focus", focus_handler)
+    focus_handler = nil
+  end
   if popup then popup.visible = false end
 end
 
 act_jump = function()
   local e = entries[selected]
   if not e then return end
+  -- Mark this entry as seen after you jump to it
+  e.seen = true
   if e.client and e.client.valid then
     notification_history.hide()
     e.client:jump_to()
@@ -478,57 +521,14 @@ local function act_clear()
 end
 
 --------------------------------------------------------------------------------
--- recording
---------------------------------------------------------------------------------
-
-local function record(n)
-  -- Our own feedback toasts must never be recorded, or acting on an entry
-  -- appends a new entry and the buffer grows on every keypress.
-  if n.app_name == SELF_APP then return end
-
-  local title = oneline(n.title)
-  local text = oneline(n.message or n.text)
-  if title == '' and text == '' then return end
-  if matches_any(title .. ' ' .. text, IGNORE_PATTERNS) then return end
-
-  local app = n.app_name
-  if not app or app == '' then app = 'awesome' end
-  if matches_any(app, IGNORE_APPS) then return end
-
-  -- First still-valid client naughty associated with the notification, so the
-  -- entry can raise its source window later.
-  local target
-  if n.clients then
-    for _, c in ipairs(n.clients) do
-      if c and c.valid then target = c break end
-    end
-  end
-
-  table.insert(entries, 1, {
-    time    = os.time(),
-    urgency = n.urgency or 'normal',
-    app     = oneline(app),
-    title   = title,
-    text    = text,
-    client  = target,
-  })
-  while #entries > MAX_ENTRIES do table.remove(entries) end
-
-  append_cache(entries[1])
-  refresh_count_widget()
-
-  if popup and popup.visible then
-    -- A new entry shifts everything down; follow the selection so the popup
-    -- does not silently jump to a different notification under the cursor.
-    if selected > 1 then selected = selected + 1 end
-    render()
-  end
-end
-
---------------------------------------------------------------------------------
 -- key handling
 --------------------------------------------------------------------------------
 
+-- The popup is a wibox and can never take keyboard focus, so a global keygrab
+-- is what makes the keys work at all. The raw core `keygrabber` API is used
+-- instead of the awful.keygrabber object wrapper: that one refuses to start
+-- (silently) whenever it thinks another instance is current, which left the
+-- popup open with no keys and no way to close it.
 local function handle_key(mod, key)
   local has_shift = false
   for _, m in ipairs(mod) do if m == 'Shift' then has_shift = true end end
@@ -562,14 +562,75 @@ local function handle_key(mod, key)
   render()
 end
 
-grabber = awful.keygrabber {
-  stop_key      = { 'Escape', 'q', 'n' },
-  stop_event    = 'press',
-  stop_callback = function() if popup then popup.visible = false end end,
-  keypressed_callback = function(_, mod, key)
+-- Install the global keygrab. Only handles 'press' events, so the key release
+-- of the opening Win+n (grabber is installed during that press) is ignored.
+local function grab_keys()
+  if grabber_func then return end
+  grabber_func = function(mod, key, event)
+    if event ~= 'press' then return end
+    if key == 'Escape' or key == 'q' or key == 'n' then
+      return notification_history.hide()
+    end
     handle_key(mod, key)
-  end,
-}
+  end
+  keygrabber.run(grabber_func)
+end
+
+--------------------------------------------------------------------------------
+-- recording
+--------------------------------------------------------------------------------
+
+local function record(n)
+  -- Our own feedback toasts must never be recorded, or acting on an entry
+  -- appends a new entry and the buffer grows on every keypress.
+  if n.app_name == SELF_APP then return end
+
+  -- freedesktop_hints lives in _private (no getter exists for it), so access
+  -- it defensively in case a future awesome version renames the field.
+  if not (n._private and n._private.freedesktop_hints)
+     and n.app_name ~= INTERNAL_APP then
+    return
+  end
+
+  local title = oneline(n.title)
+  local text = oneline(n.message or n.text)
+  if title == '' and text == '' then return end
+  if matches_any(title .. ' ' .. text, IGNORE_PATTERNS) then return end
+
+  local app = n.app_name
+  if not app or app == '' then app = 'awesome' end
+  if matches_any(app, IGNORE_APPS) then return end
+
+  -- First still-valid client naughty associated with the notification, so the
+  -- entry can raise its source window later.
+  local target
+  if n.clients then
+    for _, c in ipairs(n.clients) do
+      if c and c.valid then target = c break end
+    end
+  end
+
+  table.insert(entries, 1, {
+    time    = os.time(),
+    urgency = n.urgency or 'normal',
+    app     = oneline(app),
+    title   = title,
+    text    = text,
+    client  = target,
+    seen    = false,  -- track whether this notification was viewed
+  })
+  while #entries > MAX_ENTRIES do table.remove(entries) end
+
+  append_cache(entries[1])
+  refresh_count_widget()
+
+  if popup and popup.visible then
+    -- A new entry shifts everything down; follow the selection so the popup
+    -- does not silently jump to a different notification under the cursor.
+    if selected > 1 then selected = selected + 1 end
+    render()
+  end
+end
 
 --------------------------------------------------------------------------------
 -- public API
@@ -579,13 +640,27 @@ function notification_history.show()
   if #entries == 0 then return toast_empty() end
 
   selected, offset = 1, 0
+  -- Mark all entries as seen when popup opens (scroll, Win+n, etc.)
+  for i = 1, #entries do
+    entries[i].seen = true
+  end
+  refresh_count_widget()
   render()
   local p = ensure_popup()
   p.visible = true
   -- Reassigning the placement property forces a resize-and-reposition pass, so
   -- the popup follows the currently focused screen when reopened elsewhere.
   p.placement = place_top_right
-  grabber:start()
+  grab_keys()
+
+  -- Close the popup when the user focuses another client (clicks a window
+  -- outside the popup). The handler is replaced on each show() call so
+  -- there's never more than one connection active.
+  if focus_handler then
+    client.disconnect_signal("focus", focus_handler)
+  end
+  focus_handler = function(c) notification_history.hide() end
+  client.connect_signal("focus", focus_handler)
 end
 
 function notification_history.toggle()
@@ -596,8 +671,6 @@ function notification_history.toggle()
   end
 end
 
--- Wibar badge for the buffer size. Add it to a dynamic layout; it hides
--- itself while the buffer is empty.
 function notification_history.widget()
   local w = ensure_count_widget()
   refresh_count_widget()
@@ -608,6 +681,9 @@ end
 function notification_history.get_entries()
   return entries
 end
+
+-- Config-internal toasts wanting a history entry must use this app_name.
+notification_history.internal_app = INTERNAL_APP
 
 load_cache()
 naughty.connect_signal('added', function(n) record(n) end)
