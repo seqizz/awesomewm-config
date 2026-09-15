@@ -148,7 +148,8 @@ end
 --------------------------------------------------------------------------------
 
 -- Wibar badge with the current buffer size. Swaps an SVG per count, hides
--- itself while the buffer is empty, and toggles the history popup on click.
+-- itself while the buffer is empty: left click toggles the history popup,
+-- middle click clears the buffer.
 -- Built lazily: beautiful.init() has not run when this module is required.
 local count_widget
 local count_image
@@ -176,7 +177,9 @@ local function ensure_count_widget()
   count_tooltip = awful.tooltip { objects = { count_widget }, text = '' }
 
   count_widget:buttons(gears.table.join(
-    awful.button({}, 1, function() notification_history.toggle() end)
+    awful.button({}, 1, function() notification_history.toggle() end),
+    -- Same action as 'C' in the popup.
+    awful.button({}, 2, function() notification_history.clear() end)
   ))
   return count_widget
 end
@@ -675,6 +678,13 @@ function notification_history.widget()
   local w = ensure_count_widget()
   refresh_count_widget()
   return w
+end
+
+-- Badge middle-click wrapper. act_clear is a chunk-local declared after the
+-- widget builder, so the button closure cannot see it lexically (locals are
+-- visible only from their declaration point); route through the table.
+function notification_history.clear()
+  act_clear()
 end
 
 -- Exposed for other widgets/scripts that may want the raw list.
