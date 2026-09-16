@@ -115,6 +115,26 @@ local function utf8_truncate(s, limit)
   return s
 end
 
+-- freedesktop notification bodies may carry a small markup subset (b/i/u/a/
+-- img/br, per the spec's "body-markup" capability) plus escaped entities.
+-- This history list only ever renders plain text (label() re-escapes for its
+-- own colored span), so formatting is stripped rather than interpreted --
+-- otherwise the raw tags/entities show up verbatim once xml_escape() runs on
+-- them a second time at render time.
+local function strip_notification_markup(s)
+  if not s or s == '' then return s end
+  s = s:gsub('<br%s*/?>', '\n')
+  s = s:gsub('</?[biu]>', '')
+  s = s:gsub('</?span[^>]*>', '')
+  s = s:gsub('<a%s+href="[^"]*"%s*>', ''):gsub('</a>', '')
+  s = s:gsub('<img%s+[^>]*/?>', '')
+  -- &amp; must decode last, or "&amp;lt;" (an escaped literal "&lt;") would
+  -- wrongly collapse all the way down to "<".
+  s = s:gsub('&lt;', '<'):gsub('&gt;', '>'):gsub('&quot;', '"'):gsub('&apos;', "'")
+  s = s:gsub('&amp;', '&')
+  return s
+end
+
 -- Collapse a notification body into one displayable line.
 local function oneline(s)
   if not s or s == '' then return '' end
@@ -595,8 +615,8 @@ local function record(n)
     return
   end
 
-  local title = oneline(n.title)
-  local text = oneline(n.message or n.text)
+  local title = oneline(strip_notification_markup(n.title))
+  local text = oneline(strip_notification_markup(n.message or n.text))
   if title == '' and text == '' then return end
   if matches_any(title .. ' ' .. text, IGNORE_PATTERNS) then return end
 
