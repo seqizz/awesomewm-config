@@ -78,6 +78,7 @@ local IGNORE_PATTERNS = {
 -- announcing every track change).
 local IGNORE_APPS = {
   '^screen_split$', -- Win+F6 split ratio readout, transient by design
+  '^pasystray$',    -- sink/port change toasts, noisy on every audio switch
 }
 
 -- Dimmed gruvbox gray for secondary text (timestamps, hints, low urgency).
