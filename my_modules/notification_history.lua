@@ -641,6 +641,10 @@ local function record(n)
     title   = title,
     text    = text,
     client  = target,
+    -- Kept only to match this entry against naughty's 'destroyed' signal
+    -- below, so dismissing the popup itself marks it seen. Not persisted:
+    -- entries reloaded from disk never had a live notification anyway.
+    notification = n,
     seen    = false,  -- track whether this notification was viewed
   })
   while #entries > MAX_ENTRIES do table.remove(entries) end
@@ -718,6 +722,23 @@ notification_history.internal_app = INTERNAL_APP
 
 load_cache()
 naughty.connect_signal('added', function(n) record(n) end)
+
+-- Dismissing the popup you actually saw should not leave the badge red. Only
+-- dismissed_by_user counts: a timeout expiry means the user never necessarily
+-- looked at it, so that case is left for the history popup to mark seen.
+naughty.connect_signal('destroyed', function(n, reason)
+  if reason ~= require('naughty.constants').notification_closed_reason.dismissed_by_user then
+    return
+  end
+  for i = 1, #entries do
+    if entries[i].notification == n then
+      entries[i].seen = true
+      refresh_count_widget()
+      if popup and popup.visible then render() end
+      return
+    end
+  end
+end)
 
 return notification_history
 -- vim: set ts=2 sw=2 tw=0 et :
