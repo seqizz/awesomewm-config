@@ -59,7 +59,7 @@ local INTERNAL_APP = 'awesome_internal'
 -- Apps whose notification payload is a plaintext secret. Their entries stay in
 -- the in-memory list for the session but are never written to the cache file.
 local NO_PERSIST_APPS = {
-  'rofi%-rbw', 'rbw', 'pass', 'gopass', 'keepassxc', 'bitwarden',
+  'rofi%-rbw', 'rbw', 'pass', 'gopass', 'keepassxc', 'bitwarden'
 }
 
 -- WM self-chatter: state confirmations that are meaningless once read. Matched
@@ -78,7 +78,8 @@ local IGNORE_PATTERNS = {
 -- announcing every track change).
 local IGNORE_APPS = {
   '^screen_split$', -- Win+F6 split ratio readout, transient by design
-  '^pasystray$',    -- sink/port change toasts, noisy on every audio switch
+  '^pasystray$',
+  '^blueman$',
 }
 
 -- Dimmed gruvbox gray for secondary text (timestamps, hints, low urgency).
@@ -541,7 +542,6 @@ local function act_clear()
   flush_cache()
   refresh_count_widget()
   notification_history.hide()
-  toast_empty()
 end
 
 --------------------------------------------------------------------------------
