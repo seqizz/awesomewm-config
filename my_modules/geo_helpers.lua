@@ -20,6 +20,21 @@ helpers.rect = function()
   end
 end
 
+-- Rectangle with the top-left corner cut off by `size` px. This is the window
+-- shape every client gets from the default rule; kept here so the places that
+-- have to re-apply it after temporarily squaring a client off stay in sync.
+helpers.chamfer = function(size)
+  return function(cr, width, height)
+    cr:move_to(size, 0)
+    cr:line_to(width - size, 0)
+    cr:line_to(width, size)
+    cr:line_to(width, height)
+    cr:line_to(0, height)
+    cr:line_to(0, size)
+    cr:close_path()
+  end
+end
+
 function helpers.create_titlebar(c, titlebar_buttons, titlebar_position, titlebar_size)
   awful.titlebar(c, {font = beautiful.titlebar_font, position = titlebar_position, size = titlebar_size}) : setup {
     {

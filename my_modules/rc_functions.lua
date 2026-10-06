@@ -5,6 +5,7 @@ local beautiful = require("beautiful")
 local naughty = require("naughty")
 local my_utils = require('my_modules/my_utils')
 local my_theme = require('my_modules/my_theme')
+local geo_helpers = require('my_modules/geo_helpers')
 local xresources = require("beautiful.xresources")
 local dpi = xresources.apply_dpi
 
@@ -97,6 +98,138 @@ function float_toggle(c)
     c.sticky = false
     c.skip_taskbar = false
   end
+end
+
+-- Geometry of the whole physical panel `s` sits on: a fake screen only covers
+-- half of a split ultrawide, so the union of the pair is taken. Screens that
+-- are not part of a split answer with their own geometry.
+function monitor_geometry(s)
+  local left, right = get_fake_pair(s, screens_table)
+  if not left then return s.geometry end
+
+  local lg, rg = left.geometry, right.geometry
+
+  local x1 = math.min(lg.x, rg.x)
+  local y1 = math.min(lg.y, rg.y)
+  local x2 = math.max(lg.x + lg.width, rg.x + rg.width)
+  local y2 = math.max(lg.y + lg.height, rg.y + rg.height)
+
+  return { x = x1, y = y1, width = x2 - x1, height = y2 - y1 }
+end
+
+-- Clients that are currently in alternative fullscreen, mapped to the state
+-- needed to put them back. Weak keys so a closed client does not keep its entry
+-- (and the client object) alive forever.
+local real_fullscreen_state = setmetatable({}, { __mode = 'k' })
+
+-- Guards the re-assert handlers below against reacting to their own geometry
+-- change, which would recurse forever.
+local real_fullscreen_applying = false
+
+-- Push a client back onto its target geometry. Games are the reason this is
+-- needed: toolkits like SDL/Wine re-assert their own size (and often ask for
+-- EWMH fullscreen, which awesome would clamp back to a single screen) a moment
+-- after the window is mapped or after an in-game resolution change.
+local function enforce_real_fullscreen(c)
+  if real_fullscreen_applying then return end
+
+  local st = real_fullscreen_state[c]
+  if not st or not c.valid then return end
+
+  real_fullscreen_applying = true
+
+  c.fullscreen = false
+  c.maximized = false
+  c.maximized_horizontal = false
+  c.maximized_vertical = false
+
+  local g, t = c:geometry(), st.target
+  if g.x ~= t.x or g.y ~= t.y or g.width ~= t.width or g.height ~= t.height then
+    c:geometry(t)
+  end
+
+  real_fullscreen_applying = false
+end
+
+-- One set of handlers for all clients; the state table decides whether a given
+-- client is currently being held in place.
+client.connect_signal('property::geometry',  enforce_real_fullscreen)
+client.connect_signal('property::fullscreen', enforce_real_fullscreen)
+client.connect_signal('property::maximized',  enforce_real_fullscreen)
+client.connect_signal('request::geometry', function(c) enforce_real_fullscreen(c) end)
+
+-- Alternative fullscreen: cover the entire physical monitor instead of the
+-- screen object the client happens to live on. Needed because native fullscreen
+-- is clamped to that screen, which on a split ultrawide is only half the panel.
+function real_fullscreen_toggle(c)
+  if not c or not c.valid then return end
+
+  local old = real_fullscreen_state[c]
+  if old then
+    real_fullscreen_state[c] = nil
+
+    c.fullscreen = old.fullscreen
+    c.floating = old.floating
+    c.ontop = old.ontop
+    c.above = old.above
+    c.border_width = old.border_width
+    c.size_hints_honor = old.size_hints_honor
+    -- Fall back to the default chamfer: a client that never had an explicit
+    -- shape would otherwise come back square.
+    c.shape = old.shape or geo_helpers.chamfer(dpi(12))
+
+    -- Spanning past the screen boundary makes awesome re-home the client (and
+    -- with it, re-tag it) by the top-left corner, so both have to be put back
+    -- explicitly before the geometry lands.
+    local tags = {}
+    for _, t in ipairs(old.tags) do
+      if t.activated then table.insert(tags, t) end
+    end
+    if #tags > 0 then c:tags(tags) end
+
+    c:geometry(old.geometry)
+    return
+  end
+
+  real_fullscreen_state[c] = {
+    geometry = c:geometry(),
+    fullscreen = c.fullscreen,
+    floating = c.floating,
+    ontop = c.ontop,
+    above = c.above,
+    border_width = c.border_width,
+    size_hints_honor = c.size_hints_honor,
+    shape = c.shape,
+    tags = c:tags(),
+    target = monitor_geometry(c.screen),
+  }
+
+  -- Must stay false: a fullscreen client gets re-clamped to its own screen on
+  -- every geometry request, which would undo the span immediately.
+  c.fullscreen = false
+  c.floating = true
+  c.ontop = true
+  c.above = true
+  c.border_width = 0
+  -- Games and other clients with aspect/resize-increment hints would otherwise
+  -- be snapped to a smaller size than the panel.
+  c.size_hints_honor = false
+  -- The default rule chamfers the top-left corner; nothing should be cut out of
+  -- a window that is meant to cover the whole panel.
+  c.shape = gears.shape.rectangle
+
+  enforce_real_fullscreen(c)
+
+  -- Clients that switch video mode settle late and with several resizes in a
+  -- row; the signal handlers catch most of it, this covers whatever lands
+  -- while awesome is not looking.
+  local ticks = 0
+  gears.timer.start_new(0.5, function()
+    ticks = ticks + 1
+    if not real_fullscreen_state[c] or not c.valid then return false end
+    enforce_real_fullscreen(c)
+    return ticks < 8
+  end)
 end
 
 function move_or_expand(c, action, direction)

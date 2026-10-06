@@ -139,6 +139,8 @@ awful.key({ ctrl, alt          }, "s",      function (c) suspend_toggle(c) end),
 -- Shrink window and make it sticky & on top (e.g. conference call): Ctrl + Alt + w
 awful.key({ ctrl, alt          }, "w",      function (c) float_toggle(c) end),
 awful.key({ ctrl, alt          }, "f",      function (c) c.fullscreen = not c.fullscreen end),
+-- Fullscreen across the whole physical monitor (ignores the fake screen split): Ctrl + Alt + Shift + f
+awful.key({ ctrl, alt, "Shift" }, "f",      function (c) real_fullscreen_toggle(c) end),
 -- Sticky toggle for window: Ctrl + Alt + Shift + s
 awful.key({ ctrl, alt, "Shift" }, "s",      function (c) sticky_toggle(c) end),
 -- Hide stickies to the bottom-right corner (toggle) : Win + Esc
@@ -912,16 +914,7 @@ client.connect_signal("property::fullscreen", function(c)
   if c.fullscreen then
     c.shape = gears.shape.rectangle
   else
-    local s = dpi(12)
-    c.shape = function(cr, w, h)
-      cr:move_to(s, 0)
-      cr:line_to(w - s, 0)
-      cr:line_to(w, s)
-      cr:line_to(w, h)
-      cr:line_to(0, h)
-      cr:line_to(0, s)
-      cr:close_path()
-    end
+    c.shape = helpers.chamfer(dpi(12))
   end
 end)
 
