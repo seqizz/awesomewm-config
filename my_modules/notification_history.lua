@@ -188,6 +188,18 @@ local HUB_TOKEN    = 'ANANASOR4'
 local HUB_TIMEOUT  = 2     -- seconds, tolerance budget for the hub answer
 local HUB_PRE_SHOW = true  -- false = ask the hub but never veto display
 
+-- Scope for native notification ids. naughty numbers notifications with a
+-- counter that restarts at 1 with the WM, while a hub instance now stays open
+-- for as long as its row is readable here (see trim_entries). Without a scope,
+-- notification 1 after a restart would arrive as the same (device_id,
+-- native_id) pair as the still-open instance 1 from before it, and the hub
+-- would update that unrelated logical in place instead of creating a new one.
+--
+-- The timestamp alone collides on a quick restart (Win+Ctrl+R twice within a
+-- second), so mix in a table address: ASLR makes it differ between processes.
+local HUB_SESSION = tostring(os.time()) .. '-'
+  .. (tostring({}):match('0x(%x+)') or '0')
+
 -- Device id, resolved on first use rather than at load time.
 --
 -- rc.lua requires this module before it sets the `hostname` global, so reading
@@ -275,6 +287,27 @@ local function hub_report_async(path, body_json)
   }, function() end)
 end
 
+-- Evict entries past MAX_ENTRIES, telling the hub about each one.
+--
+-- This is the only moment a notification really leaves this device, and the
+-- hub's orphan sweep (AGENTS.md 6.1) depends on hearing about exactly those.
+-- A popup timing out is not one of them: it only hides the toast, while the
+-- row stays readable here and in the cache file. Reporting a removal there
+-- would claim the last copy vanished while it is still sitting unread, and the
+-- sweep would then expire it out of the hub's Active list.
+--
+-- Echoes carry no instance id of their own (section 14.1), so there is nothing
+-- to close for them; dropping one is a local affair.
+local function trim_entries()
+  while #entries > MAX_ENTRIES do
+    local e = table.remove(entries)
+    if e.hub_instance then
+      hub_report_async('/api/v1/instances/' .. e.hub_instance .. '/removed',
+        '{"native_reason":"history_evicted"}')
+    end
+  end
+end
+
 -- Bulk resolve for "clear history": one request instead of one curl per
 -- entry (the hub caps it at 500 ids per call).
 local function hub_bulk_resolve(logical_ids)
@@ -308,7 +341,8 @@ end
 -- (decision/reason/logical_id/instance_id) or nil when the hub is
 -- unreachable or answered garbage.
 local function hub_ingest(n, title, text, app, args)
-  local native_id = (args and args.id) or n.id or tostring(n)
+  local native_id = HUB_SESSION .. ':'
+    .. tostring((args and args.id) or n.id or tostring(n))
   local urgency = n.urgency or 'normal'
   if urgency == 'critical' then urgency = 'high' end
   local body = table.concat({
@@ -522,7 +556,7 @@ local function load_cache()
   f:close()
 
   entries = loaded
-  while #entries > MAX_ENTRIES do table.remove(entries) end
+  trim_entries()
   -- Trim the file back down; without this it grows forever across restarts.
   flush_cache()
   refresh_count_widget()
@@ -940,7 +974,7 @@ local function handle_remote_notification(data_json)
     remote  = true,  -- session-only marker, never serialized to cache
   }
   table.insert(entries, 1, e)
-  while #entries > MAX_ENTRIES do table.remove(entries) end
+  trim_entries()
   append_cache(e)
   refresh_count_widget()
   if popup and popup.visible then
@@ -970,11 +1004,11 @@ end
 -- of another device's notification (section 14.1), which has no instance id
 -- because it was never ingested from here.
 --
--- A local entry is kept, popup and all. Its copy being closed does not mean
--- anybody read it: a popup that times out reports removed(timeout) and goes
--- on sitting unread in this history, and that is exactly the notification
--- this project must never eat. It leaves on a real resolution, or when the
--- operator clears the row.
+-- A local entry is kept, popup and all. This device only reports its own copy
+-- removed once the row is evicted from the ring buffer (trim_entries), so an
+-- expiry naming one of its logicals means some *other* device's copy went
+-- away, which says nothing about whether anybody read this one. It leaves on a
+-- real resolution, or when the operator clears the row.
 --
 -- The hub cannot make this call, because only this side knows which rows are
 -- echoes and which are its own still-readable history.
@@ -1313,7 +1347,7 @@ local function record(n, args)
     hub_logical  = meta and meta.logical_id,
     seen    = false,  -- track whether this notification was viewed
   })
-  while #entries > MAX_ENTRIES do table.remove(entries) end
+  trim_entries()
 
   append_cache(entries[1])
   refresh_count_widget()
@@ -1403,10 +1437,9 @@ naughty.connect_signal('added', function(n, args) record(n, args) end)
 -- dismissed_by_user counts: a timeout expiry means the user never necessarily
 -- looked at it, so that case is left for the history popup to mark seen.
 --
--- This is also where the hub learns how a notification ended locally: a user
--- resolution propagates it to every device (AGENTS.md 2.5), a timeout expiry
--- is a plain removal and must never suppress anything anywhere. Reports are
--- async and only fire for entries the hub pre-approved (hub_instance set),
+-- This is also where the hub learns that a notification was finished with
+-- locally, which propagates the cancel to every device (AGENTS.md 6). Reports
+-- are async and only fire for entries the hub pre-approved (hub_instance set),
 -- so a suppression here can never echo back to the server as a resolution.
 --
 -- Kind is always 'click'. naughty.layout.box binds mouse button 1 to
@@ -1415,30 +1448,25 @@ naughty.connect_signal('added', function(n, args) record(n, args) end)
 -- hub's strongest resolution kind describes. Swiping-style dismissal has no
 -- equivalent here; the history popup's own delete reports user_dismiss.
 --
--- An expiry is reported too, as a plain removal. It resolves nothing and
--- suppresses nothing anywhere, it just closes this device's instance: without
--- it the hub keeps the logical active forever, and nothing on the server side
--- ages active notifications out. The entry stays in history and stays unseen,
--- because a timeout says nothing about whether anybody looked at it.
+-- A timeout expiry is deliberately NOT reported. On this client the popup is
+-- not the notification: when it times out the row stays in `entries`, readable
+-- with the history popup and persisted to the cache file. Reporting a removal
+-- here would tell the hub that the last copy of a desktop-only notification is
+-- gone, and its orphan sweep would expire the logical out of the Active list
+-- minutes later while the text is still sitting here unread. The copy leaves
+-- this device when the row leaves the ring buffer, which is where
+-- trim_entries() reports it.
 --
 -- Every other reason is left alone. 'silent' in particular is what the hub
 -- sync itself destroys popups with, and close_live() removes the entry from
 -- `entries` before destroying, so the loop below cannot find it and a
 -- server-driven cancel can never echo back as a local report.
 naughty.connect_signal('destroyed', function(n, reason)
-  if reason ~= naughty_reason.dismissed_by_user and reason ~= naughty_reason.expired then
+  if reason ~= naughty_reason.dismissed_by_user then
     return
   end
   for i = 1, #entries do
     if entries[i].notification == n then
-      if reason == naughty_reason.expired then
-        if entries[i].hub_instance then
-          hub_report_async(
-            '/api/v1/instances/' .. entries[i].hub_instance .. '/removed',
-            '{"native_reason":"timeout"}')
-        end
-        return
-      end
       entries[i].seen = true
       if entries[i].hub_instance then
         hub_report_async(
