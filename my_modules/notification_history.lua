@@ -997,22 +997,32 @@ local function handle_remote_notification(data_json)
   end
 end
 
--- An expiry (kind 'expired') is the hub reporting that every copy it knows
--- about went away with nobody finishing it -- an app withdrawing its own
--- notification, or a timeout. It is not somebody dealing with the content, so
--- it may only retract what this device renders on the hub's behalf: an echo
--- of another device's notification (section 14.1), which has no instance id
--- because it was never ingested from here.
+-- An expiry is the hub ending a notification nobody finished with, and how much
+-- it licenses this client to retract depends on why it ended.
 --
--- A local entry is kept, popup and all. This device only reports its own copy
--- removed once the row is evicted from the ring buffer (trim_entries), so an
--- expiry naming one of its logicals means some *other* device's copy went
--- away, which says nothing about whether anybody read this one. It leaves on a
--- real resolution, or when the operator clears the row.
+-- 'expired' (orphan): every copy the hub knew about went away on its own. The
+-- only thing that can be stale here is an echo, a row rendered on another
+-- device's behalf (section 14.1), which has no instance id because it was never
+-- ingested from here. A local entry is kept, popup and all: this device reports
+-- its own copy removed only once the row is evicted from the ring buffer
+-- (trim_entries), so an expiry naming one of its logicals means some *other*
+-- device's copy went away, which says nothing about whether anybody read this
+-- one. It leaves on a real resolution, or when the operator clears the row.
 --
--- The hub cannot make this call, because only this side knows which rows are
--- echoes and which are its own still-readable history.
-local function expiry_may_drop(kind, e)
+-- 'withdrawn': the app that posted the notification cancelled it at the source
+-- and did not put it back within the hub's grace. Here the local row is the
+-- whole point of the event (reading a mail on the phone leaves its copy sitting
+-- on this screen), so it goes too. Nothing is suppressed on the hub side for
+-- this, so the cost of a wrong one is the notification showing again.
+--
+-- Called from both paths with whatever each has: the live event carries the
+-- kind, while the reconcile poll sees only state='expired' and has to read the
+-- row's expiry_reason. Anything unrecognised is treated as a resolution and
+-- drops, which is how a hub older than this client keeps working.
+local WITHDRAWN_REASON = 'source_withdrawn'
+
+local function expiry_may_drop(kind, e, reason)
+  if kind == 'withdrawn' or reason == WITHDRAWN_REASON then return true end
   if kind ~= 'expired' then return true end
   return not e.hub_instance
 end
@@ -1035,11 +1045,14 @@ local function handle_hub_event(data_json)
   local logical = parse_field(data_json, 'logical_id')
   local instance = parse_field(data_json, 'instance_id')
   local kind = parse_field(data_json, 'kind')
+  -- Carries the same value the hub stamped on the row (expiry_reason), so the
+  -- live path and the catch-up path below decide on identical evidence.
+  local reason = parse_field(data_json, 'reason')
   local why = (ev_type == 'suppress') and 'suppressed by crap rule'
     or ('resolved elsewhere (' .. (kind or 'unknown') .. ')')
   drop_matching(function(e)
     if logical and logical ~= '' and e.hub_logical == logical then
-      return expiry_may_drop(kind, e)
+      return expiry_may_drop(kind, e, reason)
     end
     if instance and instance ~= '' and e.hub_instance == instance then return true end
     return false
@@ -1063,6 +1076,12 @@ local function parse_items(out)
         -- different things here: see expiry_may_drop. Missing reads as
         -- 'resolved', which is what every hub predating orphan expiry sent.
         state = obj:match('"state":"([^"]*)"') or 'resolved',
+        -- Why it expired. The state alone cannot separate an orphan expiry
+        -- (echoes only) from a withdrawal (drop the local row too), and this
+        -- path is the only way a client that missed the SSE frame ever learns
+        -- about either. Absent on hubs below schema 011 and on rows expired
+        -- before it, which reads as the conservative orphan case.
+        expiry_reason = obj:match('"expiry_reason":"([^"]*)"') or '',
         -- Bounds the content fallback below. Always present on list items;
         -- resolved_at would be the closer stamp but is only set once resolved,
         -- and crap items never get one.
@@ -1145,15 +1164,16 @@ local function reconcile_with_hub()
     if #lists == 0 then return end
     drop_matching(function(e)
       for _, item in ipairs(lists) do
-        -- An expired item is the catch-up form of the kind='expired' event,
-        -- so it gets the same restriction: echoes only, never a local row
-        -- that may still be unread.
+        -- An expired item is the catch-up form of an expiry event, and gets
+        -- the same treatment: echoes only for an orphan expiry, the local row
+        -- as well for a withdrawal, which is why the reason is read here.
         if e.hub_logical and e.hub_logical == item.id then
-          if expiry_may_drop(item.state, e) then return true end
+          if expiry_may_drop(item.state, e, item.expiry_reason) then return true end
         elseif not e.hub_logical and content_matches(e, item) then
-          -- Id-less rows are matched by content alone. An expired item is too
-          -- weak a signal to drop one on: it says nothing about whether the
-          -- operator read this.
+          -- Id-less rows are matched by content alone, and that match is fuzzy
+          -- (collapsed text, a 30 minute window). Only a real resolution drops
+          -- one: an expiry of either flavour says the hub's copy ended, not
+          -- that this unlinked row is the same notification.
           if item.state ~= 'expired' then return true end
         end
       end
