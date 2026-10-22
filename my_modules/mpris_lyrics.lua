@@ -326,16 +326,94 @@ local function json_has_synced_lyrics(json_str)
   return json_str:find('"syncedLyrics"%s*:%s*"') ~= nil
 end
 
+-- Extract a numeric JSON value (LRCLIB reports duration as a float)
+local function json_extract_number(json_str, key)
+  return tonumber(json_str:match('"' .. key .. '"%s*:%s*(%-?[%d%.]+)'))
+end
+
+-- Split a top-level JSON array into its element substrings. Needed because the
+-- lyric text inside a record contains braces and quotes, so a pattern split
+-- would cut records apart; this tracks brace depth and skips string bodies.
+local function json_split_records(json_str)
+  local records = {}
+  local pos, depth, start = 1, 0, nil
+  while true do
+    local i = json_str:find('[{}"]', pos)
+    if not i then break end
+    local c = json_str:sub(i, i)
+    if c == '"' then
+      -- jump past the string body, honouring backslash escapes
+      local j = i + 1
+      while true do
+        local k = json_str:find('[\\"]', j)
+        if not k then
+          j = #json_str + 1
+          break
+        end
+        if json_str:sub(k, k) == '\\' then
+          j = k + 2
+        else
+          j = k + 1
+          break
+        end
+      end
+      pos = j
+    elseif c == '{' then
+      if depth == 0 then start = i end
+      depth = depth + 1
+      pos = i + 1
+    else
+      depth = depth - 1
+      if depth == 0 and start then
+        table.insert(records, json_str:sub(start, i))
+        start = nil
+      end
+      pos = i + 1
+    end
+  end
+  return records
+end
+
+-- Pick the /api/search record that best matches the track actually playing.
+-- LRCLIB search is fuzzy and orders by its own relevance, so taking the first
+-- record with lyrics regularly lands on a cover or a different album version
+-- (and that wrong result then gets disk-cached forever). Duration is the
+-- strongest discriminator; exact title/artist matches break ties. `field` is
+-- the lyric field a record must carry to be eligible ('syncedLyrics' or
+-- 'plainLyrics').
+local function pick_best_record(records, field, artist, title, duration)
+  local want_title  = title:lower()
+  local want_artist = artist:lower()
+  local best, best_score
+  for _, rec in ipairs(records) do
+    if rec:find('"' .. field .. '"%s*:%s*"') then
+      local rec_dur = json_extract_number(rec, 'duration')
+      -- unknown duration on either side: neutral penalty, so title/artist decide
+      local score = (duration > 0 and rec_dur) and math.abs(rec_dur - duration) or 999
+      if (json_extract_string(rec, 'trackName') or ''):lower() == want_title then
+        score = score - 5
+      end
+      if (json_extract_string(rec, 'artistName') or ''):lower() == want_artist then
+        score = score - 5
+      end
+      if not best_score or score < best_score then
+        best, best_score = rec, score
+      end
+    end
+  end
+  return best
+end
+
 -- ─── LRCLIB fetch ─────────────────────────────────────────────────────────────
 
 -- Try /api/get first, fall back to /api/search
+-- Requests are never skipped when one is already in flight: the newest track
+-- always wins. Instead every callback re-checks `key` against state.cache_key
+-- and discards its result if the track moved on, so a slow request can't pin
+-- the widget to the previous song.
 local function fetch_lyrics(artist, title, album, duration)
-  if state.fetching then
-    dbg('[lyrics] fetch SKIPPED (already fetching) for [' .. artist .. ' - ' .. title .. ']')
-    return
-  end
-  state.fetching = true
   local key = make_cache_key(artist, title, duration)
+  state.fetching = true
   dbg('[lyrics] fetch START key=[' .. key .. ']')
 
   -- check memory cache first
@@ -394,6 +472,11 @@ local function fetch_lyrics(artist, title, album, duration)
   end
 
   awful.spawn.easy_async_with_shell(cmd, function(stdout, stderr, reason, exit_code)
+    -- A newer fetch owns state.lines and state.fetching now; leave both alone.
+    if key ~= state.cache_key then
+      dbg('[lyrics] GET STALE for key=[' .. key .. '], discarding')
+      return
+    end
     dbg('[lyrics] GET result exit=' .. tostring(exit_code) .. ' len=' ..
       tostring(stdout and #stdout or 0) .. ' has_synced=' ..
       tostring(stdout and json_has_synced_lyrics(stdout) or false))
@@ -423,12 +506,24 @@ local function fetch_lyrics(artist, title, album, duration)
 
     dbg('[lyrics] SEARCH ' .. search_url)
     awful.spawn.easy_async_with_shell(search_cmd, function(out2, _, _, exit2)
+      -- A newer fetch owns state.lines and state.fetching now; leave both alone.
+      if key ~= state.cache_key then
+        dbg('[lyrics] SEARCH STALE for key=[' .. key .. '], discarding')
+        return
+      end
       dbg('[lyrics] SEARCH result exit=' .. tostring(exit2) .. ' len=' ..
         tostring(out2 and #out2 or 0) .. ' has_synced=' ..
         tostring(out2 and json_has_synced_lyrics(out2) or false))
-      if exit2 == 0 and out2 and #out2 > 0 and json_has_synced_lyrics(out2) then
-        -- search returns an array; find first entry with syncedLyrics
-        local synced2 = json_extract_string(out2, 'syncedLyrics')
+
+      -- search returns an array of ~20 fuzzy matches; score them against the
+      -- track we are playing instead of trusting LRCLIB's own ordering
+      local records = (exit2 == 0 and out2 and #out2 > 0) and json_split_records(out2) or {}
+
+      if #records > 0 then
+        local best = pick_best_record(records, 'syncedLyrics', artist, title, duration)
+        local synced2 = best and json_extract_string(best, 'syncedLyrics')
+        dbg('[lyrics] SEARCH ' .. #records .. ' records, synced match=' ..
+          tostring(best and json_extract_string(best, 'trackName') or 'none'))
         if synced2 and #synced2 > 0 then
           local parsed2 = split_long_lines(parse_lrc(synced2), CONFIG.max_width)
           if #parsed2 > 0 then
@@ -443,9 +538,10 @@ local function fetch_lyrics(artist, title, album, duration)
         end
       end
 
-      -- No synced lyrics anywhere. Fall back to plainLyrics (search's first
-      -- record, else the /api/get record) for the tooltip.
-      local plain = ((exit2 == 0) and extract_plain(out2)) or get_plain
+      -- No synced lyrics anywhere. Fall back to plainLyrics (best-scoring
+      -- search record, else the /api/get record) for the tooltip.
+      local plain_rec = (#records > 0) and pick_best_record(records, 'plainLyrics', artist, title, duration) or nil
+      local plain = (plain_rec and extract_plain(plain_rec)) or get_plain
 
       -- Distinguish "server confirmed no lyrics" from "request failed". curl
       -- exit 0 means we got a real answer; anything else (28=timeout, DNS, etc.)

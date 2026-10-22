@@ -319,13 +319,17 @@ local function hub_bulk_resolve(logical_ids)
       .. table.concat(parts, ',') .. ']}')
 end
 
--- Async GET for the reconcile pass. cb gets the body or nil on any failure;
--- never blocks the WM.
-local function hub_get_async(path, cb)
+-- Async POST that hands the response body back. Used by the reconcile probe,
+-- which is a read despite the verb: the id set it sends is past what a query
+-- string should carry (AGENTS.md 11.2).
+local function hub_post_async(path, body_json, cb)
   awful.spawn.easy_async({
     'curl', '-sS',
-    '--connect-timeout', '3', '--max-time', '5',
+    '--connect-timeout', '3', '--max-time', '10',
+    '-X', 'POST',
     '-H', 'Authorization: Bearer ' .. HUB_TOKEN,
+    '-H', 'Content-Type: application/json',
+    '-d', body_json,
     HUB_URL .. path,
   }, function(out)
     if out and out:sub(1, 1) == '{' then cb(out) else cb(nil) end
@@ -503,6 +507,10 @@ local function serialize(e)
   return table.concat({
     tostring(e.time), esc(e.urgency), esc(e.app), esc(e.title), esc(e.text),
     tostring(e.seen or false), esc(e.hub_logical or ''), esc(e.hub_instance or ''),
+    -- Persisted for the same reason the ids are: without it a restored entry
+    -- the hub was told to ignore turns into an ordinary id-less row and goes
+    -- back to being matched by content.
+    tostring(e.hub_ignored or false),
   }, '\t')
 end
 
@@ -550,6 +558,9 @@ local function load_cache()
         -- them.
         hub_logical  = unesc_optional(fields[7]),
         hub_instance = unesc_optional(fields[8]),
+        -- Absent on older lines too, which reads as false: a row written
+        -- before ignore rules existed cannot have been ignored.
+        hub_ignored  = (fields[9] or 'false') == 'true',
       })
     end
   end
@@ -872,16 +883,29 @@ end
 --   1. real-time: the hub's SSE stream reports dismiss/suppress from other
 --      devices (or the web UI); the matching live popup is closed and the
 --      history row dropped;
---   2. reconcile: periodically and on each new notification, pull the hub's
---      dismissed + crap lists and drop matching entries. This covers what the
---      stream cannot: notifications shown while the hub was offline (fail
---      open) and events missed during a stream outage.
+--   2. reconcile: periodically and on each new notification, name the logical
+--      ids still held here and ask the hub what became of each. This covers
+--      what the stream cannot: events missed during a stream outage.
+--
+-- Reconcile asks by id rather than pulling the hub's resolved list, because a
+-- list is ranked and capped. Its default order puts urgency first, so once the
+-- page fills with normal and high rows a `low` one is on no page the client can
+-- ask for, and it stays on screen through every pass: a Firefox download expiry
+-- survived seven hours of 60-second rechecks that way. A set of ids has no
+-- ranking to fall off, and it reaches the one case no listing can - a logical
+-- deleted by hub retention appears in no list at all, but comes back from the
+-- probe as explicitly unknown.
+--
+-- Rows with no logical id (shown while the hub was unreachable, fail-open)
+-- cannot be asked about and are left to age out of the ring. They used to be
+-- matched against the resolved list by content, on collapsed text within a 30
+-- minute window, which was never strong evidence.
 --
 -- The reverse direction (local drop/dismiss -> hub) lives in act_delete,
 -- act_clear and the 'destroyed' handler above.
 
-local SYNC_INTERVAL   = 60   -- reconcile every N seconds
-local SYNC_LIST_LIMIT = 200  -- matches MAX_ENTRIES on the hub side
+local SYNC_INTERVAL    = 60   -- reconcile every N seconds
+local STATE_PROBE_LIMIT = 500 -- hub's per-call id cap; MAX_ENTRIES is below it
 
 local debug = false -- flip to true to trace hub sync activity
 
@@ -1015,14 +1039,26 @@ end
 -- on this screen), so it goes too. Nothing is suppressed on the hub side for
 -- this, so the cost of a wrong one is the notification showing again.
 --
+-- 'relinked': a human finished with another notification that says the same
+-- thing, and the hub only worked out the two were copies at that moment (its
+-- matching runs once, when a notification arrives). Same licence as a
+-- withdrawal and for the same reason: the row on this screen is about something
+-- already dealt with elsewhere.
+--
 -- Called from both paths with whatever each has: the live event carries the
 -- kind, while the reconcile poll sees only state='expired' and has to read the
--- row's expiry_reason. Anything unrecognised is treated as a resolution and
--- drops, which is how a hub older than this client keeps working.
-local WITHDRAWN_REASON = 'source_withdrawn'
+-- row's expiry_reason. The reason table is therefore not a convenience, it is
+-- the only evidence the catch-up path gets. Anything unrecognised is treated as
+-- a resolution and drops, which is how a hub older than this client keeps
+-- working.
+local FULL_DROP_REASONS = {
+  ['source_withdrawn']     = true,
+  ['relinked_to_resolved'] = true,
+}
 
 local function expiry_may_drop(kind, e, reason)
-  if kind == 'withdrawn' or reason == WITHDRAWN_REASON then return true end
+  if kind == 'withdrawn' or kind == 'relinked' then return true end
+  if reason and FULL_DROP_REASONS[reason] then return true end
   if kind ~= 'expired' then return true end
   return not e.hub_instance
 end
@@ -1059,97 +1095,70 @@ local function handle_hub_event(data_json)
   end, why)
 end
 
--- Pull flat JSON objects out of a list response ("items": [ {...}, ... ]).
--- Good enough for our own responses: fields are flat and only strings are
--- needed. A title carrying an escaped quote truncates that field, the match
--- then fails and the row waits for manual cleanup - rare, harmless.
+-- Pull the flat JSON objects out of an "items": [ {...}, ... ] response. The
+-- pattern matches innermost brace groups only, so the envelope around the
+-- array is skipped on its own. Good enough for our own responses: fields are
+-- flat and only scalars are needed. A title carrying an escaped quote
+-- truncates that field, the match then fails and the row waits for manual
+-- cleanup - rare, harmless.
 local function parse_items(out)
   local items = {}
   for obj in out:gmatch('{([^{}]*)}') do
     local id = obj:match('"id":"([^"]*)"')
     if id then
       items[#items + 1] = {
-        id    = id,
-        title = obj:match('"canonical_title":"([^"]*)"') or '',
-        body  = obj:match('"canonical_body":"([^"]*)"') or '',
-        -- 'resolved' and 'expired' both arrive on the resolved list and mean
-        -- different things here: see expiry_may_drop. Missing reads as
-        -- 'resolved', which is what every hub predating orphan expiry sent.
+        id = id,
+        -- 'resolved' and 'expired' mean different things here: see
+        -- expiry_may_drop. Missing reads as 'resolved', which is what every
+        -- hub predating orphan expiry sent.
         state = obj:match('"state":"([^"]*)"') or 'resolved',
+        -- Suppressed by a crap rule. Still 'active' in the state column, so
+        -- it has to be read separately or a crap row looks live.
+        crap = obj:match('"crap":(%a+)') == 'true',
         -- Why it expired. The state alone cannot separate an orphan expiry
         -- (echoes only) from a withdrawal (drop the local row too), and this
         -- path is the only way a client that missed the SSE frame ever learns
         -- about either. Absent on hubs below schema 011 and on rows expired
         -- before it, which reads as the conservative orphan case.
         expiry_reason = obj:match('"expiry_reason":"([^"]*)"') or '',
-        -- Bounds the content fallback below. Always present on list items;
-        -- resolved_at would be the closer stamp but is only set once resolved,
-        -- and crap items never get one.
-        last_seen = obj:match('"last_seen_at":"([^"]*)"') or '',
       }
     end
   end
   return items
 end
 
--- Compare a history entry against a hub list item. Entries the hub knows
--- match by logical id; entries shown while the hub was offline have no ids
--- and match by content within a time window. Local bodies are oneline()-
--- collapsed and truncated to TEXT_LIMIT with a trailing '…', hub bodies are
--- full text, so accept a prefix match in either direction.
-local function norm_text(s)
-  s = (s or ''):lower():gsub('%s+', ' ')
-  return (s:gsub('^%s+', ''):gsub('%s+$', ''))
-end
-
--- Hub timestamps are RFC 3339 (UTC in practice). os.time() reads its table as
--- local time, so the local/UTC delta is added back; it is recomputed per call
--- because DST moves it.
-local function rfc3339_to_epoch(ts)
-  if not ts or ts == '' then return nil end
-  local y, mo, d, h, mi, s = ts:match('^(%d+)-(%d+)-(%d+)[Tt ](%d+):(%d+):(%d+)')
-  if not y then return nil end
-  local epoch = os.time({
-    year = tonumber(y), month = tonumber(mo), day = tonumber(d),
-    hour = tonumber(h), min = tonumber(mi), sec = tonumber(s), isdst = false,
-  })
-  if not epoch then return nil end
-  local now = os.time()
-  epoch = epoch + os.difftime(now, os.time(os.date('!*t', now)))
-  -- Numeric zone instead of 'Z' ("+02:00"): shift it back to UTC.
-  local sign, oh, om = ts:match('([+%-])(%d%d):?(%d%d)$')
-  if sign then
-    local shift = tonumber(oh) * 3600 + tonumber(om) * 60
-    epoch = epoch + ((sign == '+') and -shift or shift)
-  end
-  return epoch
-end
-
--- How far apart a history entry and a hub item may be and still count as the
--- same observation. Only id-less entries ever reach this check, and without a
--- bound a recurring notification (same sender, same title, every week) matches
--- its own long-resolved twin and is dropped from history while the hub still
--- lists the new one as active.
-local CONTENT_MATCH_WINDOW = 30 * 60
-
-local function content_matches(e, item)
-  -- Time gate first: cheaper than the text comparison, and it is what keeps
-  -- the recurring-twin case out. An unreadable or missing stamp means "cannot
-  -- tell", and not dropping a notification beats dropping the wrong one.
-  local item_time = rfc3339_to_epoch(item.last_seen)
-  if not item_time or not e.time then return false end
-  if math.abs(os.difftime(item_time, e.time)) > CONTENT_MATCH_WINDOW then return false end
-  if norm_text(e.title) ~= norm_text(item.title) then return false end
-  local eb = norm_text(e.text):gsub('…$', '')
-  local sb = norm_text(item.body)
-  if eb == '' then return sb == '' end
-  return sb:sub(1, #eb) == eb or eb:sub(1, #sb) == sb
+-- Ids the hub answered it has never heard of ("unknown": [ "...", ... ]).
+--
+-- Read from the explicit list and never inferred from what is missing out of
+-- what was asked: absence conflates "reaped by retention", "forgotten",
+-- "never existed" and "the hub is answering from an older backup", and under
+-- that last one every id at once would read as gone.
+local function parse_unknown(out)
+  local ids = {}
+  local arr = out:match('"unknown":%[(.-)%]')
+  if not arr then return ids end
+  for id in arr:gmatch('"([^"]*)"') do ids[#ids + 1] = id end
+  return ids
 end
 
 local reconcile_pending = false
 
 local function reconcile_with_hub()
-  if reconcile_pending or #entries == 0 then return end
+  if reconcile_pending then return end
+
+  -- The probe is the ids this device is still rendering. Rows without one
+  -- (fail-open, shown while the hub was unreachable) cannot be asked about and
+  -- wait for the ring to evict them.
+  local ids, seen = {}, {}
+  for _, e in ipairs(entries) do
+    if e.hub_logical and e.hub_logical ~= '' and not seen[e.hub_logical] then
+      seen[e.hub_logical] = true
+      ids[#ids + 1] = json_str(e.hub_logical)
+      if #ids >= STATE_PROBE_LIMIT then break end
+    end
+  end
+  if #ids == 0 then return end
+
   reconcile_pending = true
   -- Deadman switch: a curl that never spawns means no callback ever arrives,
   -- and the flag would otherwise disable re-checking forever.
@@ -1158,38 +1167,57 @@ local function reconcile_with_hub()
     return false
   end)
 
-  local lists, got = {}, 0
-  local function finish()
-    reconcile_pending = false
-    if #lists == 0 then return end
-    drop_matching(function(e)
-      for _, item in ipairs(lists) do
-        -- An expired item is the catch-up form of an expiry event, and gets
-        -- the same treatment: echoes only for an orphan expiry, the local row
-        -- as well for a withdrawal, which is why the reason is read here.
-        if e.hub_logical and e.hub_logical == item.id then
-          if expiry_may_drop(item.state, e, item.expiry_reason) then return true end
-        elseif not e.hub_logical and content_matches(e, item) then
-          -- Id-less rows are matched by content alone, and that match is fuzzy
-          -- (collapsed text, a 30 minute window). Only a real resolution drops
-          -- one: an expiry of either flavour says the hub's copy ended, not
-          -- that this unlinked row is the same notification.
-          if item.state ~= 'expired' then return true end
-        end
-      end
-      return false
-    end, 'hub sync')
-  end
-  local function on_list(out)
-    if out then
-      for _, item in ipairs(parse_items(out)) do lists[#lists + 1] = item end
-    end
-    got = got + 1
-    if got == 2 then finish() end
-  end
+  hub_post_async('/api/v1/notifications/states',
+    '{"logical_ids":[' .. table.concat(ids, ',') .. ']}',
+    function(out)
+      reconcile_pending = false
+      if not out then return end
 
-  hub_get_async('/api/v1/notifications?state=resolved&limit=' .. SYNC_LIST_LIMIT, on_list)
-  hub_get_async('/api/v1/notifications?state=crap&limit=' .. SYNC_LIST_LIMIT, on_list)
+      local states, unknown = {}, {}
+      for _, item in ipairs(parse_items(out)) do states[item.id] = item end
+      for _, id in ipairs(parse_unknown(out)) do unknown[id] = true end
+      -- A body that parsed to nothing at all is a malformed answer, not an
+      -- empty hub. Acting on it would read as "none of this exists".
+      if not next(states) and not next(unknown) then return end
+
+      drop_matching(function(e)
+        local id = e.hub_logical
+        if not id or id == '' then return false end
+
+        local st = states[id]
+        if st then
+          -- A crap rule now covers it: suppressed everywhere, so stop showing
+          -- it here. Crap rows keep state 'active', hence the separate check.
+          if st.crap then return true end
+          if st.state == 'active' then return false end
+          -- An expired row is the catch-up form of an expiry event and gets
+          -- the same gate: echoes only for an orphan expiry, this row as well
+          -- for a withdrawal or a relink, which is why the reason is read.
+          if st.state == 'expired' then
+            return expiry_may_drop('expired', e, st.expiry_reason)
+          end
+          -- Resolved, or a state this client does not know: somebody finished
+          -- with it. An unknown state reads as a resolution so a newer hub
+          -- keeps working against this client.
+          return true
+        end
+
+        if unknown[id] then
+          -- The hub holds no row under this id: reaped by retention, or
+          -- forgotten while this client was not listening. Only echoes go. A
+          -- forget broadcasts its resolve before deleting the row, so an echo
+          -- the hub cannot name means that broadcast was missed, which is
+          -- exactly the case needing cleanup. An own row stays: "the hub
+          -- cannot name it" is not evidence that anybody read it, and dropping
+          -- an unread notification on that is the one failure this project
+          -- does not allow.
+          return not e.hub_instance
+        end
+
+        -- Asked about and answered neither way. Nothing to act on.
+        return false
+      end, 'hub sync')
+    end)
 end
 
 -- Debounced reconcile trigger for the record() path ("ask again about kept
@@ -1365,6 +1393,13 @@ local function record(n, args)
     -- still has somewhere to report to.
     hub_instance = meta and meta.instance_id,
     hub_logical  = meta and meta.logical_id,
+    -- The hub answered 'ignore': an ignore rule covers this notification, so
+    -- it holds no row for it and never will. The entry is kept and displayed
+    -- like any other (ignore means "bother does not manage this", not "hide
+    -- it"), but it carries no ids and must not be matched against hub rows by
+    -- content either, so the flag has to be explicit: "no ids" otherwise
+    -- means "ingested while the hub was unreachable", which does get matched.
+    hub_ignored  = meta ~= nil and meta.decision == 'ignore',
     seen    = false,  -- track whether this notification was viewed
   })
   trim_entries()
