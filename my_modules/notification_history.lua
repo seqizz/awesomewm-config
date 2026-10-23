@@ -18,6 +18,21 @@ local dpi = beautiful.xresources.apply_dpi
 
 local notification_history = {}
 
+-- Reasons meaning "the app that posted this took it back", as opposed to the
+-- popup merely going away.
+--
+-- The freedesktop spec fixes 3 for "closed by a call to CloseNotification" and
+-- that is the value arriving over the wire, so it is listed outright; the
+-- naughty constant is added when present because the two should agree and a
+-- local build is the authority if they ever do not. Listing the raw 3 is safe
+-- even on a naughty that happens to use it for something internal, because
+-- every close this module initiates is marked (`_hub_closed`) and skipped
+-- before this table is consulted.
+local APP_RETRACT_REASONS = { [3] = true }
+if naughty_reason.dismissed_by_command then
+  APP_RETRACT_REASONS[naughty_reason.dismissed_by_command] = true
+end
+
 -- Tunables
 local MAX_ENTRIES = 200 -- ring buffer size, also the on-disk trim target
 local VIEWPORT    = 5   -- rows rendered at once; list scrolls inside this
@@ -924,6 +939,12 @@ end
 close_live = function(e)
   local n = e.notification
   if n and n._private and not n._private.is_destroyed then
+    -- Marked before the destroy, read by the 'destroyed' handler: a close this
+    -- module initiated is never a report. Detaching the entry first would do
+    -- the same job and act_delete/act_clear do exactly that, but
+    -- drop_matching() closes while the entry is still in `entries`, so the
+    -- ordering is not something the handler can rely on.
+    n._hub_closed = true
     -- Silent destroy: hub dismiss/suppress or history clear should not
     -- trigger the notification's run/click callback (the originating
     -- app would interpret that as a user action).
@@ -1512,11 +1533,45 @@ naughty.connect_signal('added', function(n, args) record(n, args) end)
 -- this device when the row leaves the ring buffer, which is where
 -- trim_entries() reports it.
 --
--- Every other reason is left alone. 'silent' in particular is what the hub
--- sync itself destroys popups with, and close_live() removes the entry from
--- `entries` before destroying, so the loop below cannot find it and a
--- server-driven cancel can never echo back as a local report.
+-- An app retracting its own notification is reported, as a removal rather than
+-- a resolution: see the branch below.
+--
+-- Every other reason is left alone, and closes this module initiated are left
+-- alone whatever reason they carry. They are recognised by the `_hub_closed`
+-- mark that close_live() sets, not by their reason and not by the entry having
+-- been detached first: act_delete and act_clear do detach first, but
+-- drop_matching() closes while the entry is still in `entries`, so an echo
+-- guard resting on that ordering would hold for two call sites out of three.
 naughty.connect_signal('destroyed', function(n, reason)
+  -- Anything this module closed itself, whatever reason it used.
+  if n and (n._hub_closed or n._hub_veto) then
+    return
+  end
+
+  -- The source took the notification back: the app called CloseNotification
+  -- because whatever it was about stopped being true (the mail was read in
+  -- another client, the build finished, the call was answered elsewhere).
+  --
+  -- Unlike a timeout this does say the copy here is finished, so the row goes
+  -- rather than staying readable in the ring, and the hub hears `app_cancel`,
+  -- which is what feeds its withdrawal expiry (AGENTS.md 6.2) and clears the
+  -- same notification off the phone. A removal, not a resolution: nobody
+  -- necessarily read it, so nothing is suppressed and the cost of a wrong one
+  -- is the notification arriving again.
+  if APP_RETRACT_REASONS[reason] then
+    local e
+    for i = 1, #entries do
+      if entries[i].notification == n then e = entries[i] break end
+    end
+    if not e then return end
+    if e.hub_instance then
+      hub_report_async('/api/v1/instances/' .. e.hub_instance .. '/removed',
+        '{"native_reason":"app_cancel"}')
+    end
+    drop_matching(function(x) return x.notification == n end, 'app retracted')
+    return
+  end
+
   if reason ~= naughty_reason.dismissed_by_user then
     return
   end
