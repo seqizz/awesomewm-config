@@ -594,7 +594,40 @@ end
 
 local popup
 local grabber_func   -- installed raw keygrabber callback, nil while not grabbing
-local focus_handler  -- client::focus signal, connected on show, disconnected on hide
+local focus_handler  -- dismiss signals, connected on show, disconnected on hide
+
+-- Signals meaning "the user went somewhere else", so the popup should get out
+-- of the way.
+--
+-- 'focus' alone misses the commonest case. This popup is a wibox, not a
+-- client, so opening it never takes client focus: whatever was focused before
+-- still is. Clicking back into that same window therefore changes no focus and
+-- reports nothing, and the popup sits there over the window being used.
+--
+-- 'request::activate' is emitted on every click into a client whether or not
+-- it already had focus (rc_clientbuttons), plus by the tasklist, titlebars and
+-- unminimise. Nothing emits it on a timer, so this stays event-driven and
+-- costs nothing while the popup is closed, which is whenever these are not
+-- connected at all.
+local DISMISS_SIGNALS = { 'focus', 'request::activate' }
+
+local function disconnect_dismiss()
+  if not focus_handler then return end
+  for _, sig in ipairs(DISMISS_SIGNALS) do
+    client.disconnect_signal(sig, focus_handler)
+  end
+  focus_handler = nil
+end
+
+local function connect_dismiss()
+  -- Replaced rather than added to on each show(), so there is never more than
+  -- one connection per signal.
+  disconnect_dismiss()
+  focus_handler = function() notification_history.hide() end
+  for _, sig in ipairs(DISMISS_SIGNALS) do
+    client.connect_signal(sig, focus_handler)
+  end
+end
 
 -- Top right, below the wibar, same corner naughty itself uses, so
 -- re-reading history lands where the notifications originally appeared.
@@ -753,10 +786,7 @@ function notification_history.hide()
     keygrabber.stop(grabber_func)
     grabber_func = nil
   end
-  if focus_handler then
-    client.disconnect_signal("focus", focus_handler)
-    focus_handler = nil
-  end
+  disconnect_dismiss()
   if popup then popup.visible = false end
 end
 
@@ -1500,14 +1530,8 @@ function notification_history.show()
   p.placement = place_top_right
   grab_keys()
 
-  -- Close the popup when the user focuses another client (clicks a window
-  -- outside the popup). The handler is replaced on each show() call so
-  -- there's never more than one connection active.
-  if focus_handler then
-    client.disconnect_signal("focus", focus_handler)
-  end
-  focus_handler = function(c) notification_history.hide() end
-  client.connect_signal("focus", focus_handler)
+  -- Close the popup as soon as the user goes back to a window.
+  connect_dismiss()
 end
 
 function notification_history.toggle()
