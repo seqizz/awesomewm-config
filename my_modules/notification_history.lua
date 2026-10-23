@@ -1001,7 +1001,17 @@ end
 -- reports the hub-driven removal back as a user dismissal (no echo loop).
 close_live = function(e)
   local n = e.notification
-  if n and n._private and not n._private.is_destroyed then
+  -- `_hub_closed` doubles as the re-entrancy guard, and has to, because
+  -- `is_destroyed` is not a usable one: notification:destroy() emits
+  -- 'destroyed' first and only sets the flag after every handler returned.
+  -- Anything reached from inside that emit therefore still sees a live-looking
+  -- notification, and a second destroy() runs naughty's cleanup() twice, which
+  -- trips `assert(naughty.notifications[scr][position][idx] == self)` because
+  -- the first pass already unindexed it. The flag also survives such an abort:
+  -- the error unwinds destroy() before it can set `is_destroyed`, leaving the
+  -- object permanently destroy-able-looking, so later clears would re-trip the
+  -- same assert.
+  if n and n._private and not n._private.is_destroyed and not n._hub_closed then
     -- Marked before the destroy, read by the 'destroyed' handler: a close this
     -- module initiated is never a report. Detaching the entry first would do
     -- the same job and act_delete/act_clear do exactly that, but
@@ -1625,6 +1635,10 @@ naughty.connect_signal('destroyed', function(n, reason)
       hub_report_async('/api/v1/instances/' .. e.hub_instance .. '/removed',
         '{"native_reason":"app_cancel"}')
     end
+    -- This runs inside n's own destroy(), so n must not be destroyed again on
+    -- the way out. drop_matching() -> close_live() would otherwise do exactly
+    -- that; the mark makes close_live skip it (see the guard there).
+    n._hub_closed = true
     drop_matching(function(x) return x.notification == n end, 'app retracted')
     return
   end
