@@ -760,22 +760,55 @@ function notification_history.hide()
   if popup then popup.visible = false end
 end
 
+-- Clicking a row says the same thing as clicking the popup it came from: you
+-- have dealt with this one. Reported as `click`, the hub's strongest
+-- resolution kind, which closes the notification on every other device.
+--
+-- The row goes whether or not there was a window to raise. A row with no live
+-- client is the case where clicking is most clearly terminal: it was restored
+-- from disk, or the thing that posted it is gone, so there is nowhere to go
+-- and look and the click was the whole interaction.
+--
+-- Jumping is therefore not a way to visit a notification without answering for
+-- it. `d` sends the same row away with `user_dismiss` instead, which is the
+-- difference between "I went and looked" and "I do not need this".
 act_jump = function()
   local e = entries[selected]
   if not e then return end
-  -- Mark this entry as seen after you jump to it
-  e.seen = true
-  if e.client and e.client.valid then
-    notification_history.hide()
-    e.client:jump_to()
-  else
-    -- Nothing to raise (restored from disk, or the notification had no client).
-    naughty.notification {
-      app_name = SELF_APP,
-      text     = 'No live client for this notification',
-      timeout  = 2,
-    }
+  local target = (e.client and e.client.valid) and e.client or nil
+
+  -- Entries shown while the hub was unreachable carry no ids and stay local.
+  if e.hub_instance then
+    hub_report_async('/api/v1/instances/' .. e.hub_instance .. '/resolve',
+      '{"kind":"click"}')
+  elseif e.hub_logical then
+    -- Echoes have no instance id of their own; resolve the logical.
+    hub_report_async('/api/v1/notifications/' .. e.hub_logical .. '/resolve',
+      '{"kind":"click"}')
   end
+  table.remove(entries, selected)
+  -- Entry is gone before the destroy, so the 'destroyed' handler cannot
+  -- double-report the resolution just sent.
+  close_live(e)
+  flush_cache()
+  refresh_count_widget()
+
+  if target then
+    notification_history.hide()
+    target:jump_to()
+    return
+  end
+  naughty.notification {
+    app_name = SELF_APP,
+    text     = 'No live client - dismissed',
+    timeout  = 2,
+  }
+  if #entries == 0 then
+    return notification_history.hide()
+  end
+  -- render() reclamps `selected`, which the removal above may have put past
+  -- the end of the list.
+  render()
 end
 
 local function act_yank()
