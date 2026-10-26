@@ -438,7 +438,7 @@ end
 --   'no'    = ignore remote notifications (local only)
 --   'yes'   = show them in the history popup
 --   'popup' = also fire a normal system popup "$device: ($app) title · body"
-local REMOTE_NOTIFICATIONS = 'yes'
+local REMOTE_NOTIFICATIONS = 'popup'
 
 -- Minimal JSON string encoding: awesome has no JSON library and the payload
 -- is flat strings, so hand-rolling beats adding a dependency.
@@ -720,6 +720,10 @@ local function serialize(e)
     -- the hub was told to ignore turns into an ordinary id-less row and goes
     -- back to being matched by content.
     tostring(e.hub_ignored or false),
+    -- Where the row came from. Only the display marker depends on it, but a
+    -- restored echo that lost it reads as a local notification whose window is
+    -- merely gone, which is a different and more actionable thing.
+    tostring(e.remote or false),
   }, '\t')
 end
 
@@ -770,6 +774,9 @@ local function load_cache()
         -- Absent on older lines too, which reads as false: a row written
         -- before ignore rules existed cannot have been ignored.
         hub_ignored  = (fields[9] or 'false') == 'true',
+        -- Same for the origin marker; an old line is assumed local, which is
+        -- what every line written before echoes existed actually was.
+        remote       = (fields[10] or 'false') == 'true',
       })
     end
   end
@@ -890,11 +897,17 @@ local function make_row(e, index)
     body = (e.text ~= '' and e.title ~= e.text) and (e.title .. ' · ' .. e.text) or e.title
   end
 
+  -- Echoes carry the *sending* app's name (QKSMS, the phone's mail client),
+  -- which reads exactly like a local one and invites a click that can never go
+  -- anywhere: there is no window here and no dbus id to activate. The marker
+  -- says so up front rather than after the fact.
+  local app_label = e.remote and ('[R] ' .. e.app) or e.app
+
   local row = wibox.widget {
     {
       {
         label(relative_time(e.time), is_sel and beautiful.fg_normal_alt or DIM, COL_TIME),
-        label(e.app, is_sel and beautiful.fg_normal_alt or beautiful.fg_normal, COL_APP),
+        label(app_label, is_sel and beautiful.fg_normal_alt or beautiful.fg_normal, COL_APP),
         label(body, is_sel and beautiful.fg_focus or fg, COL_BODY),
         -- Marker for entries a click still gets somewhere: either the source
         -- window is alive to raise, or the app still holds the notification
@@ -1309,7 +1322,7 @@ local function handle_remote_notification(data_json)
     hub_instance = nil,
     hub_logical  = logical,
     seen    = false,
-    remote  = true,  -- session-only marker, never serialized to cache
+    remote  = true,
   }
   table.insert(entries, 1, e)
   trim_entries()
