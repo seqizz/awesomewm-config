@@ -12,6 +12,9 @@ local wibox = require('wibox')
 local gears = require('gears')
 local naughty = require('naughty')
 local naughty_reason = require('naughty.constants').notification_closed_reason
+local nnotif = require('naughty.notification')
+local lgi = require('lgi')
+local Gio, GLib = lgi.Gio, lgi.GLib
 local beautiful = require('beautiful')
 local my_utils = require('my_modules/my_utils')
 local dpi = beautiful.xresources.apply_dpi
@@ -109,6 +112,11 @@ local function urgency_fg(urgency)
   return beautiful.fg_normal
 end
 
+-- Debug print, defined next to the hub debug switch further down. Declared
+-- here because the dbus activation section below it is needed by trim_entries,
+-- which sits above that switch.
+local dbg
+
 -- entries[1] is the newest. Prepending is O(n) but n <= MAX_ENTRIES.
 local entries = {}
 local selected = 1
@@ -180,6 +188,189 @@ end
 -- Single-quote for `sh -c`, safe for newlines and quotes in notification text.
 local function shquote(s)
   return "'" .. s:gsub("'", "'\\''") .. "'"
+end
+
+--------------------------------------------------------------------------------
+-- freedesktop activation: a row click says what a popup click says
+--------------------------------------------------------------------------------
+
+-- Clicking a naughty popup and clicking the same notification's row here were
+-- never the same gesture. The popup click ends in
+-- notification:destroy(dismissed_by_user), and naughty/dbus.lua answers that
+-- reason by emitting ActionInvoked(id, "default") on the session bus ahead of
+-- NotificationClosed. That signal is what makes Telegram open the chat the
+-- message came from, a mail client open the mail, a build bot open the job. A
+-- row click only ever raised the client naughty guessed from the sender's PID,
+-- so the app surfaced on whatever it happened to be showing.
+--
+-- Emitting that ActionInvoked later only works while the id still means
+-- something to the app that posted it, and apps forget an id as soon as they
+-- see its NotificationClosed. So for a notification that got a row here, the
+-- close naughty emits when the popup times out is withheld, and the close is
+-- sent from this module instead when the row leaves: acted on, dropped,
+-- cleared, evicted, or the WM exiting. That is the point the last copy on this
+-- machine is really gone, which is the same line trim_entries already draws
+-- for the hub.
+--
+-- The action is emitted unconditionally rather than only for notifications
+-- that declared a "default" action, because naughty's own popup click does
+-- exactly that (sendNotificationClosed in naughty/dbus.lua emits it for every
+-- dismissed_by_user, action or no action). Apps that registered none ignore
+-- the signal, so matching naughty costs nothing and avoids guessing at an
+-- action table the app may never have sent.
+--
+-- What is deliberately not handled: an app that retires its notification by
+-- calling CloseNotification while the row is still here. naughty drops that on
+-- the floor once the notification object is destroyed, so this module never
+-- learns, keeps offering the row, and the activation lands on an id the app
+-- has forgotten. The click then falls back to raising the client, which is the
+-- old behaviour.
+
+-- Senders whose ids must not be held open past their popup, matched against a
+-- lowercased app_name. Escape hatch for an app that keys something off its own
+-- notification being closed; nothing has needed it so far.
+local NO_HOLD_APPS = {}
+
+local NOTIFY_PATH  = '/org/freedesktop/Notifications'
+local NOTIFY_IFACE = 'org.freedesktop.Notifications'
+
+-- A signal only reaches the apps if it comes from the connection that owns
+-- org.freedesktop.Notifications, which is naughty's. GDBus hands out one
+-- shared connection per bus type per process and naughty acquires the name on
+-- it via g_bus_own_name, so this handle is that same connection rather than a
+-- second one that would emit under a unique name nobody is subscribed to.
+local session_bus
+local function notify_bus()
+  if session_bus == nil then
+    local ok, conn = pcall(Gio.bus_get_sync, Gio.BusType.SESSION, nil)
+    session_bus = (ok and conn) or false
+  end
+  return session_bus or nil
+end
+
+local function emit_notify_signal(name, variant)
+  local conn = notify_bus()
+  if not conn then return false end
+  local ok = pcall(function()
+    conn:emit_signal(nil, NOTIFY_PATH, NOTIFY_IFACE, name, variant)
+  end)
+  if not ok then dbg('dbus emit failed: ' .. name) end
+  return ok
+end
+
+-- True while this module is holding e's notification id open on behalf of the
+-- app that posted it.
+local function holding(e)
+  return (e and e.dbus_id and e.dbus_open) and true or false
+end
+
+-- Whether clicking the row can still reach the app that posted it: either the
+-- id is held open here, or naughty still owns a live popup for it.
+local function activatable(e)
+  if not e or not e.dbus_id then return false end
+  if e.dbus_open then return true end
+  local n = e.notification
+  return (n and n._private and not n._private.is_destroyed
+    and not (n._hub_closed or n._hub_veto)) and true or false
+end
+
+-- Report the row as clicked to the app that posted it. Returns whether the
+-- app was actually told, so the caller knows an app is about to surface a
+-- window of its own choosing.
+--
+-- A row can be clicked while its popup is still on screen (the history popup
+-- opens over them). In that case naughty still owns the notification and
+-- dismissing it emits the same pair, so it is destroyed through naughty rather
+-- than hand-rolled. The close is marked as this module's so the hub handler
+-- does not report a resolution act_jump is already reporting itself.
+local function dbus_activate(e)
+  if not e or not e.dbus_id then return false end
+
+  if not e.dbus_open then
+    local n = e.notification
+    if n and n._private and not n._private.is_destroyed
+       and not (n._hub_closed or n._hub_veto) then
+      n._hub_closed = true
+      n:destroy(naughty_reason.dismissed_by_user)
+      return true
+    end
+    return false
+  end
+
+  e.dbus_open = false
+  emit_notify_signal('ActionInvoked',
+    GLib.Variant('(us)', { e.dbus_id, 'default' }))
+  emit_notify_signal('NotificationClosed',
+    GLib.Variant('(uu)', { e.dbus_id, naughty_reason.dismissed_by_user }))
+  dbg('activated notification ' .. tostring(e.dbus_id))
+  return true
+end
+
+-- Hand a held id back without claiming anybody acted on it.
+local function dbus_release(e, reason)
+  if not holding(e) then return end
+  e.dbus_open = false
+  emit_notify_signal('NotificationClosed',
+    GLib.Variant('(uu)', { e.dbus_id, reason or naughty_reason.expired }))
+end
+
+-- Entries are removed from the list by value, so identity is the only way to
+-- ask whether a given row is still readable.
+local function entry_is_live(e)
+  for i = 1, #entries do
+    if entries[i] == e then return true end
+  end
+  return false
+end
+
+-- Reasons that only take the popup off the screen. Every other reason (the app
+-- calling CloseNotification, a click, a close this module initiated) really
+-- ends the notification, and its close goes out untouched.
+local HOLD_REASONS = {
+  [naughty_reason.expired] = true,
+  [naughty_reason.silent]  = true, -- right click on the popup: hide, do not act
+}
+
+-- Withhold the dbus close for `n` so `e` can still invoke its default action.
+--
+-- naughty/dbus.lua reads `n.id` from a 'destroyed' handler that cannot be
+-- unsubscribed (it closes over a table this module has no reach into), and
+-- running before it is not an option either: gears.object dispatches handlers
+-- with pairs(), so connection order buys nothing. destroy() itself is the one
+-- deterministic point, so it is wrapped per notification. For the duration of
+-- the call `n.id` points at a number no client was ever given, the close goes
+-- out naming that number and every app ignores it, and the real id is put back
+-- on the way out. _gen_next_id() supplies the decoy so it can never collide
+-- with a notification that is actually live somewhere.
+--
+-- The swap writes straight to _private: set_id() asserts an id is assigned
+-- only once, and the property path would additionally re-index a notification
+-- that is in the middle of being destroyed.
+--
+-- rawset is required for the wrapper. crush() copied destroy() onto the object
+-- as a plain field, while a plain assignment is caught by the property
+-- system's __newindex and would land in _private.destroy, an unrelated
+-- callback that leaves the real method untouched.
+local function hold_open(n, e)
+  local inner = rawget(n, 'destroy')
+  if type(inner) ~= 'function' then return end
+
+  rawset(n, 'destroy', function(self, reason, keep_visible)
+    local hold = HOLD_REASONS[reason]
+      and not (self._hub_closed or self._hub_veto)
+      and entry_is_live(e)
+    if not hold then return inner(self, reason, keep_visible) end
+
+    local real = self._private.id
+    self._private.id = nnotif._gen_next_id()
+    local ok, res = pcall(inner, self, reason, keep_visible)
+    self._private.id = real
+    if not ok then error(res, 0) end
+    -- Only a destroy that actually ran swallowed a close worth replacing; a
+    -- repeat destroy returns false and its close went out long ago.
+    if res then e.dbus_open = true end
+    return res
+  end)
 end
 
 --------------------------------------------------------------------------------
@@ -316,6 +507,9 @@ end
 local function trim_entries()
   while #entries > MAX_ENTRIES do
     local e = table.remove(entries)
+    -- Same line for the app that posted it: the id was held open only for as
+    -- long as the row was readable.
+    dbus_release(e)
     if e.hub_instance then
       hub_report_async('/api/v1/instances/' .. e.hub_instance .. '/removed',
         '{"native_reason":"history_evicted"}')
@@ -702,8 +896,11 @@ local function make_row(e, index)
         label(relative_time(e.time), is_sel and beautiful.fg_normal_alt or DIM, COL_TIME),
         label(e.app, is_sel and beautiful.fg_normal_alt or beautiful.fg_normal, COL_APP),
         label(body, is_sel and beautiful.fg_focus or fg, COL_BODY),
-        -- Marker for entries that can still raise their source window.
-        label((e.client and e.client.valid) and '⏎' or '', DIM, COL_MARK),
+        -- Marker for entries a click still gets somewhere: either the source
+        -- window is alive to raise, or the app still holds the notification
+        -- and can be told to act on it.
+        label(((e.client and e.client.valid) or activatable(e)) and '⏎' or '',
+          DIM, COL_MARK),
         spacing = ROW_SPACING,
         layout  = wibox.layout.fixed.horizontal,
       },
@@ -751,7 +948,7 @@ render = function()
 
   local header = string.format('Notifications  %d/%d   ·   %s', selected, #entries,
     hub_connected and 'hub ✓' or 'hub ✗')
-  local footer = 'j/k move · ⏎ raise · y yank · d drop · C clear · click row · Esc/q close'
+  local footer = 'j/k move · ⏎ open · y yank · d drop · C clear · click row · Esc/q close'
 
   ensure_popup():setup {
     {
@@ -792,12 +989,15 @@ end
 
 -- Clicking a row says the same thing as clicking the popup it came from: you
 -- have dealt with this one. Reported as `click`, the hub's strongest
--- resolution kind, which closes the notification on every other device.
+-- resolution kind, which closes the notification on every other device, and
+-- handed to the posting app as its default action where the id is still held
+-- open, which is what gets Telegram to the right chat rather than merely to
+-- its window.
 --
--- The row goes whether or not there was a window to raise. A row with no live
--- client is the case where clicking is most clearly terminal: it was restored
--- from disk, or the thing that posted it is gone, so there is nowhere to go
--- and look and the click was the whole interaction.
+-- The row goes whether or not there was a window to raise. A row with neither
+-- a live client nor a held id is the case where clicking is most clearly
+-- terminal: it was restored from disk, or the thing that posted it is gone, so
+-- there is nowhere to go and look and the click was the whole interaction.
 --
 -- Jumping is therefore not a way to visit a notification without answering for
 -- it. `d` sends the same row away with `user_dismiss` instead, which is the
@@ -806,6 +1006,10 @@ act_jump = function()
   local e = entries[selected]
   if not e then return end
   local target = (e.client and e.client.valid) and e.client or nil
+
+  -- Before close_live, which would otherwise release the id as a plain
+  -- expiry and lose the click.
+  local activated = dbus_activate(e)
 
   -- Entries shown while the hub was unreachable carry no ids and stay local.
   if e.hub_instance then
@@ -827,6 +1031,11 @@ act_jump = function()
     notification_history.hide()
     target:jump_to()
     return
+  end
+  -- The app was handed the click and brings up whatever window it considers
+  -- right for it, so there is nothing here left to raise or to report.
+  if activated then
+    return notification_history.hide()
   end
   naughty.notification {
     app_name = SELF_APP,
@@ -864,6 +1073,9 @@ act_delete = function()
       '{"kind":"user_dismiss"}')
   end
   table.remove(entries, selected)
+  -- Dropping a row is a deliberate dismissal, so the app hears that rather
+  -- than the plain expiry close_live would otherwise send.
+  dbus_release(e, naughty_reason.dismissed_by_user)
   -- Entry is gone before the destroy, so the 'destroyed' handler cannot
   -- double-report the dismissal we just sent.
   close_live(e)
@@ -888,7 +1100,10 @@ local function act_clear()
   -- what the bulk dismiss already tombstoned.
   local old = entries
   entries = {}
-  for _, e in ipairs(old) do close_live(e) end
+  for _, e in ipairs(old) do
+    dbus_release(e, naughty_reason.dismissed_by_user)
+    close_live(e)
+  end
   flush_cache()
   refresh_count_widget()
   -- The badge is hidden on an empty buffer, so a tooltip opened by hovering it
@@ -990,7 +1205,7 @@ local debug = false -- flip to true to trace hub sync activity
 -- debug print: fires on the module-local flag OR the global printmore master
 -- switch (same convention as mpris/mpris_lyrics). Hub sync feedback goes
 -- through here so drops are silent in normal use and traceable when needed.
-local function dbg(msg)
+dbg = function(msg)
   if debug or printmore then
     debug_print(msg, true)
   end
@@ -1000,6 +1215,11 @@ end
 -- before this runs, so the 'destroyed' handler finds nothing and never
 -- reports the hub-driven removal back as a user dismissal (no echo loop).
 close_live = function(e)
+  -- A row leaving the list is the moment the app can be told its notification
+  -- is gone here, whether or not a popup for it is still on screen. Callers
+  -- that mean something more specific than "it expired" release it themselves
+  -- first; this is the catch-all.
+  dbus_release(e)
   local n = e.notification
   -- `_hub_closed` doubles as the re-entrancy guard, and has to, because
   -- `is_destroyed` is not a usable one: notification:destroy() emits
@@ -1470,6 +1690,15 @@ local function record(n, args)
     end
   end
 
+  -- Only dbus-delivered notifications have an id an app knows about; the
+  -- config's own internal toasts come in under INTERNAL_APP with no hints and
+  -- nothing on the other end to activate.
+  local dbus_id
+  if n._private and n._private.freedesktop_hints
+     and not matches_any(app, NO_HOLD_APPS) then
+    dbus_id = n.id
+  end
+
   table.insert(entries, 1, {
     time    = os.time(),
     urgency = n.urgency or 'normal',
@@ -1494,8 +1723,15 @@ local function record(n, args)
     -- content either, so the flag has to be explicit: "no ids" otherwise
     -- means "ingested while the hub was unreachable", which does get matched.
     hub_ignored  = meta ~= nil and meta.decision == 'ignore',
+    -- Native notification id, used to invoke the default action from the row
+    -- long after the popup is gone. Not persisted, unlike the hub ids: an id
+    -- only means anything to the running process that was given it, and a
+    -- restart has already dropped every one of them.
+    dbus_id   = dbus_id,
+    dbus_open = false, -- set once the expiring popup's close has been withheld
     seen    = false,  -- track whether this notification was viewed
   })
+  if dbus_id then hold_open(n, entries[1]) end
   trim_entries()
 
   append_cache(entries[1])
@@ -1658,6 +1894,25 @@ naughty.connect_signal('destroyed', function(n, reason)
       if popup and popup.visible then render() end
       return
     end
+  end
+end)
+
+-- An exit or a restart (Win+Ctrl+R) takes every popup and every held id with
+-- it, so the apps are told rather than left holding notifications against a
+-- server that will come back as a different connection with a fresh id
+-- counter. The flush is not optional: awesome execs itself straight after this
+-- signal and a message still sitting in the GDBus output queue never leaves.
+awesome.connect_signal('exit', function()
+  local sent = false
+  for _, e in ipairs(entries) do
+    if holding(e) then
+      dbus_release(e)
+      sent = true
+    end
+  end
+  if sent then
+    local conn = notify_bus()
+    if conn then pcall(function() conn:flush_sync(nil) end) end
   end
 end)
 
