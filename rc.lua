@@ -27,6 +27,7 @@ local notification_history = require("my_modules/notification_history")
 -- local keyboard_widget = require("my_modules/keyboard")
 local helpers = require("my_modules/geo_helpers")
 local edid = require('my_modules/edid')
+local nixos_profile = require('my_modules/profile')
 local dpi = require('beautiful').xresources.apply_dpi
 local hostname_fh = io.popen("uname -n")
 hostname = hostname_fh:read('*l')
@@ -974,6 +975,9 @@ screen.connect_signal('list', function()
 
     process_screens(my_systray, screens_table, printmore)
 
+    -- Fresh wibars come up with the theme background, so re-tint them.
+    nixos_profile.refresh({ force = true })
+
     screen_change_in_progress = false
     screen_change_timer = nil
     return false  -- don't repeat
@@ -989,6 +993,10 @@ else
 end
 
 process_screens(my_systray, screens_table, printmore)
+
+-- Must run after the wibars exist; the tint is applied to live widgets, not
+-- only to the beautiful table.
+nixos_profile.refresh({ force = true })
 
 tag.connect_signal('request::screen', function(t)
   -- recover tags on a removed screen
