@@ -117,6 +117,12 @@ end
 -- which sits above that switch.
 local dbg
 
+-- Close a still-visible popup quietly. Defined in the hub sync section, but
+-- trim_entries sits far above it and has to reach it: a row leaving the ring
+-- must take its popup with it, or the popup outlives the row it belongs to and
+-- the app that posted it is never told the notification ended.
+local close_live
+
 -- entries[1] is the newest. Prepending is O(n) but n <= MAX_ENTRIES.
 local entries = {}
 local selected = 1
@@ -449,9 +455,11 @@ local function hub_device()
   return hub_device_cached
 end
 
--- Remote notifications from other devices, delivered over the hub SSE stream
--- as `created` frames. The hub deduplicates before broadcast, so the same
--- message lagging across devices is only ever announced once.
+-- Whether this device renders other devices' notifications at all.
+--
+-- The only echo decision left here. Which notifications reach this device, when
+-- and why is the hub's: it sends an `echo` frame once, after its grace, and
+-- only to devices holding no copy of their own (SPEC 8.4, D-67).
 --   'no'    = ignore remote notifications (local only)
 --   'yes'   = show them in the history popup
 --   'popup' = also fire a normal system popup "$device: ($app) title · body"
@@ -566,9 +574,16 @@ end
 local function trim_entries()
   while #entries > MAX_ENTRIES do
     local e = table.remove(entries)
-    -- Same line for the app that posted it: the id was held open only for as
-    -- long as the row was readable.
-    dbus_release(e)
+    -- Tell the app first: the id was held open only for as long as the row was
+    -- readable, and close_live hands it back whether it was held or the
+    -- notification is somehow still alive.
+    --
+    -- A notification that was recorded without ever being displayed (the echo
+    -- takeover in record()) is the case that needs the second half. Nothing
+    -- made it expire, so nothing ever withheld its close, and releasing the
+    -- held id alone would leave the object alive and the app still believing
+    -- its notification is on screen.
+    close_live(e)
     hub_event(e, 'not_readable', 'history_evicted')
   end
 end
@@ -641,6 +656,10 @@ local function hub_ingest(n, title, text, app, args)
     instance_id = parse_field(out, 'instance_id'),
     native_id   = native_id,
     generation  = generation,
+    -- Whether the hub already announced this notification to the devices
+    -- without it, this one included. It replaces the table this client used to
+    -- keep of what it had echoed (D-67).
+    echoed      = out:match('"echoed":true') ~= nil,
   }
   if not meta.decision then return nil end
   return meta
@@ -957,7 +976,7 @@ end
 -- Forward declarations: rows need the actions, actions need render().
 -- close_live lives in the hub sync section but act_delete/act_clear also
 -- close popups of entries they drop.
-local render, act_jump, act_delete, close_live
+local render, act_jump, act_delete
 
 local function make_row(e, index)
   local is_sel = (index == selected)
@@ -1344,23 +1363,39 @@ local function drop_matching(pred, why)
   end
 end
 
--- Logical ids we already displayed as remote notifications. Used to veto the
--- local copy when the same message lags in from this device later (one popup,
--- never two).
+-- Logical ids an echo is on screen for. Cleared when the local copy turns up
+-- and takes the row over (take_over_echo).
+--
+-- Not a dedup table any more: the hub sends an echo once, to the devices that
+-- do not hold the notification, so there is nothing here to deduplicate. What
+-- is left is the one fact only this process knows - whether a toast was
+-- actually put on screen - which is what decides whether the takeover is
+-- silent (D-67).
 local remote_shown = {}
 
--- A remote notification from another device. The event carries display fields
--- (server-enriched), so no follow-up fetch is needed. parse_field is the same
--- hand-rolled extractor the rest of the hub sync uses; a title with escaped
--- quotes truncates that field, same accepted limitation as the reconcile pass.
-local function handle_remote_notification(data_json)
+local render_echo
+
+-- An echo frame: the hub has decided this device should render another
+-- device's notification.
+--
+-- Everything that used to be decided here is decided there now. Whether the
+-- frame is this device's own notification, whether this device already holds a
+-- copy, and whether to wait in case a local copy is about to arrive were all
+-- answered by guesswork against a broadcast that went to everyone; the hub
+-- knows the origin, knows every instance, and is the only thing that can see
+-- the second copy arrive (D-67).
+--
+-- So this is now: render it, unless the operator does not want echoes at all.
+local function handle_echo(data_json)
+  if REMOTE_NOTIFICATIONS == 'no' then return end
   local logical = parse_field(data_json, 'logical_id')
   if not logical or logical == '' then return end
   if remote_shown[logical] then return end
+  render_echo(data_json, logical)
+end
 
+render_echo = function(data_json, logical)
   local device_id = parse_field(data_json, 'device_id')
-  if device_id and device_id ~= '' and device_id == hub_device() then return end
-
   local device_name = parse_field(data_json, 'device_name')
   local app         = parse_field(data_json, 'app')
   local app_name    = parse_field(data_json, 'app_name')
@@ -1406,6 +1441,40 @@ local function handle_remote_notification(data_json)
     -- dismissal only marks the entry seen (remote copy, never a tombstone).
     e.notification = n
   end
+end
+
+-- The real local notification turned up for a logical an echo is already
+-- showing. The echo row goes and the local one takes its place.
+--
+-- Always a straight swap, never a veto of the local copy. The echo is the
+-- weaker row of the two: it has no dbus id and no client, so clicking it ends
+-- the notification but can never raise the app that sent it, while the local
+-- copy can do both. Keeping the echo and throwing the local one away - which
+-- is what this did before - traded the only actionable copy for the one that
+-- arrived first.
+--
+-- Returns whether the echo had already put a popup on screen, which is the one
+-- thing about this only the local process knows. The caller uses it to take
+-- over silently: the message has been announced once already and does not
+-- deserve a second toast.
+--
+-- Nothing is reported to the hub. Both rows are the same logical, and dropping
+-- the echo here is this device rearranging what it renders, not a decision
+-- about the notification (close_live marks its own closes, so the 'destroyed'
+-- handler stays quiet too).
+local function take_over_echo(logical)
+  local popped = false
+  for _, e in ipairs(entries) do
+    if e.remote and e.hub_logical == logical and e.notification then
+      popped = true
+      break
+    end
+  end
+  drop_matching(function(e)
+    return e.remote and e.hub_logical == logical
+  end, 'local copy took over the echo')
+  remote_shown[logical] = nil
+  return popped
 end
 
 -- What a hub answer licenses this client to take off a screen (SPEC 2).
@@ -1455,18 +1524,24 @@ end
 -- correctness (SPEC 7.4).
 local function handle_hub_event(data_json)
   local ev_type = parse_field(data_json, 'type')
-  if ev_type == 'created' then
-    if REMOTE_NOTIFICATIONS ~= 'no' then
-      handle_remote_notification(data_json)
-    end
+  if ev_type == 'echo' then
+    handle_echo(data_json)
     return
   end
+  -- `created` is a doorbell: it says a notification arrived somewhere and
+  -- carries no content. Whether this device should render it is the hub's
+  -- decision, and it arrives later as an `echo` frame (SPEC 8.4).
   if ev_type ~= 'ended' and ev_type ~= 'untracked' then return end
 
   local logical = parse_field(data_json, 'logical_id')
   if not logical or logical == '' then return end
   local retract = parse_field(data_json, 'retract')
   local cause = parse_field(data_json, 'cause') or 'unknown'
+
+  -- Nothing to cancel here any more. A notification that ends before its echo
+  -- grace elapses leaves the hub's active pool, so no echo is ever sent for it;
+  -- this client used to hold the pending echo itself and had to remember to
+  -- drop it (D-67).
 
   if retract == 'none' then
     local changed = false
@@ -1762,25 +1837,22 @@ local function record(n, args)
   -- notification is shown (fail open).
   local meta = hub_ingest(n, title, text, app, args)
 
-  -- Dedup against a remote copy already shown this session: the same message
-  -- lagged in from another device first. popup mode already notified via the
-  -- remote popup, so veto the local copy; yes mode only mirrored it, so drop
-  -- the mirror and record the real local notification (with its live client).
-  if meta and meta.logical_id and remote_shown[meta.logical_id] then
-    if REMOTE_NOTIFICATIONS == 'popup' then
-      n._hub_veto = true
-      n.ignore = true
-      gears.timer.delayed_call(function()
-        if n._private and not n._private.is_destroyed then
-          n:destroy(naughty_reason.silent)
-        end
-      end)
-      return
-    end
-    drop_matching(function(e)
-      return e.remote and e.hub_logical == meta.logical_id
-    end)
-    remote_shown[meta.logical_id] = nil
+  -- The same message reached this device twice: once as an echo of whichever
+  -- device the hub heard from first, and once as the real local notification.
+  -- The local copy always wins, because it is the only one of the two that can
+  -- raise the app that sent it.
+  --
+  -- The hub's grace means this is the uncommon case: usually the local copy
+  -- arrives before any echo is sent, and the hub then never sends one, because
+  -- this device holds a copy by the time the grace elapses (D-66).
+  local silent = false
+  if meta and meta.echoed and meta.logical_id and meta.logical_id ~= '' then
+    -- The hub says it announced this notification to the devices that did not
+    -- have it, which at the time included this one. Whatever is on screen for
+    -- that logical is an echo of the message now arriving locally, and the
+    -- local copy is the better row: it can raise the app that sent it (D-66).
+    silent = take_over_echo(meta.logical_id)
+    dbg('local copy took over the echo for ' .. meta.logical_id)
   end
 
   -- Veto destroys use the 'silent' reason on purpose. The default reason is
@@ -1801,6 +1873,20 @@ local function record(n, args)
       end
     end)
     return
+  end
+
+  -- Taking over an echo that already announced this message: display is
+  -- skipped, the notification is not. `ignore` keeps naughty from building a
+  -- box; everything else about the object stays, which is what matters, since
+  -- the whole point of preferring the local copy is its dbus id. The row stays
+  -- clickable through exactly the path a popup that timed out leaves behind
+  -- (hold_open, then dbus_activate).
+  --
+  -- Deliberately not destroyed, unlike a suppression: destroying it would send
+  -- the close straight away and hand the id back, and clicking the row would
+  -- then reach nothing.
+  if silent then
+    n.ignore = true
   end
 
   -- First still-valid client naughty associated with the notification, so the
