@@ -406,6 +406,23 @@ local HUB_PRE_SHOW = true  -- false = ask the hub but never veto display
 local HUB_SESSION = tostring(os.time()) .. '-'
   .. (tostring({}):match('0x(%x+)') or '0')
 
+-- Generation for the next posting (SPEC 1). The hub requires a value that
+-- strictly increases per native id, and uses it to tell one posting under a
+-- reused key from another: an answer naming a generation this device is not
+-- showing is about a copy that is already gone, and acting on it would cancel
+-- the notification currently on screen.
+--
+-- A plain counter is enough, and increasing it globally rather than per key
+-- satisfies "per key" for free. Native ids are already scoped by HUB_SESSION,
+-- so a restart cannot collide with a posting from before it; the counter
+-- restarting at 1 alongside is therefore safe.
+local hub_generation = 0
+
+local function next_generation()
+  hub_generation = hub_generation + 1
+  return hub_generation
+end
+
 -- Device id, resolved on first use rather than at load time.
 --
 -- rc.lua requires this module before it sets the `hostname` global, so reading
@@ -433,7 +450,7 @@ local function hub_device()
 end
 
 -- Remote notifications from other devices, delivered over the hub SSE stream
--- (notification_created). The hub deduplicates before broadcast, so the same
+-- as `created` frames. The hub deduplicates before broadcast, so the same
 -- message lagging across devices is only ever announced once.
 --   'no'    = ignore remote notifications (local only)
 --   'yes'   = show them in the history popup
@@ -493,38 +510,77 @@ local function hub_report_async(path, body_json)
   }, function() end)
 end
 
+-- Report what happened to one of this device's own postings (SPEC 7.2).
+--
+-- `ended` is a value of the hub's closed enum and nothing else: the hub answers
+-- 400 for anything outside it and never substitutes the nearest human action,
+-- so a reason this client cannot classify is reported as 'not_readable' rather
+-- than guessed at (D-63). `platform` is what actually happened here, recorded
+-- by the hub for its detail page and never branched on there (D-62).
+--
+-- One shape where v2 had four endpoints (resolve and removed, each addressable
+-- by instance id or by native key). A posting is named by (device, native id,
+-- generation), and this client knows all three from the moment it ingested.
+--
+-- Returns false for a row with no posting of its own, which is what an echo is.
+local function hub_event(e, ended, platform)
+  if not (e and e.hub_native and e.hub_generation) then return false end
+  hub_report_async('/api/v1/events', table.concat({
+    '{"device_id":' .. json_str(hub_device()),
+    ',"events":[{',
+    '"native_id":' .. json_str(e.hub_native),
+    ',"generation":' .. tostring(e.hub_generation),
+    ',"ended":' .. json_str(ended),
+    ',"at":' .. json_str(os.date('!%Y-%m-%dT%H:%M:%SZ')),
+    platform and (',"platform_reason":' .. json_str(platform)) or '',
+    '}]}',
+  }))
+  return true
+end
+
+-- End a logical outright. Only ever for an echo: a row this device renders on
+-- another device's behalf has no posting here to report against, and dropping
+-- one is a full ending for everybody, because the hub can cancel a notification
+-- on a device but never create one (D-47).
+local function hub_end_logical(logical_id, cause)
+  if not logical_id or logical_id == '' then return end
+  hub_report_async('/api/v1/notifications/' .. logical_id .. '/end',
+    '{"cause":' .. json_str(cause) .. '}')
+end
+
 -- Evict entries past MAX_ENTRIES, telling the hub about each one.
 --
--- This is the only moment a notification really leaves this device, and the
--- hub's orphan sweep (AGENTS.md 6.1) depends on hearing about exactly those.
--- A popup timing out is not one of them: it only hides the toast, while the
--- row stays readable here and in the cache file. Reporting a removal there
--- would claim the last copy vanished while it is still sitting unread, and the
--- sweep would then expire it out of the hub's Active list.
+-- This is the only moment a notification really leaves this device, and it is
+-- what the hub's orphan sweep waits for (D-12, D-13). A popup timing out is not
+-- one of them: it only hides the toast, while the row stays readable here and
+-- in the cache file. Reporting a close there would claim the last copy vanished
+-- while it is still sitting unread.
 --
--- Echoes carry no instance id of their own (section 14.1), so there is nothing
--- to close for them; dropping one is a local affair.
+-- 'not_readable', because nobody finished with it: the row aged out. That ends
+-- no logical and suppresses nothing on its own.
+--
+-- Sync would reach the same place on its next pass, since an evicted row is no
+-- longer in `holding` and the hub closes what this device stops naming. Doing
+-- it here is the same answer a minute earlier, and the two agree: closing a row
+-- twice is idempotent.
 local function trim_entries()
   while #entries > MAX_ENTRIES do
     local e = table.remove(entries)
     -- Same line for the app that posted it: the id was held open only for as
     -- long as the row was readable.
     dbus_release(e)
-    if e.hub_instance then
-      hub_report_async('/api/v1/instances/' .. e.hub_instance .. '/removed',
-        '{"native_reason":"history_evicted"}')
-    end
+    hub_event(e, 'not_readable', 'history_evicted')
   end
 end
 
--- Bulk resolve for "clear history": one request instead of one curl per
--- entry (the hub caps it at 500 ids per call).
-local function hub_bulk_resolve(logical_ids)
+-- Bulk ending for "clear history": one request instead of one curl per entry
+-- (the hub caps it at 500 ids per call).
+local function hub_bulk_end(logical_ids)
   if #logical_ids == 0 then return end
   local parts = {}
   for _, id in ipairs(logical_ids) do parts[#parts + 1] = json_str(id) end
-  hub_report_async('/api/v1/notifications/resolve-many',
-    '{"kind":"user_dismiss","logical_ids":['
+  hub_report_async('/api/v1/notifications/end-many',
+    '{"cause":"user_dismiss","logical_ids":['
       .. table.concat(parts, ',') .. ']}')
 end
 
@@ -556,6 +612,7 @@ end
 local function hub_ingest(n, title, text, app, args)
   local native_id = HUB_SESSION .. ':'
     .. tostring((args and args.id) or n.id or tostring(n))
+  local generation = next_generation()
   local urgency = n.urgency or 'normal'
   if urgency == 'critical' then urgency = 'high' end
   local body = table.concat({
@@ -564,6 +621,7 @@ local function hub_ingest(n, title, text, app, args)
     ',"client_type":"linux"',
     ',"mode":"pre_show"',
     ',"native_id":' .. json_str(tostring(native_id)),
+    ',"generation":' .. tostring(generation),
     ',"app":' .. json_str(app),
     ',"app_name":' .. json_str((args and args.app_name) or n.app_name or app),
     ',"title":' .. json_str(title),
@@ -574,13 +632,15 @@ local function hub_ingest(n, title, text, app, args)
     ',"raw":{}',
     '}',
   })
-  local out = hub_request('/api/v1/notifications/ingest', body)
+  local out = hub_request('/api/v1/ingest', body)
   if not out then return nil end
   local meta = {
     decision    = parse_field(out, 'decision'),
     reason      = parse_field(out, 'reason'),
     logical_id  = parse_field(out, 'logical_id'),
     instance_id = parse_field(out, 'instance_id'),
+    native_id   = native_id,
+    generation  = generation,
   }
   if not meta.decision then return nil end
   return meta
@@ -724,6 +784,11 @@ local function serialize(e)
     -- restored echo that lost it reads as a local notification whose window is
     -- merely gone, which is a different and more actionable thing.
     tostring(e.remote or false),
+    -- The posting identity, appended last so a cache file written before this
+    -- existed still parses: those lines restore with no posting and are simply
+    -- never named in a sync, which is the same place a fail-open row sits.
+    esc(e.hub_native or ''),
+    tostring(e.hub_generation or 0),
   }, '\t')
 end
 
@@ -777,6 +842,11 @@ local function load_cache()
         -- Same for the origin marker; an old line is assumed local, which is
         -- what every line written before echoes existed actually was.
         remote       = (fields[10] or 'false') == 'true',
+        -- Absent on every line written before generations. A row restored
+        -- without one keeps its logical id but can no longer be reported
+        -- against, so it is left out of `holding` and ages out of the ring.
+        hub_native     = unesc_optional(fields[11]),
+        hub_generation = tonumber(fields[12]),
       })
     end
   end
@@ -1025,13 +1095,9 @@ act_jump = function()
   local activated = dbus_activate(e)
 
   -- Entries shown while the hub was unreachable carry no ids and stay local.
-  if e.hub_instance then
-    hub_report_async('/api/v1/instances/' .. e.hub_instance .. '/resolve',
-      '{"kind":"click"}')
-  elseif e.hub_logical then
-    -- Echoes have no instance id of their own; resolve the logical.
-    hub_report_async('/api/v1/notifications/' .. e.hub_logical .. '/resolve',
-      '{"kind":"click"}')
+  if not hub_event(e, 'user_click', 'history_row_click') then
+    -- An echo has no posting of its own; end the logical instead.
+    hub_end_logical(e.hub_logical, 'user_click')
   end
   table.remove(entries, selected)
   -- Entry is gone before the destroy, so the 'destroyed' handler cannot
@@ -1074,16 +1140,11 @@ end
 act_delete = function()
   local e = entries[selected]
   if not e then return end
-  -- Dropping a row means "gone everywhere": tombstone it on the hub so the
-  -- other devices drop it too (PLAN.md 2.5). Entries that were shown while
-  -- the hub was offline have no ids and stay local-only.
-  if e.hub_instance then
-    hub_report_async('/api/v1/instances/' .. e.hub_instance .. '/resolve',
-      '{"kind":"user_dismiss"}')
-  elseif e.hub_logical then
-    -- Remote entries have no instance id of their own; resolve the logical.
-    hub_report_async('/api/v1/notifications/' .. e.hub_logical .. '/resolve',
-      '{"kind":"user_dismiss"}')
+  -- Dropping a row means "gone everywhere": the hub ends the logical and the
+  -- other devices drop their copies. Entries shown while the hub was offline
+  -- have no ids and stay local-only.
+  if not hub_event(e, 'user_dismiss', 'history_row_delete') then
+    hub_end_logical(e.hub_logical, 'user_dismiss')
   end
   table.remove(entries, selected)
   -- Dropping a row is a deliberate dismissal, so the app hears that rather
@@ -1108,7 +1169,7 @@ local function act_clear()
   for _, e in ipairs(entries) do
     if e.hub_logical then ids[#ids + 1] = e.hub_logical end
   end
-  hub_bulk_resolve(ids)
+  hub_bulk_end(ids)
   -- Detach first, then close: the 'destroyed' handler must not double-report
   -- what the bulk dismiss already tombstoned.
   local old = entries
@@ -1185,33 +1246,32 @@ end
 -- hub sync: retroactive cleanup of already-shown notifications
 --------------------------------------------------------------------------------
 
--- Two paths converge here:
---   1. real-time: the hub's SSE stream reports dismiss/suppress from other
---      devices (or the web UI); the matching live popup is closed and the
---      history row dropped;
---   2. reconcile: periodically and on each new notification, name the logical
---      ids still held here and ask the hub what became of each. This covers
---      what the stream cannot: events missed during a stream outage.
+-- Two paths converge here, and only one of them is load-bearing:
+--   1. the SSE stream, which says "this ended, here is what you may retract"
+--      within a second of it happening;
+--   2. hub_sync, which says the same thing about everything this device holds,
+--      once a minute and whenever a notification arrives.
 --
--- Reconcile asks by id rather than pulling the hub's resolved list, because a
--- list is ranked and capped. Its default order puts urgency first, so once the
--- page fills with normal and high rows a `low` one is on no page the client can
--- ask for, and it stays on screen through every pass: a Firefox download expiry
--- survived seven hours of 60-second rechecks that way. A set of ids has no
--- ranking to fall off, and it reaches the one case no listing can - a logical
--- deleted by hub retention appears in no list at all, but comes back from the
--- probe as explicitly unknown.
+-- The stream is a doorbell. Everything it carries is also reachable from the
+-- next sync, so a client that misses every frame is still correct, one minute
+-- behind (SPEC 7.4). That is a deliberate inversion: in v2 the stream carried
+-- a vocabulary the catch-up path could not reconstruct, so a dropped frame and
+-- a missing `expiry_reason` column between them could leave a stale row on
+-- screen for good.
 --
--- Rows with no logical id (shown while the hub was unreachable, fail-open)
--- cannot be asked about and are left to age out of the ring. They used to be
--- matched against the resolved list by content, on collapsed text within a 30
--- minute window, which was never strong evidence.
+-- Sync is also the reverse direction. The hub closes whatever it believed was
+-- live on this device that `holding` did not name, which is how a row that
+-- left the ring, or a popup vetoed before it was ever recorded, stops pinning
+-- a logical to the Active list. v2 had no equivalent here at all: only
+-- trim_entries ever told the hub a copy was gone, so anything that left by
+-- another route leaked an open instance forever.
 --
--- The reverse direction (local drop/dismiss -> hub) lives in act_delete,
--- act_clear and the 'destroyed' handler above.
+-- What still lives outside it: act_delete, act_clear, act_jump and the
+-- 'destroyed' handler report immediately rather than waiting for the next
+-- pass, because a cross-device cancel should land in a second.
 
-local SYNC_INTERVAL    = 60   -- reconcile every N seconds
-local STATE_PROBE_LIMIT = 500 -- hub's per-call id cap; MAX_ENTRIES is below it
+local SYNC_INTERVAL = 60  -- sync every N seconds
+local SYNC_LIMIT    = 500 -- hub's per-call cap on `holding`; MAX_ENTRIES is below it
 
 local debug = false -- flip to true to trace hub sync activity
 
@@ -1348,215 +1408,264 @@ local function handle_remote_notification(data_json)
   end
 end
 
--- An expiry is the hub ending a notification nobody finished with, and how much
--- it licenses this client to retract depends on why it ended.
+-- What a hub answer licenses this client to take off a screen (SPEC 2).
 --
--- 'expired' (orphan): every copy the hub knew about went away on its own. The
--- only thing that can be stale here is an echo, a row rendered on another
--- device's behalf (section 14.1), which has no instance id because it was never
--- ingested from here. A local entry is kept, popup and all: this device reports
--- its own copy removed only once the row is evicted from the ring buffer
--- (trim_entries), so an expiry naming one of its logicals means some *other*
--- device's copy went away, which says nothing about whether anybody read this
--- one. It leaves on a real resolution, or when the operator clears the row.
+-- The hub sends two facts with every ending - `retract` and `suppresses` - and
+-- this client acts on `retract` alone. The cause string is for the log. That is
+-- the whole of the rule now; v2 decoded an event `kind` and a row's
+-- `expiry_reason` through two hand-written tables that had to be kept in step
+-- with the hub by hand, and the hub knowingly shipped one misleading reason
+-- string rather than break them (D-03).
 --
--- 'withdrawn': the app that posted the notification cancelled it at the source
--- and did not put it back within the hub's grace. Here the local row is the
--- whole point of the event (reading a mail on the phone leaves its copy sitting
--- on this screen), so it goes too. Nothing is suppressed on the hub side for
--- this, so the cost of a wrong one is the notification showing again.
+--   'all'  - the thing the row is about is finished or gone at the source. The
+--            row goes, read or unread.
+--   'echo' - only a row this device renders on another device's behalf. One of
+--            this device's own stays, popup and all: an ending that merely says
+--            "every copy the hub knew about went away" says nothing about
+--            whether anybody read this one, and this client reports its own
+--            copy gone only when the row leaves the ring (D-13, D-14).
+--   'none' - the hub has no opinion and no row. Forget the ids, leave the
+--            notification exactly where it is (D-25).
 --
--- 'relinked': a human finished with another notification that says the same
--- thing, and the hub only worked out the two were copies at that moment (its
--- matching runs once, when a notification arrives). Same licence as a
--- withdrawal and for the same reason: the row on this screen is about something
--- already dealt with elsewhere.
---
--- Called from both paths with whatever each has: the live event carries the
--- kind, while the reconcile poll sees only state='expired' and has to read the
--- row's expiry_reason. The reason table is therefore not a convenience, it is
--- the only evidence the catch-up path gets. Anything unrecognised is treated as
--- a resolution and drops, which is how a hub older than this client keeps
--- working.
-local FULL_DROP_REASONS = {
-  ['source_withdrawn']     = true,
-  ['relinked_to_resolved'] = true,
-}
-
-local function expiry_may_drop(kind, e, reason)
-  if kind == 'withdrawn' or kind == 'relinked' then return true end
-  if reason and FULL_DROP_REASONS[reason] then return true end
-  if kind ~= 'expired' then return true end
+-- An echo is a row with no posting of this device's own, which is exactly the
+-- rows carrying no instance id (section 14.1).
+local function is_echo(e)
   return not e.hub_instance
 end
 
--- One SSE data frame: resolve (somebody finished with it on another device,
--- by dismissing, clicking or the app withdrawing it) and suppress (a new crap
--- rule covers it now) both mean "stop showing this here".
---
--- 'dismiss' is still accepted so a hub that has not been updated yet keeps
--- working; it was the pre-rename name for the same event.
+-- Whether `retract` licenses dropping this row. An unrecognised value licenses
+-- nothing, which is the safe direction: it keeps a duplicate.
+local function retract_drops(retract, e)
+  if retract == 'all' then return true end
+  if retract == 'echo' then return is_echo(e) end
+  return false
+end
+
+-- Forget the hub ids on a row the hub no longer tracks, keeping the row itself.
+-- Returns whether anything changed, so the caller knows to rewrite the cache.
+local function forget_ids(e)
+  if not (e.hub_logical or e.hub_instance or e.hub_native) then return false end
+  e.hub_logical, e.hub_instance = nil, nil
+  e.hub_native, e.hub_generation = nil, nil
+  return true
+end
+
+-- One SSE frame. The stream is a doorbell: everything it carries is also
+-- reachable from the next sync, so a missed frame costs a minute and never
+-- correctness (SPEC 7.4).
 local function handle_hub_event(data_json)
   local ev_type = parse_field(data_json, 'type')
-  if ev_type == 'notification_created' then
+  if ev_type == 'created' then
     if REMOTE_NOTIFICATIONS ~= 'no' then
       handle_remote_notification(data_json)
     end
     return
   end
-  if ev_type ~= 'resolve' and ev_type ~= 'dismiss' and ev_type ~= 'suppress' then return end
+  if ev_type ~= 'ended' and ev_type ~= 'untracked' then return end
+
   local logical = parse_field(data_json, 'logical_id')
-  local instance = parse_field(data_json, 'instance_id')
-  local kind = parse_field(data_json, 'kind')
-  -- Carries the same value the hub stamped on the row (expiry_reason), so the
-  -- live path and the catch-up path below decide on identical evidence.
-  local reason = parse_field(data_json, 'reason')
-  local why = (ev_type == 'suppress') and 'suppressed by crap rule'
-    or ('resolved elsewhere (' .. (kind or 'unknown') .. ')')
-  drop_matching(function(e)
-    if logical and logical ~= '' and e.hub_logical == logical then
-      return expiry_may_drop(kind, e, reason)
+  if not logical or logical == '' then return end
+  local retract = parse_field(data_json, 'retract')
+  local cause = parse_field(data_json, 'cause') or 'unknown'
+
+  if retract == 'none' then
+    local changed = false
+    for _, e in ipairs(entries) do
+      if e.hub_logical == logical and forget_ids(e) then changed = true end
     end
-    if instance and instance ~= '' and e.hub_instance == instance then return true end
-    return false
-  end, why)
+    if changed then
+      flush_cache()
+      dbg('hub stopped tracking (' .. cause .. '), ids forgotten')
+    end
+    return
+  end
+
+  drop_matching(function(e)
+    if e.hub_logical ~= logical then return false end
+    return retract_drops(retract, e)
+  end, 'ended elsewhere (' .. cause .. ')')
 end
 
--- Pull the flat JSON objects out of an "items": [ {...}, ... ] response. The
--- pattern matches innermost brace groups only, so the envelope around the
--- array is skipped on its own. Good enough for our own responses: fields are
--- flat and only scalars are needed. A title carrying an escaped quote
--- truncates that field, the match then fails and the row waits for manual
--- cleanup - rare, harmless.
-local function parse_items(out)
+-- Pull the flat objects out of one named array of a sync response. The objects
+-- are flat and carry no brackets of their own, so a non-greedy match to the
+-- first ']' is exact. Good enough for our own responses; a title carrying an
+-- escaped quote is not in any of these arrays, which is why this is safe here
+-- and was a caveat on the listing parse it replaces.
+local function parse_array(out, name)
   local items = {}
-  for obj in out:gmatch('{([^{}]*)}') do
-    local id = obj:match('"id":"([^"]*)"')
-    if id then
-      items[#items + 1] = {
-        id = id,
-        -- 'resolved' and 'expired' mean different things here: see
-        -- expiry_may_drop. Missing reads as 'resolved', which is what every
-        -- hub predating orphan expiry sent.
-        state = obj:match('"state":"([^"]*)"') or 'resolved',
-        -- Suppressed by a crap rule. Still 'active' in the state column, so
-        -- it has to be read separately or a crap row looks live.
-        crap = obj:match('"crap":(%a+)') == 'true',
-        -- Why it expired. The state alone cannot separate an orphan expiry
-        -- (echoes only) from a withdrawal (drop the local row too), and this
-        -- path is the only way a client that missed the SSE frame ever learns
-        -- about either. Absent on hubs below schema 011 and on rows expired
-        -- before it, which reads as the conservative orphan case.
-        expiry_reason = obj:match('"expiry_reason":"([^"]*)"') or '',
-      }
-    end
-  end
+  local arr = out:match('"' .. name .. '":%[(.-)%]')
+  if not arr then return items end
+  for obj in arr:gmatch('{(.-)}') do items[#items + 1] = obj end
   return items
 end
 
--- Ids the hub answered it has never heard of ("unknown": [ "...", ... ]).
---
--- Read from the explicit list and never inferred from what is missing out of
--- what was asked: absence conflates "reaped by retention", "forgotten",
--- "never existed" and "the hub is answering from an older backup", and under
--- that last one every id at once would read as gone.
-local function parse_unknown(out)
-  local ids = {}
-  local arr = out:match('"unknown":%[(.-)%]')
-  if not arr then return ids end
-  for id in arr:gmatch('"([^"]*)"') do ids[#ids + 1] = id end
-  return ids
+local function obj_str(obj, name)
+  return obj:match('"' .. name .. '":"([^"]*)"')
 end
 
-local reconcile_pending = false
+local function obj_num(obj, name)
+  return tonumber(obj:match('"' .. name .. '":(%-?%d+)'))
+end
 
-local function reconcile_with_hub()
-  if reconcile_pending then return end
+local sync_pending = false
 
-  -- The probe is the ids this device is still rendering. Rows without one
-  -- (fail-open, shown while the hub was unreachable) cannot be asked about and
-  -- wait for the ring to evict them.
-  local ids, seen = {}, {}
+-- The one repair path (SPEC 7.3).
+--
+-- This device says what it is holding and the hub answers with everything it
+-- should do. Both directions in one request: the hub also closes whatever it
+-- believed was live here that `holding` did not name, which is what v2 needed
+-- a second pass for on the Android side and had no equivalent of at all here.
+--
+-- Asked, never listed. A listing is ranked and capped, so once a page fills
+-- with normal and high urgency rows a `low` one is on no page this client can
+-- ask for: a Firefox download expiry survived seven hours of 60-second
+-- rechecks that way (D-24). A set of ids has no ranking to fall off, needs no
+-- cursor and no clock agreement, and it reaches the one case no listing can -
+-- a logical the hub deleted on purpose comes back as an explicit answer rather
+-- than as an absence (D-25).
+--
+-- Rows with no hub ids (shown while the hub was unreachable, fail-open) are not
+-- in `holding`. The hub has no instance for them either, since their ingest
+-- never landed, so there is nothing for it to close and nothing to ask about;
+-- they age out of the ring. This client has no outbox by design (SPEC 13).
+local function hub_sync()
+  if sync_pending then return end
+
+  local holding, seen = {}, {}
   for _, e in ipairs(entries) do
-    if e.hub_logical and e.hub_logical ~= '' and not seen[e.hub_logical] then
+    if e.hub_native and e.hub_generation then
+      -- One of this device's own postings. Naming it is also what keeps the
+      -- hub from closing its row: anything this device stops naming is closed.
+      holding[#holding + 1] = table.concat({
+        '{"native_id":' .. json_str(e.hub_native),
+        ',"generation":' .. tostring(e.hub_generation),
+        e.hub_logical and (',"logical_id":' .. json_str(e.hub_logical)) or '',
+        '}',
+      })
+    elseif is_echo(e) and e.hub_logical and e.hub_logical ~= ''
+       and not seen[e.hub_logical] then
+      -- An echo: no posting here, so it is named by logical id alone and the
+      -- hub answers it in `echoes` (SPEC 8.4). It holds no instance either, so
+      -- there is nothing for the hub to close on its behalf.
       seen[e.hub_logical] = true
-      ids[#ids + 1] = json_str(e.hub_logical)
-      if #ids >= STATE_PROBE_LIMIT then break end
+      holding[#holding + 1] = '{"logical_id":' .. json_str(e.hub_logical) .. '}'
     end
+    -- Anything left is a row restored from a cache file written before
+    -- generations existed: it holds an instance id but no posting identity, so
+    -- it cannot be named here. The hub closes that instance on this pass and
+    -- its logical ages out as all_copies_gone, whose retract is `echo` and
+    -- therefore cannot touch a row of this device's own. The row stays
+    -- readable until the ring evicts it. One-time, bounded by MAX_ENTRIES, and
+    -- it costs a hub Active-list row rather than anything on a screen.
+    if #holding >= SYNC_LIMIT then break end
   end
-  if #ids == 0 then return end
 
-  reconcile_pending = true
+  sync_pending = true
   -- Deadman switch: a curl that never spawns means no callback ever arrives,
   -- and the flag would otherwise disable re-checking forever.
   gears.timer.start_new(20, function()
-    reconcile_pending = false
+    sync_pending = false
     return false
   end)
 
-  hub_post_async('/api/v1/notifications/states',
-    '{"logical_ids":[' .. table.concat(ids, ',') .. ']}',
-    function(out)
-      reconcile_pending = false
-      if not out then return end
+  local body = '{"device_id":' .. json_str(hub_device())
+    .. ',"holding":[' .. table.concat(holding, ',') .. ']}'
 
-      local states, unknown = {}, {}
-      for _, item in ipairs(parse_items(out)) do states[item.id] = item end
-      for _, id in ipairs(parse_unknown(out)) do unknown[id] = true end
-      -- A body that parsed to nothing at all is a malformed answer, not an
-      -- empty hub. Acting on it would read as "none of this exists".
-      if not next(states) and not next(unknown) then return end
+  hub_post_async('/api/v1/sync', body, function(out)
+    sync_pending = false
+    if not out then return end
 
-      drop_matching(function(e)
-        local id = e.hub_logical
-        if not id or id == '' then return false end
+    local changed = false
 
-        local st = states[id]
-        if st then
-          -- A crap rule now covers it: suppressed everywhere, so stop showing
-          -- it here. Crap rows keep state 'active', hence the separate check.
-          if st.crap then return true end
-          if st.state == 'active' then return false end
-          -- An expired row is the catch-up form of an expiry event and gets
-          -- the same gate: echoes only for an orphan expiry, this row as well
-          -- for a withdrawal or a relink, which is why the reason is read.
-          if st.state == 'expired' then
-            return expiry_may_drop('expired', e, st.expiry_reason)
-          end
-          -- Resolved, or a state this client does not know: somebody finished
-          -- with it. An unknown state reads as a resolution so a newer hub
-          -- keeps working against this client.
-          return true
+    -- Mapping repairs first: a cancel below may name a row whose ids only just
+    -- arrived.
+    for _, obj in ipairs(parse_array(out, 'ids')) do
+      local native, gen = obj_str(obj, 'native_id'), obj_num(obj, 'generation')
+      for _, e in ipairs(entries) do
+        if e.hub_native == native and e.hub_generation == gen then
+          e.hub_logical = obj_str(obj, 'logical_id') or e.hub_logical
+          e.hub_instance = obj_str(obj, 'instance_id') or e.hub_instance
+          changed = true
         end
+      end
+    end
 
-        if unknown[id] then
-          -- The hub holds no row under this id: reaped by retention, or
-          -- forgotten while this client was not listening. Only echoes go. A
-          -- forget broadcasts its resolve before deleting the row, so an echo
-          -- the hub cannot name means that broadcast was missed, which is
-          -- exactly the case needing cleanup. An own row stays: "the hub
-          -- cannot name it" is not evidence that anybody read it, and dropping
-          -- an unread notification on that is the one failure this project
-          -- does not allow.
-          return not e.hub_instance
+    -- Verdicts, keyed the way the rows are.
+    local by_native, by_logical = {}, {}
+    for _, obj in ipairs(parse_array(out, 'cancel')) do
+      local native = obj_str(obj, 'native_id')
+      if native then
+        by_native[native] = {
+          generation = obj_num(obj, 'generation'),
+          retract = obj_str(obj, 'retract'),
+          cause = obj_str(obj, 'cause') or 'unknown',
+        }
+      end
+    end
+    for _, obj in ipairs(parse_array(out, 'echoes')) do
+      local logical = obj_str(obj, 'logical_id')
+      if logical then
+        by_logical[logical] = {
+          retract = obj_str(obj, 'retract'),
+          cause = obj_str(obj, 'cause') or 'unknown',
+        }
+      end
+    end
+    -- The hub holds no row for these, deliberately or because it never knew
+    -- them. retract is none: forget the ids, keep the notification.
+    local untracked = {}
+    for _, obj in ipairs(parse_array(out, 'untracked')) do
+      local native = obj_str(obj, 'native_id')
+      if native then untracked[native] = true end
+    end
+
+    for _, e in ipairs(entries) do
+      if e.hub_native and untracked[e.hub_native] and forget_ids(e) then
+        changed = true
+      end
+    end
+
+    drop_matching(function(e)
+      if e.hub_native then
+        local v = by_native[e.hub_native]
+        if not v then return false end
+        -- The hub is describing a different posting under this reusable key,
+        -- so it is not about what is on screen (D-27).
+        if v.generation ~= e.hub_generation then return false end
+        if v.retract == 'none' then
+          if forget_ids(e) then changed = true end
+          return false
         end
+        return retract_drops(v.retract, e)
+      end
+      if e.hub_logical then
+        local v = by_logical[e.hub_logical]
+        if not v then return false end
+        if v.retract == 'none' then
+          if forget_ids(e) then changed = true end
+          return false
+        end
+        return retract_drops(v.retract, e)
+      end
+      return false
+    end, 'hub sync')
 
-        -- Asked about and answered neither way. Nothing to act on.
-        return false
-      end, 'hub sync')
-    end)
+    -- drop_matching rewrites the cache when it removes something; a pass that
+    -- only repaired or forgot ids still has to.
+    if changed then flush_cache() end
+  end)
 end
 
 -- Debounced reconcile trigger for the record() path ("ask again about kept
 -- notifications on each new one"): notification bursts must not stack list
 -- requests.
-local reconcile_wakeup = nil
+local sync_wakeup = nil
 
-local function schedule_reconcile(delay)
-  if reconcile_wakeup then reconcile_wakeup:stop() end
-  reconcile_wakeup = gears.timer.start_new(delay or 10, function()
-    reconcile_wakeup = nil
-    reconcile_with_hub()
+local function schedule_sync(delay)
+  if sync_wakeup then sync_wakeup:stop() end
+  sync_wakeup = gears.timer.start_new(delay or 10, function()
+    sync_wakeup = nil
+    hub_sync()
     return false
   end)
 end
@@ -1597,7 +1706,7 @@ local function start_hub_stream()
       gears.timer.start_new(5, function()
         if my_gen == stream_gen then
           start_hub_stream()
-          reconcile_with_hub()
+          hub_sync()
         end
         return false
       end)
@@ -1703,6 +1812,15 @@ local function record(n, args)
     end
   end
 
+  -- Whether the hub holds a row for this notification. False when it was
+  -- unreachable (fail-open, no ids at all) and when an ignore rule covers it
+  -- (the hub stored nothing and never will). Both leave the row local-only:
+  -- it is displayed like any other, it is simply not something the hub has an
+  -- opinion about.
+  local tracked = meta ~= nil
+    and meta.decision ~= 'ignore'
+    and meta.logical_id ~= nil and meta.logical_id ~= ''
+
   -- Only dbus-delivered notifications have an id an app knows about; the
   -- config's own internal toasts come in under INTERNAL_APP with no hints and
   -- nothing on the other end to activate.
@@ -1723,18 +1841,25 @@ local function record(n, args)
     -- below, so dismissing the popup itself marks it seen. Not persisted:
     -- entries reloaded from disk never had a live notification anyway.
     notification = n,
-    -- Hub ids from the pre-show answer, used to report dismissal/removal back
-    -- and to match this entry during reconcile. Unlike `notification` these
-    -- are persisted: the hub rows outlive the WM, so dropping a restored entry
-    -- still has somewhere to report to.
-    hub_instance = meta and meta.instance_id,
-    hub_logical  = meta and meta.logical_id,
+    -- Hub ids from the pre-show answer, used to report back and to name this
+    -- row in a sync. Unlike `notification` these are persisted: the hub rows
+    -- outlive the WM, so dropping a restored entry still has somewhere to
+    -- report to.
+    hub_instance = tracked and meta.instance_id or nil,
+    hub_logical  = tracked and meta.logical_id or nil,
+    -- The posting this row is, as the hub names it (SPEC 1). Persisted for the
+    -- same reason the ids are, and needed for the same report: an ending is
+    -- addressed by (device, native id, generation), and after a restart the
+    -- native id cannot be rederived - HUB_SESSION has changed, and naughty's
+    -- counter has restarted underneath it.
+    hub_native     = tracked and meta.native_id or nil,
+    hub_generation = tracked and meta.generation or nil,
     -- The hub answered 'ignore': an ignore rule covers this notification, so
     -- it holds no row for it and never will. The entry is kept and displayed
-    -- like any other (ignore means "bother does not manage this", not "hide
-    -- it"), but it carries no ids and must not be matched against hub rows by
-    -- content either, so the flag has to be explicit: "no ids" otherwise
-    -- means "ingested while the hub was unreachable", which does get matched.
+    -- like any other, because ignore means "bother does not manage this", not
+    -- "hide it". Recorded to tell the two id-less cases apart when reading a
+    -- cache file or the debug log: this one is permanent and deliberate, while
+    -- "shown while the hub was unreachable" is neither.
     hub_ignored  = meta ~= nil and meta.decision == 'ignore',
     -- Native notification id, used to invoke the default action from the row
     -- long after the popup is gone. Not persisted, unlike the hub ids: an id
@@ -1760,7 +1885,7 @@ local function record(n, args)
   -- New notifications are a cheap trigger to re-check what we still show:
   -- exactly the moment stale entries (offline-shown, stream-outage) are most
   -- annoying. Debounced.
-  schedule_reconcile(10)
+  schedule_sync(10)
 end
 
 --------------------------------------------------------------------------------
@@ -1772,7 +1897,7 @@ function notification_history.show()
 
   -- Opening the popup is a natural "show me the truth now" moment: run the
   -- reconcile shortly after so stale rows do not survive a popup session.
-  schedule_reconcile(1)
+  schedule_sync(1)
 
   selected, offset = 1, 0
   -- Mark all entries as seen when popup opens (scroll, Win+n, etc.)
@@ -1830,9 +1955,10 @@ naughty.connect_signal('added', function(n, args) record(n, args) end)
 -- looked at it, so that case is left for the history popup to mark seen.
 --
 -- This is also where the hub learns that a notification was finished with
--- locally, which propagates the cancel to every device (AGENTS.md 6). Reports
--- are async and only fire for entries the hub pre-approved (hub_instance set),
--- so a suppression here can never echo back to the server as a resolution.
+-- locally, which propagates the cancel to every device. Reports are async and
+-- only fire for rows carrying a posting identity, which a suppressed or
+-- vetoed notification never gets, so a suppression here can never echo back to
+-- the hub as a human action.
 --
 -- Kind is always 'click'. naughty.layout.box binds mouse button 1 to
 -- dismissed_by_user and button 3 to silent, so the only way to reach this
@@ -1880,10 +2006,7 @@ naughty.connect_signal('destroyed', function(n, reason)
       if entries[i].notification == n then e = entries[i] break end
     end
     if not e then return end
-    if e.hub_instance then
-      hub_report_async('/api/v1/instances/' .. e.hub_instance .. '/removed',
-        '{"native_reason":"app_cancel"}')
-    end
+    hub_event(e, 'source_withdrew', 'dismissed_by_command')
     -- This runs inside n's own destroy(), so n must not be destroyed again on
     -- the way out. drop_matching() -> close_live() would otherwise do exactly
     -- that; the mark makes close_live skip it (see the guard there).
@@ -1898,11 +2021,7 @@ naughty.connect_signal('destroyed', function(n, reason)
   for i = 1, #entries do
     if entries[i].notification == n then
       entries[i].seen = true
-      if entries[i].hub_instance then
-        hub_report_async(
-          '/api/v1/instances/' .. entries[i].hub_instance .. '/resolve',
-          '{"kind":"click"}')
-      end
+      hub_event(entries[i], 'user_click', 'dismissed_by_user')
       refresh_count_widget()
       if popup and popup.visible then render() end
       return
@@ -1932,8 +2051,8 @@ end)
 -- Hub sync startup: live event stream immediately, first reconcile delayed
 -- (does not race network bring-up), then periodic.
 start_hub_stream()
-gears.timer.start_new(5, function() reconcile_with_hub() return false end)
-gears.timer.start_new(SYNC_INTERVAL, function() reconcile_with_hub() return true end)
+gears.timer.start_new(5, function() hub_sync() return false end)
+gears.timer.start_new(SYNC_INTERVAL, function() hub_sync() return true end)
 
 return notification_history
 -- vim: set ts=2 sw=2 tw=0 et :
