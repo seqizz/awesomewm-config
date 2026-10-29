@@ -13,6 +13,10 @@ local my_theme = require('my_modules/my_theme')
 
 local PROFILE_FILE = '/etc/nixos-profile'
 
+-- Hosts without the work/private specialisation have no PROFILE_FILE at all,
+-- which must look exactly like an untinted theme rather than an error state.
+local DEFAULT_PROFILE = 'private'
+
 -- accent: focused client border, the loud signal.
 -- taglist_bg: selected tag background.
 -- bar_bg: wibar background.
@@ -31,24 +35,21 @@ local PROFILES = {
     taglist_bg = my_theme.bg_focus,
     bar_bg = my_theme.bg_normal,
   },
-  unknown = {
-    accent = '#cc241d', -- gruvbox red: file missing or unparsable
-    taglist_bg = '#cc241d',
-    bar_bg = '#2e2020',
-  },
 }
 
 local profile = {
   name = nil,
 }
 
+-- A missing or unparsable file is not an error worth signalling in the UI: any
+-- host that does not switch profiles simply stays on the baseline look.
 local function read_profile()
   local f = io.open(PROFILE_FILE, 'r')
-  if not f then return 'unknown' end
+  if not f then return DEFAULT_PROFILE end
   local line = f:read('*l') or ''
   f:close()
   local name = line:match('^%s*(%S+)')
-  if not name or not PROFILES[name] then return 'unknown' end
+  if not name or not PROFILES[name] then return DEFAULT_PROFILE end
   return name
 end
 
@@ -75,7 +76,7 @@ local function repaint(colors)
 end
 
 function profile.apply()
-  local colors = PROFILES[profile.name] or PROFILES.unknown
+  local colors = PROFILES[profile.name] or PROFILES[DEFAULT_PROFILE]
 
   beautiful.border_focus = colors.accent
   beautiful.taglist_bg_focus = colors.taglist_bg
