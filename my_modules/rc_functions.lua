@@ -784,11 +784,6 @@ screen.connect_signal("request::wallpaper", function(_)
   end)
 end)
 
-local function createFolder(folder)
-  local p = io.popen('mkdir -p ' .. folder)
-  p:close()
-end
-
 local function get_tag_with_focused_window()
     for s in screen do
         for _, t in ipairs(s.tags) do
@@ -804,15 +799,158 @@ local function get_tag_with_focused_window()
     return nil
 end
 
-function save_current_tags(screens_table)
-  local focused_tag = get_tag_with_focused_window()
+-- The focus marker in the tagsave files only answers "which tag", so a selected
+-- but empty tag is still a valid answer. get_tag_with_focused_window() can only
+-- see tags that hold the focused client, hence the fall back to whatever tag the
+-- focused screen is showing.
+local function get_focused_tag()
+  local t = get_tag_with_focused_window()
+  if t then return t end
 
-  -- Ensure that the folder exists
-  createFolder(tagsave_folder)
+  local s = awful.screen.focused()
+  return s and s.selected_tag or nil
+end
+
+-- One `key=value` line per entry. Used for the auxiliary state files
+-- (layouts/splits/clients) whose keys are tag or screen names, unlike the
+-- per-screen tag files which are a plain ordered list.
+local function read_kv_file(filename)
+  local entries = {}
+  for _, line in ipairs(my_utils.read_lines_from(filename)) do
+    local key, value = line:match("^([^=]+)=(.*)$")
+    if key then entries[key] = value end
+  end
+  return entries
+end
+
+-- Merge into what is already on disk rather than replacing it. These files are
+-- written by whichever screen layout happens to be active, and a layout only
+-- knows about its own screens: saving from the laptop panel alone would drop the
+-- wide monitor's split ratio, so switching back would come up at the default.
+local function update_kv_file(filename, entries)
+  local merged = read_kv_file(filename)
+  for key, value in pairs(entries) do
+    merged[key] = tostring(value)
+  end
+
+  local f = io.open(filename, "w")
+  if not f then
+    debug_print("update_kv_file: could not open " .. filename)
+    return
+  end
+  for key, value in pairs(merged) do
+    f:write(key, "=", value, "\n")
+  end
+  f:close()
+end
+
+-- Layouts belong to the four global tags, not to a screen, so they live in a
+-- single file instead of being duplicated into every per-screen tagsave.
+local function save_tag_layouts()
+  local layouts = {}
+  for _, t in ipairs(root.tags()) do
+    if t.layout and t.layout.name then
+      layouts[my_utils.get_first_word(t.name)] = t.layout.name
+    end
+  end
+  update_kv_file(tagsave_folder .. "/tagsave-layouts", layouts)
+end
+
+local function load_tag_layouts(printmore)
+  local layouts = read_kv_file(tagsave_folder .. "/tagsave-layouts")
+  for _, t in ipairs(root.tags()) do
+    local wanted = layouts[my_utils.get_first_word(t.name)]
+    if wanted then
+      -- Only accept a layout the tag actually offers; rc_tags.lua restricts each
+      -- tag to max/tile and a stale file must not smuggle in a third one.
+      for _, candidate in ipairs(t.layouts or {}) do
+        if candidate.name == wanted then
+          t.layout = candidate
+          debug_print("load_tag_layouts: " .. t.name .. " -> " .. wanted, printmore)
+          break
+        end
+      end
+    end
+  end
+end
+
+-- Store the share of the pair width held by the left (fake) half, keyed by the
+-- parent screen. A ratio rather than a pixel width so it still means the same
+-- thing if the output comes back at a different mode.
+local function save_screen_splits(screens_table)
+  local splits = {}
+  for name, feat in pairs(screens_table) do
+    if feat["is_fake"] and feat["parent"] then
+      local left = feat["object"].geometry
+      local right = feat["parent"]["object"].geometry
+      local total = left.width + right.width
+      if total > 0 then
+        splits[feat["parent"]["name"]] = string.format("%.4f", left.width / total)
+      end
+    end
+  end
+  update_kv_file(tagsave_folder .. "/tagsave-splits", splits)
+end
+
+function load_screen_splits(screens_table, printmore)
+  local splits = read_kv_file(tagsave_folder .. "/tagsave-splits")
+  for name, feat in pairs(screens_table) do
+    if feat["is_fake"] and feat["parent"] then
+      local ratio = tonumber(splits[feat["parent"]["name"]])
+      if ratio and ratio > 0 and ratio < 1 then
+        local left = feat["object"]
+        local right = feat["parent"]["object"]
+        local total = left.geometry.width + right.geometry.width
+        debug_print("load_screen_splits: " .. name .. " -> " .. ratio, printmore)
+        set_split_boundary(left, right, total * ratio)
+      end
+    end
+  end
+end
+
+-- Remember which window had the focus on each tag by X window id. The id stays
+-- valid across an awesome restart because the X server keeps running; after a
+-- full X restart nothing matches and the entry is simply ignored.
+local function save_focused_clients()
+  local clients = {}
+  for _, t in ipairs(root.tags()) do
+    -- Walk the global focus history and take the most recent client that is on
+    -- this tag. Same depth as focus_previous_client() uses.
+    for idx = 0, 9 do
+      local c = awful.client.focus.history.get(nil, idx)
+      if not c then break end
+      if c.window and my_utils.table_contains(c:tags(), t) then
+        clients[my_utils.get_first_word(t.name)] = c.window
+        break
+      end
+    end
+  end
+  update_kv_file(tagsave_folder .. "/tagsave-clients", clients)
+end
+
+local function restore_focused_client(t, printmore)
+  local clients = read_kv_file(tagsave_folder .. "/tagsave-clients")
+  local wanted = tonumber(clients[my_utils.get_first_word(t.name)])
+  if not wanted then return false end
+
+  for _, c in ipairs(t:clients()) do
+    if c.window == wanted then
+      debug_print("restore_focused_client: " .. t.name .. " -> " .. tostring(c.name), printmore)
+      client.focus = c
+      c:raise()
+      return true
+    end
+  end
+  return false
+end
+
+function save_current_tags(screens_table)
+  local focused_tag = get_focused_tag()
+
+  gears.filesystem.make_directories(tagsave_folder)
   for name, feat in pairs(screens_table) do
     local active_tags = {}
     local filename = tagsave_folder .. "/tagsave-" .. name
-    os.remove(filename)
     for _, tagobj in pairs(feat["object"].selected_tags) do
         if my_utils.table_contains(feat["tags"], tagobj) then
             if tagobj == focused_tag then
@@ -823,11 +961,28 @@ function save_current_tags(screens_table)
             end
         end
     end
-    local f = assert(io.open(filename, "w"))
-    for _, tagname in pairs(active_tags) do
-        f:write(tagname, "\n")
+    -- io.open can fail on a full or read-only cache dir; an error thrown here
+    -- would abort the caller before it gets to restart awesome.
+    local f = io.open(filename, "w")
+    if f then
+      for _, tagname in pairs(active_tags) do
+          f:write(tagname, "\n")
+      end
+      f:close()
+    else
+      debug_print("save_current_tags: could not write " .. filename)
     end
-    f:close()
+  end
+
+  -- screens_table can hold a screen object that X has already taken away (loose
+  -- changes the layout between the save-tags hook and the debounced rebuild), and
+  -- reading geometry off an invalid screen raises. This runs on the exit path, so
+  -- an error here would stop awesome from restarting at all.
+  for _, save in ipairs({ save_tag_layouts, save_screen_splits, save_focused_clients }) do
+    local ok, err = pcall(save, screens_table)
+    if not ok then
+      debug_print("save_current_tags: auxiliary save failed: " .. tostring(err))
+    end
   end
 end
 
@@ -847,6 +1002,8 @@ function get_latest_urgent_client()
 end
 
 function load_last_active_tags(screens_table, printmore)
+  load_tag_layouts(printmore)
+
   local focused_tag = nil
   for name, feat in pairs(screens_table) do
     local filename = tagsave_folder .. "/tagsave-" .. name
@@ -854,24 +1011,54 @@ function load_last_active_tags(screens_table, printmore)
     if next(tag_list) ~= nil then
       local previous_tags = {}
       for _, tag_name in pairs(tag_list) do
-        if tag_name:sub(-1) == ":" then
+        local is_focused = tag_name:sub(-1) == ":"
+        if is_focused then
           tag_name = tag_name:sub(1, -2)
-          focused_tag = find_tag_by_first_word(tag_name, printmore)
         end
         local t = find_tag_by_first_word(tag_name, printmore)
-        table.insert(previous_tags, t)
+        -- A saved name can point at a tag that place_tags() has since handed to
+        -- a different screen (undocked session restored while docked). Driving
+        -- the view from a foreign screen's file scrambles both screens, and the
+        -- loop order is undefined, so it scrambles them differently every boot.
+        if t and my_utils.table_contains(feat["tags"], t) then
+          table.insert(previous_tags, t)
+          if is_focused then
+            focused_tag = t
+          end
+        else
+          debug_print("load_last_active_tags: skipping " .. tag_name .. ", not on " .. name, printmore)
+        end
       end
-      local _, firsttag = next(previous_tags)
-      local screen_name = find_screen_of_tag(screens_table, firsttag, printmore)
-      awful.tag.viewnone(screen_name)
-      awful.tag.viewmore(previous_tags, screen_name)
+      if next(previous_tags) ~= nil then
+        awful.tag.viewnone(feat["object"])
+        awful.tag.viewmore(previous_tags, feat["object"])
+      end
     end
   end
+
+  -- A screen showing no tag at all is a dead end: no clients, and the only way
+  -- out is the taglist or a tag keybinding. It happens whenever nothing above
+  -- selected anything for that screen, either because there is no save file for
+  -- this screen layout yet or because the file only lists tags that place_tags()
+  -- has since handed to another screen. rc_tags.lua marks only 'web' selected,
+  -- so the screen holding term/chat is the usual victim.
+  for name, feat in pairs(screens_table) do
+    if next(feat["tags"]) ~= nil and not feat["object"].selected_tag then
+      debug_print("load_last_active_tags: " .. name .. " has no tag selected, falling back to "
+                  .. feat["tags"][1].name, printmore)
+      feat["tags"][1]:view_only()
+    end
+  end
+
   if focused_tag then
     debug_print("load_last_active_tags: Last focused tag is " .. focused_tag.name .. " .. loading last", printmore)
-    -- Switch to the screen of the focused tag by emptying its screen and toggling it
-    awful.tag.viewnone(find_screen_of_tag(screens_table, focused_tag, printmore))
-    awful.tag.viewtoggle(focused_tag)
+    -- The tag is already selected by the viewmore above; all that is left is to
+    -- put the input focus on its screen. Re-selecting it here would drop any
+    -- other tag selected on the same screen.
+    awful.screen.focus(focused_tag.screen)
+    if not restore_focused_client(focused_tag, printmore) then
+      focus_previous_client(focused_tag.name, printmore)
+    end
   end
 end
 

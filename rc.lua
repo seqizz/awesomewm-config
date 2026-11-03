@@ -857,10 +857,8 @@ globalkeys = gears.table.join(
   awful.key({ win, "Shift" }, "Tab",                        function() awful.tag.viewprev(get_screen_of_focused()) end),
   awful.key({ win, "Shift" }, "c",                          function() awful.spawn(proxified_chromium_cmd) end),
   -- awful.key({ win, ctrl    }, "q",                          awesome.quit),
-  awful.key({ win, ctrl    }, "r",                          function()
-                                                                save_current_tags(screens_table)
-                                                                awesome.restart()
-                                                            end),
+  -- Saving is handled by the 'exit' signal handler, which this goes through
+  awful.key({ win, ctrl    }, "r",                          awesome.restart),
   awful.key({ win, "Shift" }, "z",                          unminimize_client),
   -- Re-read notifications that already timed out
   awful.key({ win          }, "n",                          function() notification_history.toggle() end),
@@ -1084,7 +1082,15 @@ client.connect_signal('request::titlebars', function(c)
 end)
 
 awesome.connect_signal('save-tags', function()
-  -- We are about to exit / restart awesome, save our last used tag
+  -- We are about to exit / restart awesome, save our last used tag.
+  -- Emitted by loose's pre hook, before it changes the screen layout, so the
+  -- state lands under the screen keys that are still current at that moment.
+  save_current_tags(screens_table)
+end)
+
+awesome.connect_signal('exit', function(restarting)
+  -- Covers the restart paths loose does not drive (Win+Ctrl+R, a hand-typed
+  -- awesome.restart(), awesome.quit). A crash still emits nothing.
   save_current_tags(screens_table)
 end)
 
@@ -1237,5 +1243,9 @@ awesome.connect_signal('startup', function(s, state)
 end)
 
 debug_print("Last state of the screens table is: \n" .. my_utils.dump(screens_table), printmore)
+-- Before the tag view is restored: moving the fake screen boundary reflows
+-- clients, and doing that after the tags are selected makes the restore visibly
+-- jump around.
+load_screen_splits(screens_table, printmore)
 load_last_active_tags(screens_table, printmore)
 -- vim: set ts=2 sw=2 tw=0 :
