@@ -945,6 +945,22 @@ local function place_top_right(d)
   })
 end
 
+-- Put the popup where place_top_right would put it, but while it is still
+-- hidden. The popup object is reused across shows, so reopening it on another
+-- screen maps it at its old coordinates and only then lets the placement
+-- property (which needs a layout pass) pull it over -- a mapped window that
+-- changes position is a move picom animates, so the popup visibly flies in
+-- from the screen it was last opened on. Nothing here reads the popup's own
+-- size: the width is pinned by minimum_width/maximum_width and the popup hangs
+-- from the top, so x/y are known before the first layout pass.
+local function park_top_right(d)
+  local s = awful.screen.focused()
+  local wibar_h = s.geometry.height - s.workarea.height
+
+  d.x = s.workarea.x + s.workarea.width - POPUP_WIDTH - EDGE_MARGIN
+  d.y = s.workarea.y + wibar_h + dpi(5)
+end
+
 -- Built on first use, not at require time: beautiful.init() has not run yet
 -- when rc.lua requires this module.
 local function ensure_popup()
@@ -1994,9 +2010,13 @@ function notification_history.show()
   hide_count_tooltip()
   render()
   local p = ensure_popup()
+  -- Move first, map second: see park_top_right.
+  park_top_right(p)
   p.visible = true
   -- Reassigning the placement property forces a resize-and-reposition pass, so
   -- the popup follows the currently focused screen when reopened elsewhere.
+  -- park_top_right has already landed on the same spot, so this corrects for a
+  -- width that is not exactly POPUP_WIDTH rather than moving the window.
   p.placement = place_top_right
   grab_keys()
 
