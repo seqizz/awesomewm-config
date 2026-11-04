@@ -144,6 +144,8 @@ function refresh_sound_popup()
                     sound_popup.visible = not sound_popup.visible
                     awful.spawn.with_shell('paoutput -s ' .. item)
 		            volume_widget.update()
+                    -- OSD caches the sink icon; the output just changed under it
+                    if osd then osd.invalidate_sink() end
                 end)
             )
         )

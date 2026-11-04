@@ -1,9 +1,11 @@
 local awful = require('awful')
-local beautiful = require('beautiful')
 local gears = require('gears')
 local helpers = require('my_modules/geo_helpers')
-local wibox = require('wibox')
-local dpi = require('beautiful').xresources.apply_dpi
+
+-- Global on purpose: rc.lua's volume::change / brightness:change handlers reach
+-- for it at runtime, and this file is dofile'd (not required) after
+-- beautiful.init, which is what the OSD module needs to already be in place.
+osd = require('my_modules/osd')
 
 -- Headset (Zone Vibe) mute is hardware-only: invisible to PipeWire/pamixer.
 -- Only signal we get is XF86AudioMicMute key event. Track state locally.
@@ -11,137 +13,90 @@ local dpi = require('beautiful').xresources.apply_dpi
 local mic_is_muted = true
 local mic_debounce = false
 
-local function create_slider_widget(color)
-  local sliderwidget = wibox.widget({
-    {
-      max_value = 100,
-      value = 33,
-      background_color = beautiful.slider_bg .. '50',
-      color = color,
-      shape = gears.shape.rounded_bar,
-      bar_shape = gears.shape.rounded_bar,
-      widget = wibox.widget.progressbar,
-    },
-    forced_height = dpi(250),
-    forced_width = dpi(20),
-    direction = 'east',
-    layout = wibox.container.rotate,
-  })
+-- {{{ media OSD, driven by the mpris follower
 
-  return sliderwidget
-end
-
-sound_slider = create_slider_widget(beautiful.slider_sound_fg)
-brightness_slider = create_slider_widget(beautiful.slider_brightness_fg)
-
-widget_margins = {
-  top = dpi(100),
-  right = dpi(5),
+-- playerctl subcommand per direction, and whether that action puts the OSD on
+-- screen. next/previous show it now because the follower hands us the new
+-- track's title for free; they used to show nothing at all.
+local MEDIA_CMD = {
+  pausetoggle = 'play-pause',
+  stop = 'stop',
+  next = 'next',
+  previous = 'previous',
 }
 
--- {{{ Brightness / mute / sound slider - notify stuff
-vb_slider = awful.popup({
-  widget = sound_slider,
-  visible = false,
-  bg = '#00000000', -- fully transparent
-  ontop = true,
-  shape = helpers.rrect(beautiful.border_radius),
-  placement = function(c)
-    awful.placement.top_right(c, {
-      margins = widget_margins,
-    })
-  end,
-})
+local MEDIA_OSD = {
+  pausetoggle = true,
+  stop = true,
+  next = true,
+  previous = true,
+}
 
-local function create_text_widget(markup)
-  local textwidget = wibox.widget({
-    {
-      markup = markup,
-      font = beautiful.font_name .. dpi(12),
-      align = 'center',
-      valign = 'center',
-      widget = wibox.widget.textbox,
-    },
-    direction = 'west',
-    layout = wibox.container.rotate,
-  })
+-- How long follower updates keep repainting the OSD after a keypress. A skip
+-- often produces two lines in a row (status first, then the new metadata), and
+-- painting both means the card is never left showing the previous track.
+local MEDIA_SETTLE = 0.5
 
-  return textwidget
-end
+-- How long to wait for the follower before falling back to asking playerctl.
+-- The follower normally answers in a few ms; this only trips when the active
+-- player is outside mpris.lua's allowlist (browser video, for instance), since
+-- nothing is following it.
+local MEDIA_WAIT = 0.6
 
-textwidget = create_text_widget('')
+local media_settle = nil -- running while follower updates may paint the OSD
+local media_fallback = nil -- fires only when the follower stayed silent
+local last_media = nil -- last state the follower reported
 
-vb_textinfo = awful.popup({
-  widget = textwidget,
-  visible = false,
-  bg = beautiful.bg_notification .. '60',
-  ontop = true,
-  shape = helpers.rrect(beautiful.border_radius),
-  placement = function(c)
-    awful.placement.top_right(c, {
-      margins = widget_margins,
-    })
-  end,
-})
-
-slider_timer = gears.timer({
-  timeout = 1.2,
-  callback = function()
-    vb_slider.visible = false
-    vb_textinfo.visible = false
-  end,
-})
-
--- awful.popup only re-runs its placement callback after the popup is redrawn,
--- so a popup revived on a different screen first appears at its old
--- coordinates and then visibly slides to the new spot. Move it while it is
--- still hidden, then show it.
-local function show_popup(popup, s)
-  popup.screen = s
-  awful.placement.top_right(popup, {
-    margins = widget_margins,
-    bounding_rect = s.geometry,
-  })
-  popup.visible = true
-end
-
-triggerwibox = function(action)
-  local s = awful.screen.focused()
-  if action == 'volume' then
-    vb_slider.widget = sound_slider
-    vb_textinfo.visible = false
-    show_popup(vb_slider, s)
-  elseif action == 'brightness' then
-    vb_slider.widget = brightness_slider
-    vb_textinfo.visible = false
-    show_popup(vb_slider, s)
-  elseif action == 'mute' then
-    textwidget.widget.markup = '  🔇 <i>Sound muted</i>'
-    vb_slider.visible = false
-    show_popup(vb_textinfo, s)
-  elseif string.match(action, 'Stopped') then
-    textwidget.widget.markup = '⬛ <i>Stopped</i>'
-    vb_slider.visible = false
-    show_popup(vb_textinfo, s)
-  elseif string.match(action, 'Playing') then
-    textwidget.widget.markup = '▶️ <i>Playing</i>'
-    vb_slider.visible = false
-    show_popup(vb_textinfo, s)
-  elseif string.match(action, 'Paused') then
-    textwidget.widget.markup = '⏸️ <i>Paused</i>'
-    vb_slider.visible = false
-    show_popup(vb_textinfo, s)
-  elseif action == 'micmute' then
-    textwidget.widget.markup = '🎙️🟥 <i>Mic Muted</i>'
-    vb_slider.visible = false
-    show_popup(vb_textinfo, s)
-  elseif action == 'micunmute' then
-    textwidget.widget.markup = '🎙️🟩 <i>Mic Unmuted</i>'
-    vb_slider.visible = false
-    show_popup(vb_textinfo, s)
+local function stop_timer(timer)
+  if timer then
+    timer:stop()
   end
-  slider_timer:again()
+  return nil
 end
+
+awesome.connect_signal('widget::mpris::update', function(info)
+  last_media = info
+
+  -- Only paint when the user asked for it. The follower also fires on track
+  -- changes nobody pressed a key for, and a popup for those would be a
+  -- now-playing toast, not an OSD.
+  if media_settle then
+    media_fallback = stop_timer(media_fallback)
+    osd.media(info)
+  end
+end)
+
+local function arm_media_osd(player)
+  media_settle = stop_timer(media_settle)
+  media_settle = gears.timer.start_new(MEDIA_SETTLE, function()
+    media_settle = nil
+    return false
+  end)
+
+  media_fallback = stop_timer(media_fallback)
+  media_fallback = gears.timer.start_new(MEDIA_WAIT, function()
+    media_fallback = nil
+
+    local cmd = 'playerctl status'
+    if player ~= nil then
+      cmd = cmd .. ' -p ' .. player
+    end
+
+    helpers.async(cmd, function(out)
+      osd.media({
+        status = out:gsub('%s+$', ''),
+        -- An unfollowed player gives us no metadata, so reuse whatever the
+        -- follower last knew rather than showing an empty card.
+        title = last_media and last_media.title or '',
+        artist = last_media and last_media.artist or '',
+      })
+    end)
+
+    return false
+  end)
+end
+
+-- }}}
 
 function fn_process_action(action, direction, player)
   direction = direction or 'toggle'
@@ -154,12 +109,9 @@ function fn_process_action(action, direction, player)
       awful.spawn.easy_async('pamixer -t --get-mute', function(stdout, stderr, reason, exit_code)
         stdout = stdout:gsub('%s+', '') -- f*king whitespaces
         if stdout == 'true' then
-          triggerwibox('mute')
+          osd.mute()
         else
-          helpers.async('pamixer --get-volume', function(out)
-            sound_slider.widget.value = tonumber(out)
-            triggerwibox('volume')
-          end)
+          helpers.async('pamixer --get-volume', function(out) osd.volume(tonumber(out)) end)
         end
       end)
     else
@@ -170,15 +122,7 @@ function fn_process_action(action, direction, player)
         word = 'd'
       end
       helpers.async('pamixer --get-volume --allow-boost -' .. word .. ' 5', function(out)
-        sound_slider.widget.value = tonumber(out)
-        if tonumber(out) > 100 then
-          sound_slider.forced_height = dpi(250 + tonumber(out) - 100)
-          sound_slider.widget.color = '#FF0000'
-        else
-          sound_slider.forced_height = dpi(250)
-          sound_slider.widget.color = beautiful.slider_sound_fg
-        end
-        triggerwibox('volume')
+        osd.volume(tonumber(out))
       end)
     end
 
@@ -198,11 +142,7 @@ function fn_process_action(action, direction, player)
       debug_print('[MIC] toggled → mic_is_muted=' .. tostring(mic_is_muted))
       -- Software-toggle default source for keyboard-only case (harmless if headset handles it)
       awful.spawn('pamixer --default-source -t')
-      if mic_is_muted then
-        triggerwibox('micmute')
-      else
-        triggerwibox('micunmute')
-      end
+      osd.mic(mic_is_muted)
     end
 
   -- Case 4: Brightness up/down
@@ -227,49 +167,27 @@ function fn_process_action(action, direction, player)
     helpers.async(set_command, function(out)
       awful.spawn.easy_async(get_command, function(current)
         awful.spawn.easy_async(max_command, function(max)
-          brightness_slider.widget.value = 100 * tonumber(current) / tonumber(max)
-          triggerwibox('brightness')
+          osd.brightness(100 * tonumber(current) / tonumber(max))
         end)
       end)
     end)
 
   -- Case 5: Media keys
   elseif action == 'media' then
-    show_osd = false
-    if direction == 'pausetoggle' then
-      if player ~= nil then
-        helpers.async('playerctl play-pause -p ' .. player, function(out) end)
-      else
-        helpers.async('playerctl play-pause', function(out) end)
-      end
-      show_osd = true
-    elseif direction == 'stop' then
-      if player ~= nil then
-        helpers.async('playerctl stop -p ' .. player, function(out) end)
-      else
-        helpers.async('playerctl stop', function(out) end)
-      end
-      show_osd = true
-    elseif direction == 'next' then
-      if player ~= nil then
-        helpers.async('playerctl next -p ' .. player, function(out) end)
-      else
-        helpers.async('playerctl next', function(out) end)
-      end
-    elseif direction == 'previous' then
-      if player ~= nil then
-        helpers.async('playerctl previous -p ' .. player, function(out) end)
-      else
-        helpers.async('playerctl previous', function(out) end)
-      end
+    local subcommand = MEDIA_CMD[direction]
+    if not subcommand then
+      return
     end
-    if show_osd then
-      if player ~= nil then
-        helpers.async('playerctl status -p ' .. player, function(out) triggerwibox(out) end, 0.3)
-      else
-        helpers.async('playerctl status', function(out) triggerwibox(out) end, 0.3)
-      end
+
+    local cmd = 'playerctl ' .. subcommand
+    if player ~= nil then
+      cmd = cmd .. ' -p ' .. player
+    end
+
+    helpers.async(cmd, function(out) end)
+
+    if MEDIA_OSD[direction] then
+      arm_media_osd(player)
     end
   end
 end
-

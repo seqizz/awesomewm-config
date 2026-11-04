@@ -1128,6 +1128,20 @@ client.connect_signal('unfocus', function(c)
   end
 end)
 
+-- Notification popups anchor to a screen corner, and on a split ultrawide the
+-- focused half's right edge is the seam in the middle of the panel, so they
+-- pile up there instead of on the edge of the monitor. Hand every popup to the
+-- half that owns the physical right edge, matching where the OSD shows up.
+--
+-- 'added' is emitted synchronously before naughty decides how to display the
+-- notification, which is the last point where its screen can still be changed.
+naughty.connect_signal('added', function(n)
+  local ok, s = pcall(panel_right_screen, n.screen)
+  if ok and s and s ~= n.screen then
+    pcall(function() n.screen = s end)
+  end
+end)
+
 -- HACK START --
 -- Git version workaround, shit is not complete (e.g. slack does not switch to)
 -- alerting chat etc. but at least hovers the app itself
@@ -1177,12 +1191,11 @@ awesome.connect_signal('volume::change', function()
     stdout = stdout:gsub('%s+', '')
     if stdout == 'true' then
       -- muted, only show state
-      triggerwibox('mute')
+      osd.mute()
       return
     else
       helpers.async('pamixer --get-volume', function(out)
-        vb_slider.widget.value = tonumber(out)
-        triggerwibox('volume')
+        osd.volume(tonumber(out))
       end)
     end
   end)
@@ -1192,8 +1205,7 @@ end)
 awesome.connect_signal('brightness:change', function()
   awful.spawn.easy_async('brightnessctl -q get', function(current)
     awful.spawn.easy_async('brightnessctl -q max', function(max)
-      vb_slider.widget.value = 100 * tonumber(current) / tonumber(max)
-      triggerwibox('brightness')
+      osd.brightness(100 * tonumber(current) / tonumber(max))
     end)
   end)
 end)

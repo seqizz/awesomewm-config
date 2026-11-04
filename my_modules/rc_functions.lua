@@ -117,6 +117,25 @@ function monitor_geometry(s)
   return { x = x1, y = y1, width = x2 - x1, height = y2 - y1 }
 end
 
+-- Screen owning the right edge of the physical panel `s` sits on. For a split
+-- ultrawide that is the real parent screen, since get_screens always resizes it
+-- onto the right half; anything not part of a pair answers with itself.
+--
+-- Corner-anchored popups (the OSD, notifications) use this so they land on the
+-- edge of the monitor instead of on the seam in the middle of it. screens_table
+-- can lag a layout change (loose rebuilds it debounced) and hold a screen X has
+-- already dropped, so a stale entry must not take the caller down with it.
+function panel_right_screen(s)
+  s = s or awful.screen.focused()
+
+  if type(screens_table) ~= 'table' then return s end
+
+  local ok, _, right = pcall(get_fake_pair, s, screens_table)
+  if not ok or not right then return s end
+
+  return right
+end
+
 -- Clients that are currently in alternative fullscreen, mapped to the state
 -- needed to put them back. Weak keys so a closed client does not keep its entry
 -- (and the client object) alive forever.

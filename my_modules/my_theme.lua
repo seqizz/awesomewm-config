@@ -57,6 +57,13 @@ theme.slider_sound_fg      = theme.fg_normal
 theme.slider_brightness_fg = theme.nord_mid
 theme.border_radius        = 2
 
+-- OSD popup (volume/brightness/mute/media). Accent per mode lives in osd.lua,
+-- these are the shared surface colors. The bg carries an alpha suffix so the
+-- panel sits over whatever is behind it instead of blocking it out.
+theme.osd_bg               = theme.bg_normal .. "d8"
+theme.osd_media_fg         = theme.fg_normal_alt
+theme.osd_mute_fg          = theme.warning_bg
+
 -- relative paths, so fucking easy with lua..
 local base_dir = string.gsub(debug.getinfo(1).source, "^@(.+/)[^/]+$", "%1")
 theme.gauge_icon = base_dir .. 'assets/gauge.svg'

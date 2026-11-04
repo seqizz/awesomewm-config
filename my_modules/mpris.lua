@@ -218,6 +218,7 @@ end
 local visible_state = nil -- last emitted visibility, so we only signal on change
 local hide_timer = nil -- debounces hiding to ride out transient empty lines
 local last_title = '' -- keep song text stable across empty-metadata blips
+local last_artist = '' -- same, for the artist shown in the OSD card
 
 -- Emit the visibility signal only when it actually changes. Players push many
 -- property updates while playing; re-signalling every time makes the widget flicker.
@@ -236,23 +237,31 @@ local function cancel_hide()
   end
 end
 
-local function apply_line(line)
-  -- format is: status \31 playerName \31 title
-  local status, player, title = '', nil, ''
-  local a = line:find(SEP, 1, true)
-  if a then
-    status = line:sub(1, a - 1)
-    local rest = line:sub(a + 1)
-    local b = rest:find(SEP, 1, true)
-    if b then
-      player = rest:sub(1, b - 1)
-      title = rest:sub(b + 1)
-    else
-      player = rest
+-- Split a follow line into its four SEP-separated fields, missing ones empty.
+local function split_fields(line)
+  local fields, pos = {}, 1
+
+  for _ = 1, 3 do
+    local at = line:find(SEP, pos, true)
+    if not at then
+      break
     end
-  else
-    -- playerctl emits an empty line when no followed player is present
-    status = line
+    fields[#fields + 1] = line:sub(pos, at - 1)
+    pos = at + 1
+  end
+  fields[#fields + 1] = line:sub(pos)
+
+  return fields[1] or '', fields[2] or '', fields[3] or '', fields[4] or ''
+end
+
+local function apply_line(line)
+  -- format is: status \31 playerName \31 title \31 artist
+  local status, player, title, artist = split_fields(line)
+
+  -- playerctl emits an empty line when no followed player is present; keep the
+  -- nil player the rest of this module expects in that case
+  if player == '' then
+    player = nil
   end
 
   dbg('[mpris] parsed status=[' .. status .. '] player=[' .. tostring(player) .. '] title=[' .. title .. ']')
@@ -278,6 +287,7 @@ local function apply_line(line)
   -- metadata can momentarily arrive empty mid-track; reuse the last good title
   if title ~= '' then
     last_title = title
+    last_artist = artist
   end
 
   -- keep the previous semantics: only 'Paused' shows the paused icon
@@ -286,6 +296,17 @@ local function apply_line(line)
   mpriswidget:set(last_title, is_playing)
   mpriswidget.forced_width = nil
   set_visible(true)
+
+  -- The follower is the only thing that knows about a state change the instant
+  -- it happens, so the media OSD rides along here instead of polling
+  -- `playerctl status` after a blind delay. Consumers decide whether an update
+  -- is worth showing; this fires on every track and status change.
+  awesome.emit_signal('widget::mpris::update', {
+    status = status,
+    player = player,
+    title = last_title,
+    artist = last_artist,
+  })
 end
 
 local function start_follow()
@@ -298,7 +319,7 @@ local function start_follow()
     'metadata',
     '--follow',
     '--format',
-    '{{status}}' .. SEP .. '{{playerName}}' .. SEP .. '{{title}}',
+    '{{status}}' .. SEP .. '{{playerName}}' .. SEP .. '{{title}}' .. SEP .. '{{artist}}',
   }
 
   dbg('[mpris] start_follow: ' .. table.concat(cmd, ' '))
