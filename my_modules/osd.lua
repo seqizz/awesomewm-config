@@ -17,14 +17,28 @@ local helpers = require('my_modules/geo_helpers')
 
 local osd = {}
 
--- rubato is symlinked in next to this file, the same way lain is. The dotted
--- require is mandatory: rubato derives its own submodule prefix from the name
--- it was required under, so the slash form used everywhere else in this config
--- leaves it looking for a top-level `rubato.timed` and failing. Animation is
--- optional - without the module the OSD snaps into place instead of sliding.
-local has_rubato, rubato = pcall(require, 'my_modules.rubato')
-if not has_rubato then
-  rubato = nil
+-- rubato is symlinked under ~/.local/awesome-rubato and found through the
+-- package.path rc.lua sets up for lain. The name must stay dot-separated:
+-- rubato derives the prefix for its own submodules from whatever it was
+-- required as, so the slash form used elsewhere in this config leaves it
+-- looking for a top-level `rubato.timed`. Animation is optional, without the
+-- module the OSD snaps into place instead of sliding.
+local rubato = nil
+for _, name in ipairs({ 'rubato', 'my_modules.rubato' }) do
+  local ok, mod = pcall(require, name)
+  if ok then
+    rubato = mod
+    break
+  end
+end
+
+-- Tracing of what show() decided and what the popup really became. Gated on the
+-- global printmore master switch only: one line per OSD is far too loud to want
+-- a module-local flag that can be left on by accident.
+local function dbg(msg)
+  if printmore then
+    debug_print('[osd] ' .. msg, true)
+  end
 end
 
 local ANIM = 0.2 -- slide/fade duration, same both directions
@@ -428,12 +442,28 @@ local function osd_target(s)
   return panel_right_screen(s), geo
 end
 
-local function show(mode, width)
+-- awful.popup resolves its width as min(max(fit, minimum_width), maximum_width),
+-- so the two bounds must never be crossed while they are being moved: growing
+-- the popup (the narrow level bar to the wide media card) with minimum first
+-- leaves min > max, and the widget that gets assigned next is laid out against
+-- the stale, far smaller maximum.
+local function apply_width(width)
+  if width >= (popup.maximum_width or 0) then
+    popup.maximum_width = width
+    popup.minimum_width = width
+  else
+    popup.minimum_width = width
+    popup.maximum_width = width
+  end
+end
+
+local function show(mode, width, widget)
   local s, geo = osd_target(awful.screen.focused())
   local new_anchor_x = geo.x + geo.width - width - MARGIN_RIGHT
 
-  popup.minimum_width = width
-  popup.maximum_width = width
+  -- bounds before content: the widget is laid out the moment it is assigned
+  apply_width(width)
+  popup.widget = widget
   popup.border_color = ACCENT[mode] or ACCENT.volume
 
   -- Tracked here rather than read back from the popup: the anchor also moves
@@ -471,6 +501,32 @@ local function show(mode, width)
     osd.hide()
     return false
   end)
+
+  -- The fade runs on rubato's own frame clock, which this module releases when
+  -- idle; a popup that is mapped but still fully transparent is invisible while
+  -- picom keeps blurring behind it, which looks like the OSD vanished. Check
+  -- once the animation should be over and force the end state if it is not
+  -- there, loudly enough to find out why.
+  gears.timer.start_new(ANIM + 0.1, function()
+    if shown and popup.opacity < 1 then
+      dbg(string.format('fade stalled at %.2f, forcing', popup.opacity))
+      snap(anchor_x, 1)
+    end
+
+    dbg(string.format(
+      'mode=%s want_w=%d geo=%dx%d+%d+%d opacity=%.2f visible=%s',
+      mode,
+      width,
+      popup.width,
+      popup.height,
+      popup.x,
+      popup.y,
+      popup.opacity,
+      tostring(popup.visible)
+    ))
+
+    return false
+  end)
 end
 
 -- value: 0..100 (or beyond for boosted volume)
@@ -499,8 +555,7 @@ local function show_level(mode, value, glyph, label)
     bar.value = target
   end
 
-  popup.widget = level_layout
-  show(mode, WIDTH_LEVEL)
+  show(mode, WIDTH_LEVEL, level_layout)
 end
 
 function osd.volume(value)
@@ -549,8 +604,7 @@ local function show_card(mode, glyph, line1, line2, width)
     media_sub.markup = span(truncate(line2, MEDIA_SUB_CHARS), beautiful.fg_normal, beautiful.font_small)
   end
 
-  popup.widget = media_layout
-  show(mode, width or WIDTH_MEDIA)
+  show(mode, width or WIDTH_MEDIA, media_layout)
 end
 
 -- Mic state is tracked by hand in rc_fn_actions (the headset mutes in hardware,

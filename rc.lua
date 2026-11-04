@@ -1,8 +1,11 @@
 pcall(require, "luarocks.loader")
 
--- lain symlinked under ~/.local/awesome-lain
-local lain_base = os.getenv("HOME") .. "/.local"
-package.path = package.path .. ";" .. lain_base .. "/awesome-?.lua;" .. lain_base .. "/awesome-?/init.lua"
+-- Third-party lua libs live symlinked under ~/.local as awesome-<name>, so
+-- require('lain') finds ~/.local/awesome-lain/init.lua and require('rubato')
+-- finds ~/.local/awesome-rubato/init.lua. Keeping them out of the config tree
+-- means nothing here has to be vendored or gitignored.
+local vendor_base = os.getenv("HOME") .. "/.local"
+package.path = package.path .. ";" .. vendor_base .. "/awesome-?.lua;" .. vendor_base .. "/awesome-?/init.lua"
 
 local gears = require("gears")
 local awful = require("awful")
