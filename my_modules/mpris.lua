@@ -48,7 +48,10 @@ function mpriswidget:set(state, is_playing)
     mprisimage:set_image(my_theme.music_icon_paused)
   end
 
-  mpristext.widget:set_markup_silently(' ' .. state)
+  -- Track titles carry '&' and '<' often enough ("Me & You", "<untitled>") and
+  -- set_markup_silently rejects the whole string when the markup is invalid,
+  -- leaving the textbox on the previous song with no visible error.
+  mpristext.widget:set_markup_silently(' ' .. my_utils.pango_escape(state))
 end
 
 -- Event-driven: one long-running `playerctl --follow` pushes a line on every

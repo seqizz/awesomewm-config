@@ -15,9 +15,7 @@ local mic_debounce = false
 
 -- {{{ media OSD, driven by the mpris follower
 
--- playerctl subcommand per direction, and whether that action puts the OSD on
--- screen. next/previous show it now because the follower hands us the new
--- track's title for free; they used to show nothing at all.
+-- playerctl subcommand per direction. Every one of them puts the OSD on screen.
 local MEDIA_CMD = {
   pausetoggle = 'play-pause',
   stop = 'stop',
@@ -25,26 +23,24 @@ local MEDIA_CMD = {
   previous = 'previous',
 }
 
-local MEDIA_OSD = {
-  pausetoggle = true,
-  stop = true,
-  next = true,
-  previous = true,
-}
+-- How long after the last transport keypress follower updates may repaint the
+-- card. This is a ceiling on how late an update still counts as "the user
+-- asked for this", not a delay: nothing ever waits for it to expire.
+local MEDIA_WINDOW = 3
 
--- How long follower updates keep repainting the OSD after a keypress. A skip
--- often produces two lines in a row (status first, then the new metadata), and
--- painting both means the card is never left showing the previous track.
-local MEDIA_SETTLE = 0.5
-
--- How long to wait for the follower before falling back to asking playerctl.
--- The follower normally answers in a few ms; this only trips when the active
--- player is outside mpris.lua's allowlist (browser video, for instance), since
--- nothing is following it.
+-- Only armed when nothing is being followed, so the card is not left on the
+-- bare action label for a player mpris.lua does not watch.
 local MEDIA_WAIT = 0.6
 
-local media_settle = nil -- running while follower updates may paint the OSD
-local media_fallback = nil -- fires only when the follower stayed silent
+-- Whether mpris.lua currently has a followed player. Tracked off its own
+-- visibility signal rather than by requiring the module, which is loaded
+-- earlier in rc.lua and would make the dependency circular.
+local follower_live = false
+awesome.connect_signal('widget::mpris::visible', function(v) follower_live = v end)
+
+local media_window = nil -- running while follower updates may paint the OSD
+local media_fallback = nil -- unfollowed players only, see MEDIA_WAIT
+local media_echo = nil -- title from before the burst; lines carrying it are stale
 local last_media = nil -- last state the follower reported
 
 local function stop_timer(timer)
@@ -60,20 +56,78 @@ awesome.connect_signal('widget::mpris::update', function(info)
   -- Only paint when the user asked for it. The follower also fires on track
   -- changes nobody pressed a key for, and a popup for those would be a
   -- now-playing toast, not an OSD.
-  if media_settle then
-    media_fallback = stop_timer(media_fallback)
-    osd.media(info)
+  if not media_window then
+    return
   end
+
+  -- Any line at all proves the follower is alive, so the playerctl fallback is
+  -- not needed even when this particular line is a stale echo.
+  media_fallback = stop_timer(media_fallback)
+
+  -- Spotify re-emits the pre-keypress metadata before it has the new track.
+  -- That echo is the only line worth dropping; once the title has actually
+  -- moved, every line is real and goes straight to the card.
+  if media_echo then
+    if info.title == '' or info.title == media_echo then
+      return
+    end
+    media_echo = nil
+  end
+
+  osd.media(info)
 end)
 
-local function arm_media_osd(player)
-  media_settle = stop_timer(media_settle)
-  media_settle = gears.timer.start_new(MEDIA_SETTLE, function()
-    media_settle = nil
+-- Show something true the instant the key is pressed, then let the follower
+-- overwrite it. Nothing here blocks on the player, so a burst of presses paints
+-- a burst of cards and ends on whatever the player ends on.
+local function arm_media_osd(player, direction)
+  local is_skip = direction == 'next' or direction == 'previous'
+
+  -- Only a skip has an echo to drop, and only at the head of a burst: a
+  -- play/pause legitimately reports the same title back, and re-reading the
+  -- baseline mid-burst would adopt a track already skipped past and suppress
+  -- the real updates still arriving for it.
+  if is_skip and not media_window then
+    media_echo = last_media and last_media.title
+    if media_echo == '' then
+      media_echo = nil
+    end
+  end
+
+  media_window = stop_timer(media_window)
+  media_window = gears.timer.start_new(MEDIA_WINDOW, function()
+    media_window = nil
+    media_echo = nil
     return false
   end)
 
+  if is_skip then
+    -- The track is changing and the only one known right now is the one being
+    -- skipped away from, so name the action rather than show a song that is
+    -- already wrong. The follower replaces this with the real track.
+    osd.media_action(direction)
+  else
+    -- Play/pause and stop leave the track alone, so the card can be complete
+    -- immediately; only the status is a guess, and the follower confirms or
+    -- corrects it within milliseconds.
+    osd.media({
+      status = direction == 'stop' and 'Stopped'
+        or (last_media and last_media.status == 'Playing' and 'Paused' or 'Playing'),
+      player = last_media and last_media.player,
+      title = last_media and last_media.title or '',
+      artist = last_media and last_media.artist or '',
+    })
+  end
+
   media_fallback = stop_timer(media_fallback)
+
+  -- A followed player answers over the signal. Racing it with `playerctl
+  -- status` is how the card ended up exactly one track behind: the fallback
+  -- has no metadata of its own and can only ever repeat what we already knew.
+  if follower_live then
+    return
+  end
+
   media_fallback = gears.timer.start_new(MEDIA_WAIT, function()
     media_fallback = nil
 
@@ -82,15 +136,10 @@ local function arm_media_osd(player)
       cmd = cmd .. ' -p ' .. player
     end
 
-    helpers.async(cmd, function(out)
-      osd.media({
-        status = out:gsub('%s+$', ''),
-        -- An unfollowed player gives us no metadata, so reuse whatever the
-        -- follower last knew rather than showing an empty card.
-        title = last_media and last_media.title or '',
-        artist = last_media and last_media.artist or '',
-      })
-    end)
+    -- Status only: an unfollowed player gives us no metadata, and the title we
+    -- hold belongs to whatever the follower saw last, which is a different
+    -- player entirely.
+    helpers.async(cmd, function(out) osd.media({ status = out:gsub('%s+$', '') }) end)
 
     return false
   end)
@@ -185,9 +234,6 @@ function fn_process_action(action, direction, player)
     end
 
     helpers.async(cmd, function(out) end)
-
-    if MEDIA_OSD[direction] then
-      arm_media_osd(player)
-    end
+    arm_media_osd(player, direction)
   end
 end

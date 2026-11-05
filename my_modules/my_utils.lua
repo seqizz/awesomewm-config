@@ -105,6 +105,18 @@ function my_utils.get_randomseed(b, m, r)
   return n
 end
 
+-- Make a raw string safe to hand to anything that parses pango markup.
+-- A textbox fed invalid markup keeps whatever it was showing before, so an
+-- unescaped '&' in a track title silently freezes the widget on the previous
+-- value instead of failing loudly.
+function my_utils.pango_escape(s)
+  s = tostring(s or '')
+  s = s:gsub('&', '&amp;')
+  s = s:gsub('<', '&lt;')
+  s = s:gsub('>', '&gt;')
+  return s
+end
+
 function my_utils.create_markup(arg)
   arg.size = arg.size or "medium"
   arg.rise = arg.rise or "0"

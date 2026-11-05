@@ -85,6 +85,8 @@ local GLYPH = {
   pause = pua(0xf04c), -- nf-fa-pause
   stop = pua(0xf04d), -- nf-fa-stop
   music = pua(0xf001), -- nf-fa-music
+  next = pua(0xf051), -- nf-fa-step_forward
+  previous = pua(0xf048), -- nf-fa-step_backward
   mic = pua(0xf130), -- nf-fa-microphone
   mic_off = pua(0xf131), -- nf-fa-microphone_slash
 }
@@ -617,6 +619,27 @@ function osd.mic(muted)
     nil,
     WIDTH_CARD
   )
+end
+
+-- Immediate acknowledgement of a transport keypress, shown before the player
+-- has said anything. MPRIS metadata for a skip lands hundreds of milliseconds
+-- later (Spotify answers it over the network), and the only track known at
+-- press time is the one being skipped away from, so the card names the action
+-- instead. osd.media() overwrites it as soon as the real metadata arrives.
+local MEDIA_ACTION = {
+  next = { GLYPH.next, 'Next' },
+  previous = { GLYPH.previous, 'Previous' },
+  pausetoggle = { GLYPH.music, 'Play / Pause' },
+  stop = { GLYPH.stop, 'Stop' },
+}
+
+function osd.media_action(direction)
+  local action = MEDIA_ACTION[direction]
+  if not action then
+    return
+  end
+
+  show_card('media', action[1], action[2])
 end
 
 -- info comes straight from the mpris follower: { status, player, title, artist }
