@@ -43,7 +43,7 @@ end
 
 local ANIM = 0.2 -- slide/fade duration, same both directions
 local BAR_ANIM = 0.28 -- bar fill trails the popup slightly, reads as weight
-local TIMEOUT = 1.2 -- on-screen time after the last event
+local TIMEOUT = 1.8 -- on-screen time after the last event
 local SLIDE = dpi(40) -- travel distance on show/hide
 
 local MARGIN_TOP = dpi(100)
