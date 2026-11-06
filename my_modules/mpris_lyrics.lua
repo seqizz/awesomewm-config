@@ -93,7 +93,11 @@ lyrictext.align = 'right'
 lyrictext.valign = 'center'
 lyrictext.font = my_theme.font
 
--- fixed-width container: always occupies max_width, text changes inside
+-- icon edge length of the paused indicator, reused as its collapsed width
+local PAUSED_ICON_SIZE = dpi(25)
+
+-- fixed-width container: occupies max_width while lyrics run, shrinks to the
+-- icon while paused (see show_child). Text changes inside.
 local lyrics_widget = wibox.widget({
   lyrictext,
   widget = wibox.container.constraint,
@@ -105,7 +109,7 @@ local lyrics_widget = wibox.widget({
 -- right-aligned via a place container to match lyrictext's align = 'right'.
 local paused_icon = my_utils.svg_icon({
   image = my_theme.lyrics_icon,
-  size = dpi(25),
+  size = PAUSED_ICON_SIZE,
   color = my_theme.fg_normal,
 })
 local paused_widget = wibox.widget({
@@ -116,11 +120,15 @@ local paused_widget = wibox.widget({
 })
 
 -- swap the constraint's child, only when it actually changes (update_display
--- runs every tick, so avoid needless relayouts)
-local current_child = lyrictext
+-- runs every tick, so avoid needless relayouts). The width swaps with the
+-- child: 'exact' means the container holds its width no matter how small the
+-- content is, so the paused state would otherwise keep 500px of blank wibar.
+-- Starts nil so the first call applies the width matching the initial state.
+local current_child = nil
 local function show_child(w)
   if current_child ~= w then
     lyrics_widget:set_widget(w)
+    lyrics_widget.width = (w == paused_widget) and PAUSED_ICON_SIZE or CONFIG.max_width
     current_child = w
   end
 end
