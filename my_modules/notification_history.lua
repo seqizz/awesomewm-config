@@ -225,12 +225,15 @@ end
 -- the signal, so matching naughty costs nothing and avoids guessing at an
 -- action table the app may never have sent.
 --
--- What is deliberately not handled: an app that retires its notification by
--- calling CloseNotification while the row is still here. naughty drops that on
--- the floor once the notification object is destroyed, so this module never
--- learns, keeps offering the row, and the activation lands on an id the app
--- has forgotten. The click then falls back to raising the client, which is the
--- old behaviour.
+-- Holding an id open has an inbound half, and it is not optional. An app that
+-- still believes its id is live can also retire the notification on its own
+-- (the mail was read elsewhere, the call was answered), and it does that by
+-- calling CloseNotification on exactly the id being held. naughty answers that
+-- method, but it resolves the id through naughty.get_by_id(), which only scans
+-- the notifications currently on screen; once the popup has expired the lookup
+-- finds nothing and the call is silently dropped. No second 'destroyed' signal
+-- is emitted, so the APP_RETRACT_REASONS branch below never sees it. That half
+-- is served by the CloseNotification monitor further down.
 
 -- Senders whose ids must not be held open past their popup, matched against a
 -- lowercased app_name. Escape hatch for an app that keys something off its own
@@ -1379,6 +1382,117 @@ local function drop_matching(pred, why)
   end
 end
 
+--------------------------------------------------------------------------------
+-- CloseNotification monitor: the inbound half of holding an id open
+--------------------------------------------------------------------------------
+
+-- An app that withdraws a notification whose id this module is holding open
+-- (see hold_open) calls CloseNotification on the session bus, naughty fails to
+-- resolve the id because the popup expired long ago, and the call dies there.
+-- This watches the bus for those calls and finishes the job: the hub hears
+-- `source_withdrew`, which arms its withdrawal sweep and clears the same
+-- notification off the other devices, and the row goes, because the thing it
+-- was about stopped being true at the source.
+--
+-- Not done in-process with Gio.DBusConnection:add_filter(). GDBus runs filters
+-- on its own message-handling thread, and touching awesome's Lua state from
+-- there is a crash rather than a race worth managing. A spawned reader hands
+-- every line back on the main loop instead, which is how the hub's SSE stream
+-- is already consumed.
+--
+-- dbus-monitor rather than a hand-rolled BecomeMonitor call because it
+-- negotiates: BecomeMonitor first, legacy `eavesdrop=true` match rules when the
+-- bus does not implement it. dbus-daemon and dbus-broker disagree there and
+-- this module should not have to know which one is running.
+--
+-- The match rule is as narrow as the bus can express it, so a notification id
+-- is the only thing that ever crosses the pipe. No bodies, no unrelated
+-- traffic, nothing worth logging.
+local CLOSE_MATCH = table.concat({
+  "type='method_call'",
+  "interface='" .. NOTIFY_IFACE .. "'",
+  "member='CloseNotification'",
+}, ',')
+
+-- Act on a withdrawal of `id`, if this module is the one holding that id.
+--
+-- `holding` is the whole guard against double-reporting. While a popup is still
+-- on screen naughty resolves the id itself and destroys the notification with
+-- dismissed_by_command, which the 'destroyed' handler already reports; such an
+-- entry never had an expiry close withheld, so `dbus_open` is false and this
+-- leaves it alone. Ids are per-WM-session counters and restored rows drop
+-- theirs, so a stale entry cannot answer for a number it no longer owns.
+local function app_withdrew(id)
+  for i = 1, #entries do
+    local e = entries[i]
+    if e.dbus_id == id and holding(e) then
+      hub_event(e, 'source_withdrew', 'dismissed_by_command')
+      -- The spec answer to CloseNotification is a NotificationClosed naming
+      -- reason 3. naughty emits that for notifications it still owns and could
+      -- not for this one, so it goes out here, ahead of the plain expiry
+      -- release that drop_matching -> close_live would otherwise reach for.
+      dbus_release(e, naughty_reason.dismissed_by_command)
+      drop_matching(function(x) return x == e end,
+        'app withdrew held id ' .. tostring(id))
+      return
+    end
+  end
+end
+
+-- dbus-monitor prints one unindented header line per message followed by
+-- indented argument lines. Every header resets the state, so an unrelated
+-- message can never donate its uint32 to a CloseNotification seen earlier.
+local pending_close = false
+
+local function monitor_line(line)
+  if line == '' then return end
+  if not line:match('^%s') then
+    pending_close = line:match('^method call ') ~= nil
+      and line:find('member=CloseNotification', 1, true) ~= nil
+    return
+  end
+  if not pending_close then return end
+  local id = line:match('^%s*uint32%s+(%d+)%s*$')
+  if not id then return end
+  pending_close = false
+  app_withdrew(tonumber(id))
+end
+
+-- Generation guard, same shape as the hub stream: a restart must never leave
+-- two readers feeding the same entries list.
+local monitor_gen = 0
+
+local function start_close_monitor()
+  monitor_gen = monitor_gen + 1
+  local my_gen = monitor_gen
+  pending_close = false
+  local pid = awful.spawn.with_line_callback(
+    { 'dbus-monitor', '--session', CLOSE_MATCH },
+    {
+      stdout = function(line)
+        if my_gen ~= monitor_gen then return end
+        monitor_line(line)
+      end,
+      stderr = function() end, -- the bus-address banner and its warnings
+      exit = function(reason, code)
+        if my_gen ~= monitor_gen then return end
+        dbg('CloseNotification monitor exit (' .. tostring(reason) .. '/'
+          .. tostring(code) .. '), restarting')
+        gears.timer.start_new(10, function()
+          if my_gen == monitor_gen then start_close_monitor() end
+          return false
+        end)
+      end,
+    })
+  -- awful.spawn answers with an error string when the binary is missing, and
+  -- the exit callback never runs in that case, so nothing retries. Losing the
+  -- monitor quietly is the right outcome: every other half of a held id keeps
+  -- working, this one device just stops hearing withdrawals again.
+  if type(pid) ~= 'number' then
+    dbg('CloseNotification monitor not started: ' .. tostring(pid))
+  end
+end
+
 -- Logical ids an echo is on screen for. Cleared when the local copy turns up
 -- and takes the row over (take_over_echo).
 --
@@ -2157,6 +2271,9 @@ end)
 -- Hub sync startup: live event stream immediately, first reconcile delayed
 -- (does not race network bring-up), then periodic.
 start_hub_stream()
+-- Bus-local and needs no network, so it starts with the stream rather than
+-- behind the reconcile delay.
+start_close_monitor()
 gears.timer.start_new(5, function() hub_sync() return false end)
 gears.timer.start_new(SYNC_INTERVAL, function() hub_sync() return true end)
 
