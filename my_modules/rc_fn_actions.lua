@@ -154,13 +154,16 @@ function fn_process_action(action, direction, player)
   -- Case 1: Sound mute toggle
   if action == 'sink' then
     if direction == 'toggle' then
-      -- directly toggle and print the result
-      awful.spawn.easy_async('pamixer -t --get-mute', function(stdout, stderr, reason, exit_code)
-        stdout = stdout:gsub('%s+', '') -- f*king whitespaces
-        if stdout == 'true' then
-          osd.mute()
+      -- Toggle and read both halves of the answer in one call: the mute card
+      -- needs the level too, and fetching it separately let the sink change
+      -- underneath between the two reads.
+      awful.spawn.easy_async('pamixer -t --get-mute --get-volume', function(stdout, stderr, reason, exit_code)
+        local muted = stdout:match('true') ~= nil
+        local volume = tonumber(stdout:match('%d+'))
+        if muted then
+          osd.mute(volume)
         else
-          helpers.async('pamixer --get-volume', function(out) osd.volume(tonumber(out)) end)
+          osd.volume(volume)
         end
       end)
     else

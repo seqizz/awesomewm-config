@@ -1188,18 +1188,15 @@ end)
 
 -- Show OSD notification of current status on volume:change signal
 awesome.connect_signal('volume::change', function()
-  -- check if it's muted first
-  awful.spawn.easy_async('pamixer --get-mute', function(stdout, stderr, reason, exit_code)
-    -- f*king whitespaces
-    stdout = stdout:gsub('%s+', '')
-    if stdout == 'true' then
-      -- muted, only show state
-      osd.mute()
-      return
+  -- Mute flag and level in one call: the mute card shows the level too, and two
+  -- reads can straddle an output switch and mix the two sinks' answers.
+  awful.spawn.easy_async('pamixer --get-mute --get-volume', function(stdout, stderr, reason, exit_code)
+    local muted = stdout:match('true') ~= nil
+    local volume = tonumber(stdout:match('%d+'))
+    if muted then
+      osd.mute(volume)
     else
-      helpers.async('pamixer --get-volume', function(out)
-        osd.volume(tonumber(out))
-      end)
+      osd.volume(volume)
     end
   end)
 end)

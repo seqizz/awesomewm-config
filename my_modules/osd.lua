@@ -226,6 +226,10 @@ local last_screen = nil -- screen the popup was last placed on
 local shown = false
 local hide_timer, hide_done_timer
 
+-- Bumped by every paint. Async work that finishes after a newer event has
+-- already drawn must not repaint with the value it captured when it started.
+local paint_seq = 0
+
 local function set_x(v) popup.x = math.floor(v + 0.5) end
 
 local x_anim, fade_anim, bar_anim
@@ -345,6 +349,17 @@ end
 local SINK_TTL = 5
 local sink_glyph, sink_stamp = nil, 0
 
+-- Only one dump may be in flight: a held-down volume key would otherwise fork a
+-- shell per repeat for an answer that cannot change in between. Everyone who
+-- asked while it ran is answered from the single result.
+local sink_inflight = false
+local sink_waiters = {}
+
+-- Level the volume OSD last painted. The mute card needs a number and cannot
+-- read it back off `bar`: that widget is shared with brightness, and after an
+-- output switch it still holds the previous sink's volume.
+local last_volume = nil
+
 -- Default sink first, then just the Name/Active Port lines of every sink, so
 -- the port of the default one can be looked up without parsing the whole dump.
 -- Level-1 long bracket is mandatory: the grep pattern contains '[[:space:]]',
@@ -374,6 +389,15 @@ local function classify_sink(name, port)
 end
 
 local function refresh_sink(callback)
+  if callback then
+    table.insert(sink_waiters, callback)
+  end
+
+  if sink_inflight then
+    return
+  end
+  sink_inflight = true
+
   awful.spawn.easy_async_with_shell(SINK_CMD, function(out)
     local default, name, port = nil, nil, nil
 
@@ -397,15 +421,21 @@ local function refresh_sink(callback)
 
     sink_glyph = classify_sink(default, port)
     sink_stamp = os.time()
+    sink_inflight = false
 
-    if callback then
-      callback()
+    local waiters = sink_waiters
+    sink_waiters = {}
+    for _, cb in ipairs(waiters) do
+      cb()
     end
   end)
 end
 
--- Called after a manual sink switch (sound-widget popup) so the next OSD does
--- not show the icon of the output that was just left behind.
+-- Hook for a sink switcher running inside awesome: drops the cached icon at the
+-- moment of the switch instead of one OSD later. Nothing calls it right now,
+-- the switchers in use (rofi-pulse-select, pavucontrol) are separate processes
+-- and cannot. That case is covered by osd.volume re-reading the sink whenever
+-- the popup comes up fresh, at the cost of a frame on the old icon.
 function osd.invalidate_sink()
   sink_stamp = 0
 end
@@ -463,6 +493,8 @@ local function show(mode, width, widget)
   local s, geo = osd_target(awful.screen.focused())
   local new_anchor_x = geo.x + geo.width - width - MARGIN_RIGHT
 
+  paint_seq = paint_seq + 1
+
   -- bounds before content: the widget is laid out the moment it is assigned
   apply_width(width)
   popup.widget = widget
@@ -516,7 +548,7 @@ local function show(mode, width, widget)
     end
 
     dbg(string.format(
-      'mode=%s want_w=%d geo=%dx%d+%d+%d opacity=%.2f visible=%s',
+      'mode=%s want_w=%d geo=%dx%d+%d+%d opacity=%.2f visible=%s bar=%.1f/%s clock=%s',
       mode,
       width,
       popup.width,
@@ -524,7 +556,10 @@ local function show(mode, width, widget)
       popup.x,
       popup.y,
       popup.opacity,
-      tostring(popup.visible)
+      tostring(popup.visible),
+      bar.value,
+      bar_anim and tostring(bar_anim.target) or 'no-anim',
+      RUBATO_TIMEOUTS and tostring(next(RUBATO_TIMEOUTS[1])) or 'none'
     ))
 
     return false
@@ -564,27 +599,48 @@ function osd.volume(value)
   -- rounded here: the brightness path hands over a float and '%d' on a
   -- non-integer is an error in Lua 5.3+
   value = math.floor((tonumber(value) or 0) + 0.5)
+  last_volume = value
+
+  local painted_glyph
 
   local function paint()
-    show_level('volume', value, volume_glyph(value), string.format('%d%%', value))
+    painted_glyph = volume_glyph(value)
+    show_level('volume', value, painted_glyph, string.format('%d%%', value))
   end
+
+  -- Read before painting: a popup that is not up yet is the head of a burst,
+  -- and that is exactly when the output may have been switched behind our back
+  -- by something that cannot invalidate the cache. Key repeats inside one burst
+  -- keep hitting the cache, so this still costs one pactl dump per burst.
+  local stale = not shown or os.time() - sink_stamp > SINK_TTL
 
   paint()
 
-  if os.time() - sink_stamp > SINK_TTL then
-    -- Repaint when the answer lands: the popup is still up for ~1s.
+  if stale then
+    local seq = paint_seq
     refresh_sink(function()
-      if shown then
+      -- Two reasons not to repaint: a newer keypress already drew (this closure
+      -- holds the level from when it was armed and would drag the bar
+      -- backwards), or the dump agreed with the icon already on screen. The
+      -- second matters because a repaint reassigns popup.widget, which rebuilds
+      -- the widget hierarchy underneath a bar tween that is still running.
+      if shown and seq == paint_seq and volume_glyph(value) ~= painted_glyph then
         paint()
       end
     end)
   end
 end
 
-function osd.mute()
-  -- Bar keeps its last value, red: mute says nothing about the level, and
-  -- blanking it would read as "volume went to zero".
-  show_level('mute', bar.value, GLYPH.volume_off, 'muted')
+-- value is the level to keep showing behind the mute state. Callers read it in
+-- the same pamixer call that reports the mute flag; last_volume only covers a
+-- mute arriving before any volume OSD this session.
+function osd.mute(value)
+  -- Bar keeps the level, red: mute says nothing about it, and blanking it would
+  -- read as "volume went to zero".
+  value = tonumber(value) or last_volume or 0
+  last_volume = value
+
+  show_level('mute', value, GLYPH.volume_off, 'muted')
 end
 
 function osd.brightness(value)
