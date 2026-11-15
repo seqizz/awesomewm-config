@@ -38,30 +38,28 @@ end
 
 -- Tunables
 local MAX_ENTRIES = 200 -- ring buffer size, also the on-disk trim target
-local VIEWPORT    = 5   -- rows rendered at once; list scrolls inside this
-local TEXT_LIMIT  = 140 -- chars before the message column gets truncated
-local EDGE_MARGIN = dpi(8)   -- gap from the screen edge when placed top right
+local VIEWPORT = 5 -- rows rendered at once; list scrolls inside this
+local TEXT_LIMIT = 140 -- chars before the message column gets truncated
+local EDGE_MARGIN = dpi(8) -- gap from the screen edge when placed top right
 
 -- Row geometry. Every column is forced, and the message column is whatever is
 -- left over, so the popup width is fixed no matter what a notification
 -- contains. Without this a long message makes the textbox request its natural
 -- width and the popup grows off the screen edge.
-local POPUP_WIDTH  = dpi(540)
-local COL_TIME     = dpi(45)
-local COL_APP      = dpi(130)
-local COL_MARK     = dpi(20)  -- the '⏎' raise-target marker
-local ROW_SPACING  = dpi(8)
-local ROW_PADDING  = dpi(10)  -- left/right margin inside a row
-local COL_BODY     = POPUP_WIDTH - COL_TIME - COL_APP - COL_MARK
-                     - (3 * ROW_SPACING) - (2 * ROW_PADDING)
+local POPUP_WIDTH = dpi(540)
+local COL_TIME = dpi(45)
+local COL_APP = dpi(130)
+local COL_MARK = dpi(20) -- the '⏎' raise-target marker
+local ROW_SPACING = dpi(8)
+local ROW_PADDING = dpi(10) -- left/right margin inside a row
+local COL_BODY = POPUP_WIDTH - COL_TIME - COL_APP - COL_MARK - (3 * ROW_SPACING) - (2 * ROW_PADDING)
 
 local CACHE_FILE = gears.filesystem.get_cache_dir() .. 'notification_history'
 
 -- Per-count SVG icons for the wibar badge (numbers/1-square.svg ..
 -- numbers/9-square.svg, numbers/plus-square.svg past nine). Icons are dropped
 -- in by hand; a missing file just renders as an empty slot until it exists.
-local COUNT_ICON_DIR = gears.filesystem.get_configuration_dir()
-  .. 'my_modules/assets/numbers/'
+local COUNT_ICON_DIR = gears.filesystem.get_configuration_dir() .. 'my_modules/assets/numbers/'
 
 -- app_name stamped on this module's own feedback toasts. Recorded notifications
 -- carrying it are dropped, otherwise every "No live client" toast would land in
@@ -78,7 +76,12 @@ local INTERNAL_APP = 'awesome_internal'
 -- Apps whose notification payload is a plaintext secret. Their entries stay in
 -- the in-memory list for the session but are never written to the cache file.
 local NO_PERSIST_APPS = {
-  'rofi%-rbw', 'rbw', 'pass', 'gopass', 'keepassxc', 'bitwarden'
+  'rofi%-rbw',
+  'rbw',
+  'pass',
+  'gopass',
+  'keepassxc',
+  'bitwarden',
 }
 
 -- WM self-chatter: state confirmations that are meaningless once read. Matched
@@ -107,8 +110,12 @@ local DIM = '#928374'
 -- Urgency -> message color. Resolved lazily: this module is required before
 -- beautiful.init() runs in rc.lua, so theme keys are still nil at load time.
 local function urgency_fg(urgency)
-  if urgency == 'low' then return DIM end
-  if urgency == 'critical' then return '#fb4934' end
+  if urgency == 'low' then
+    return DIM
+  end
+  if urgency == 'critical' then
+    return '#fb4934'
+  end
   return beautiful.fg_normal
 end
 
@@ -142,7 +149,9 @@ local function utf8_truncate(s, limit)
     local b = s:byte(i)
     local width = (b < 0x80 and 1) or (b < 0xE0 and 2) or (b < 0xF0 and 3) or 4
     count = count + 1
-    if count > limit then return s:sub(1, i - 1) .. '…' end
+    if count > limit then
+      return s:sub(1, i - 1) .. '…'
+    end
     i = i + width
   end
   return s
@@ -155,7 +164,9 @@ end
 -- otherwise the raw tags/entities show up verbatim once xml_escape() runs on
 -- them a second time at render time.
 local function strip_notification_markup(s)
-  if not s or s == '' then return s end
+  if not s or s == '' then
+    return s
+  end
   s = s:gsub('<br%s*/?>', '\n')
   s = s:gsub('</?[biu]>', '')
   s = s:gsub('</?span[^>]*>', '')
@@ -163,14 +174,16 @@ local function strip_notification_markup(s)
   s = s:gsub('<img%s+[^>]*/?>', '')
   -- &amp; must decode last, or "&amp;lt;" (an escaped literal "&lt;") would
   -- wrongly collapse all the way down to "<".
-  s = s:gsub('&lt;', '<'):gsub('&gt;', '>'):gsub('&quot;', '"'):gsub('&apos;', "'")
+  s = s:gsub('&lt;', '<'):gsub('&gt;', '>'):gsub('&quot;', '"'):gsub('&apos;', '\'')
   s = s:gsub('&amp;', '&')
   return s
 end
 
 -- Collapse a notification body into one displayable line.
 local function oneline(s)
-  if not s or s == '' then return '' end
+  if not s or s == '' then
+    return ''
+  end
   s = s:gsub('%s*\n%s*', ' · '):gsub('%s+', ' ')
   s = s:gsub('^%s*(.-)%s*$', '%1')
   return utf8_truncate(s, TEXT_LIMIT)
@@ -178,23 +191,29 @@ end
 
 local function matches_any(text, patterns)
   for _, p in ipairs(patterns) do
-    if text:lower():find(p) then return true end
+    if text:lower():find(p) then
+      return true
+    end
   end
   return false
 end
 
 local function relative_time(t)
   local d = os.difftime(os.time(), t)
-  if d < 60 then return 'now' end
-  if d < 3600 then return math.floor(d / 60) .. 'm' end
-  if d < 86400 then return math.floor(d / 3600) .. 'h' end
+  if d < 60 then
+    return 'now'
+  end
+  if d < 3600 then
+    return math.floor(d / 60) .. 'm'
+  end
+  if d < 86400 then
+    return math.floor(d / 3600) .. 'h'
+  end
   return math.floor(d / 86400) .. 'd'
 end
 
 -- Single-quote for `sh -c`, safe for newlines and quotes in notification text.
-local function shquote(s)
-  return "'" .. s:gsub("'", "'\\''") .. "'"
-end
+local function shquote(s) return '\'' .. s:gsub('\'', '\'\\\'\'') .. '\'' end
 
 --------------------------------------------------------------------------------
 -- freedesktop activation: a row click says what a popup click says
@@ -240,7 +259,7 @@ end
 -- notification being closed; nothing has needed it so far.
 local NO_HOLD_APPS = {}
 
-local NOTIFY_PATH  = '/org/freedesktop/Notifications'
+local NOTIFY_PATH = '/org/freedesktop/Notifications'
 local NOTIFY_IFACE = 'org.freedesktop.Notifications'
 
 -- A signal only reaches the apps if it comes from the connection that owns
@@ -259,28 +278,33 @@ end
 
 local function emit_notify_signal(name, variant)
   local conn = notify_bus()
-  if not conn then return false end
-  local ok = pcall(function()
-    conn:emit_signal(nil, NOTIFY_PATH, NOTIFY_IFACE, name, variant)
-  end)
-  if not ok then dbg('dbus emit failed: ' .. name) end
+  if not conn then
+    return false
+  end
+  local ok = pcall(function() conn:emit_signal(nil, NOTIFY_PATH, NOTIFY_IFACE, name, variant) end)
+  if not ok then
+    dbg('dbus emit failed: ' .. name)
+  end
   return ok
 end
 
 -- True while this module is holding e's notification id open on behalf of the
 -- app that posted it.
-local function holding(e)
-  return (e and e.dbus_id and e.dbus_open) and true or false
-end
+local function holding(e) return (e and e.dbus_id and e.dbus_open) and true or false end
 
 -- Whether clicking the row can still reach the app that posted it: either the
 -- id is held open here, or naughty still owns a live popup for it.
 local function activatable(e)
-  if not e or not e.dbus_id then return false end
-  if e.dbus_open then return true end
+  if not e or not e.dbus_id then
+    return false
+  end
+  if e.dbus_open then
+    return true
+  end
   local n = e.notification
-  return (n and n._private and not n._private.is_destroyed
-    and not (n._hub_closed or n._hub_veto)) and true or false
+  return (n and n._private and not n._private.is_destroyed and not (n._hub_closed or n._hub_veto))
+      and true
+    or false
 end
 
 -- Report the row as clicked to the app that posted it. Returns whether the
@@ -293,12 +317,13 @@ end
 -- than hand-rolled. The close is marked as this module's so the hub handler
 -- does not report a resolution act_jump is already reporting itself.
 local function dbus_activate(e)
-  if not e or not e.dbus_id then return false end
+  if not e or not e.dbus_id then
+    return false
+  end
 
   if not e.dbus_open then
     local n = e.notification
-    if n and n._private and not n._private.is_destroyed
-       and not (n._hub_closed or n._hub_veto) then
+    if n and n._private and not n._private.is_destroyed and not (n._hub_closed or n._hub_veto) then
       n._hub_closed = true
       n:destroy(naughty_reason.dismissed_by_user)
       return true
@@ -307,27 +332,34 @@ local function dbus_activate(e)
   end
 
   e.dbus_open = false
-  emit_notify_signal('ActionInvoked',
-    GLib.Variant('(us)', { e.dbus_id, 'default' }))
-  emit_notify_signal('NotificationClosed',
-    GLib.Variant('(uu)', { e.dbus_id, naughty_reason.dismissed_by_user }))
+  emit_notify_signal('ActionInvoked', GLib.Variant('(us)', { e.dbus_id, 'default' }))
+  emit_notify_signal(
+    'NotificationClosed',
+    GLib.Variant('(uu)', { e.dbus_id, naughty_reason.dismissed_by_user })
+  )
   dbg('activated notification ' .. tostring(e.dbus_id))
   return true
 end
 
 -- Hand a held id back without claiming anybody acted on it.
 local function dbus_release(e, reason)
-  if not holding(e) then return end
+  if not holding(e) then
+    return
+  end
   e.dbus_open = false
-  emit_notify_signal('NotificationClosed',
-    GLib.Variant('(uu)', { e.dbus_id, reason or naughty_reason.expired }))
+  emit_notify_signal(
+    'NotificationClosed',
+    GLib.Variant('(uu)', { e.dbus_id, reason or naughty_reason.expired })
+  )
 end
 
 -- Entries are removed from the list by value, so identity is the only way to
 -- ask whether a given row is still readable.
 local function entry_is_live(e)
   for i = 1, #entries do
-    if entries[i] == e then return true end
+    if entries[i] == e then
+      return true
+    end
   end
   return false
 end
@@ -337,7 +369,7 @@ end
 -- ends the notification, and its close goes out untouched.
 local HOLD_REASONS = {
   [naughty_reason.expired] = true,
-  [naughty_reason.silent]  = true, -- right click on the popup: hide, do not act
+  [naughty_reason.silent] = true, -- right click on the popup: hide, do not act
 }
 
 -- Withhold the dbus close for `n` so `e` can still invoke its default action.
@@ -362,22 +394,28 @@ local HOLD_REASONS = {
 -- callback that leaves the real method untouched.
 local function hold_open(n, e)
   local inner = rawget(n, 'destroy')
-  if type(inner) ~= 'function' then return end
+  if type(inner) ~= 'function' then
+    return
+  end
 
   rawset(n, 'destroy', function(self, reason, keep_visible)
-    local hold = HOLD_REASONS[reason]
-      and not (self._hub_closed or self._hub_veto)
-      and entry_is_live(e)
-    if not hold then return inner(self, reason, keep_visible) end
+    local hold = HOLD_REASONS[reason] and not (self._hub_closed or self._hub_veto) and entry_is_live(e)
+    if not hold then
+      return inner(self, reason, keep_visible)
+    end
 
     local real = self._private.id
     self._private.id = nnotif._gen_next_id()
     local ok, res = pcall(inner, self, reason, keep_visible)
     self._private.id = real
-    if not ok then error(res, 0) end
+    if not ok then
+      error(res, 0)
+    end
     -- Only a destroy that actually ran swallowed a close worth replacing; a
     -- repeat destroy returns false and its close went out long ago.
-    if res then e.dbus_open = true end
+    if res then
+      e.dbus_open = true
+    end
     return res
   end)
 end
@@ -398,10 +436,10 @@ end
 -- The call is synchronous and blocks awesome's main loop up to HUB_TIMEOUT
 -- seconds per notification. That is the price of deciding before display;
 -- the budget is bounded on purpose and on a LAN the round trip is a few ms.
-local HUB_URL      = 'http://bother.bigchung.us'
-local HUB_TOKEN    = 'ANANASOR4'
-local HUB_TIMEOUT  = 2     -- seconds, tolerance budget for the hub answer
-local HUB_PRE_SHOW = true  -- false = ask the hub but never veto display
+local HUB_URL = 'http://bother.bigchung.us'
+local HUB_TOKEN = 'ANANASOR4'
+local HUB_TIMEOUT = 2 -- seconds, tolerance budget for the hub answer
+local HUB_PRE_SHOW = true -- false = ask the hub but never veto display
 
 -- Scope for native notification ids. naughty numbers notifications with a
 -- counter that restarts at 1 with the WM, while a hub instance now stays open
@@ -412,8 +450,7 @@ local HUB_PRE_SHOW = true  -- false = ask the hub but never veto display
 --
 -- The timestamp alone collides on a quick restart (Win+Ctrl+R twice within a
 -- second), so mix in a table address: ASLR makes it differ between processes.
-local HUB_SESSION = tostring(os.time()) .. '-'
-  .. (tostring({}):match('0x(%x+)') or '0')
+local HUB_SESSION = tostring(os.time()) .. '-' .. (tostring({}):match('0x(%x+)') or '0')
 
 -- Generation for the next posting (SPEC 1). The hub requires a value that
 -- strictly increases per native id, and uses it to tell one posting under a
@@ -441,7 +478,9 @@ end
 -- reconcile falling back to content matching on every row.
 local hub_device_cached
 local function hub_device()
-  if hub_device_cached then return hub_device_cached end
+  if hub_device_cached then
+    return hub_device_cached
+  end
   hub_device_cached = hostname
   if not hub_device_cached or hub_device_cached == '' then
     local f = io.popen('uname -n')
@@ -472,19 +511,29 @@ local REMOTE_NOTIFICATIONS = 'popup'
 -- is flat strings, so hand-rolling beats adding a dependency.
 local function json_escape(s)
   s = tostring(s or '')
-  return (s:gsub('[%c"\\]', function(c)
-    if c == '"' then return '\\"' end
-    if c == '\\' then return '\\\\' end
-    if c == '\n' then return '\\n' end
-    if c == '\r' then return '\\r' end
-    if c == '\t' then return '\\t' end
-    return string.format('\\u%04x', c:byte())
-  end))
+  return (
+    s:gsub('[%c"\\]', function(c)
+      if c == '"' then
+        return '\\"'
+      end
+      if c == '\\' then
+        return '\\\\'
+      end
+      if c == '\n' then
+        return '\\n'
+      end
+      if c == '\r' then
+        return '\\r'
+      end
+      if c == '\t' then
+        return '\\t'
+      end
+      return string.format('\\u%04x', c:byte())
+    end)
+  )
 end
 
-local function json_str(s)
-  return '"' .. json_escape(s) .. '"'
-end
+local function json_str(s) return '"' .. json_escape(s) .. '"' end
 
 -- Synchronous hub call. curl owns the timeouts so a wedged hub can never
 -- hang the WM past the budget. Returns the response body or nil on failure.
@@ -499,10 +548,14 @@ local function hub_request(path, body_json)
     shquote(HUB_URL .. path),
   }, ' ')
   local f = io.popen(cmd, 'r')
-  if not f then return nil end
+  if not f then
+    return nil
+  end
   local out = f:read('*a')
   f:close()
-  if not out or out:sub(1, 1) ~= '{' then return nil end
+  if not out or out:sub(1, 1) ~= '{' then
+    return nil
+  end
   return out
 end
 
@@ -511,12 +564,20 @@ end
 -- up while the hub is down.
 local function hub_report_async(path, body_json)
   awful.spawn.easy_async({
-    'curl', '-sS',
-    '--connect-timeout', '3', '--max-time', '5',
-    '-X', 'POST',
-    '-H', 'Authorization: Bearer ' .. HUB_TOKEN,
-    '-H', 'Content-Type: application/json',
-    '-d', body_json or '',
+    'curl',
+    '-sS',
+    '--connect-timeout',
+    '3',
+    '--max-time',
+    '5',
+    '-X',
+    'POST',
+    '-H',
+    'Authorization: Bearer ' .. HUB_TOKEN,
+    '-H',
+    'Content-Type: application/json',
+    '-d',
+    body_json or '',
     HUB_URL .. path,
   }, function() end)
 end
@@ -535,17 +596,22 @@ end
 --
 -- Returns false for a row with no posting of its own, which is what an echo is.
 local function hub_event(e, ended, platform)
-  if not (e and e.hub_native and e.hub_generation) then return false end
-  hub_report_async('/api/v1/events', table.concat({
-    '{"device_id":' .. json_str(hub_device()),
-    ',"events":[{',
-    '"native_id":' .. json_str(e.hub_native),
-    ',"generation":' .. tostring(e.hub_generation),
-    ',"ended":' .. json_str(ended),
-    ',"at":' .. json_str(os.date('!%Y-%m-%dT%H:%M:%SZ')),
-    platform and (',"platform_reason":' .. json_str(platform)) or '',
-    '}]}',
-  }))
+  if not (e and e.hub_native and e.hub_generation) then
+    return false
+  end
+  hub_report_async(
+    '/api/v1/events',
+    table.concat({
+      '{"device_id":' .. json_str(hub_device()),
+      ',"events":[{',
+      '"native_id":' .. json_str(e.hub_native),
+      ',"generation":' .. tostring(e.hub_generation),
+      ',"ended":' .. json_str(ended),
+      ',"at":' .. json_str(os.date('!%Y-%m-%dT%H:%M:%SZ')),
+      platform and (',"platform_reason":' .. json_str(platform)) or '',
+      '}]}',
+    })
+  )
   return true
 end
 
@@ -554,9 +620,10 @@ end
 -- one is a full ending for everybody, because the hub can cancel a notification
 -- on a device but never create one (D-47).
 local function hub_end_logical(logical_id, cause)
-  if not logical_id or logical_id == '' then return end
-  hub_report_async('/api/v1/notifications/' .. logical_id .. '/end',
-    '{"cause":' .. json_str(cause) .. '}')
+  if not logical_id or logical_id == '' then
+    return
+  end
+  hub_report_async('/api/v1/notifications/' .. logical_id .. '/end', '{"cause":' .. json_str(cause) .. '}')
 end
 
 -- Evict entries past MAX_ENTRIES, telling the hub about each one.
@@ -594,12 +661,17 @@ end
 -- Bulk ending for "clear history": one request instead of one curl per entry
 -- (the hub caps it at 500 ids per call).
 local function hub_bulk_end(logical_ids)
-  if #logical_ids == 0 then return end
+  if #logical_ids == 0 then
+    return
+  end
   local parts = {}
-  for _, id in ipairs(logical_ids) do parts[#parts + 1] = json_str(id) end
-  hub_report_async('/api/v1/notifications/end-many',
-    '{"cause":"user_dismiss","logical_ids":['
-      .. table.concat(parts, ',') .. ']}')
+  for _, id in ipairs(logical_ids) do
+    parts[#parts + 1] = json_str(id)
+  end
+  hub_report_async(
+    '/api/v1/notifications/end-many',
+    '{"cause":"user_dismiss","logical_ids":[' .. table.concat(parts, ',') .. ']}'
+  )
 end
 
 -- Async POST that hands the response body back. Used by the reconcile probe,
@@ -607,64 +679,95 @@ end
 -- string should carry (AGENTS.md 11.2).
 local function hub_post_async(path, body_json, cb)
   awful.spawn.easy_async({
-    'curl', '-sS',
-    '--connect-timeout', '3', '--max-time', '10',
-    '-X', 'POST',
-    '-H', 'Authorization: Bearer ' .. HUB_TOKEN,
-    '-H', 'Content-Type: application/json',
-    '-d', body_json,
+    'curl',
+    '-sS',
+    '--connect-timeout',
+    '3',
+    '--max-time',
+    '10',
+    '-X',
+    'POST',
+    '-H',
+    'Authorization: Bearer ' .. HUB_TOKEN,
+    '-H',
+    'Content-Type: application/json',
+    '-d',
+    body_json,
     HUB_URL .. path,
   }, function(out)
-    if out and out:sub(1, 1) == '{' then cb(out) else cb(nil) end
+    if out and out:sub(1, 1) == '{' then
+      cb(out)
+    else
+      cb(nil)
+    end
   end)
 end
 
 -- The API responses are flat JSON objects; pattern extraction is enough.
-local function parse_field(json, field)
-  return json:match('"' .. field .. '":"([^"]*)"')
+local function parse_field(json, field) return json:match('"' .. field .. '":"([^"]*)"') end
+
+-- Body of one ingest request (SPEC 7.1). `f.time` is when the notification
+-- was displayed, which is now for a live arrival and the row's own time for a
+-- late one.
+local function ingest_body(f)
+  local urgency = f.urgency or 'normal'
+  if urgency == 'critical' then
+    urgency = 'high'
+  end
+  return table.concat({
+    '{',
+    '"device_id":' .. json_str(hub_device()),
+    ',"client_type":"linux"',
+    ',"mode":' .. json_str(f.mode),
+    ',"native_id":' .. json_str(tostring(f.native_id)),
+    ',"generation":' .. tostring(f.generation),
+    ',"app":' .. json_str(f.app),
+    ',"app_name":' .. json_str(f.app_name or f.app),
+    ',"title":' .. json_str(f.title),
+    ',"body":' .. json_str(f.text),
+    ',"urgency":' .. json_str(urgency),
+    ',"timestamp":' .. json_str(os.date('!%Y-%m-%dT%H:%M:%SZ', f.time)),
+    ',"dismissable":true',
+    ',"raw":{}',
+    '}',
+  })
 end
 
 -- Ask the hub about one notification. Returns a metadata table
 -- (decision/reason/logical_id/instance_id) or nil when the hub is
 -- unreachable or answered garbage.
 local function hub_ingest(n, title, text, app, args)
-  local native_id = HUB_SESSION .. ':'
-    .. tostring((args and args.id) or n.id or tostring(n))
+  local native_id = HUB_SESSION .. ':' .. tostring((args and args.id) or n.id or tostring(n))
   local generation = next_generation()
-  local urgency = n.urgency or 'normal'
-  if urgency == 'critical' then urgency = 'high' end
-  local body = table.concat({
-    '{',
-    '"device_id":' .. json_str(hub_device()),
-    ',"client_type":"linux"',
-    ',"mode":"pre_show"',
-    ',"native_id":' .. json_str(tostring(native_id)),
-    ',"generation":' .. tostring(generation),
-    ',"app":' .. json_str(app),
-    ',"app_name":' .. json_str((args and args.app_name) or n.app_name or app),
-    ',"title":' .. json_str(title),
-    ',"body":' .. json_str(text),
-    ',"urgency":' .. json_str(urgency),
-    ',"timestamp":' .. json_str(os.date('!%Y-%m-%dT%H:%M:%SZ')),
-    ',"dismissable":true',
-    ',"raw":{}',
-    '}',
+  local body = ingest_body({
+    mode = 'pre_show',
+    native_id = native_id,
+    generation = generation,
+    app = app,
+    app_name = (args and args.app_name) or n.app_name,
+    title = title,
+    text = text,
+    urgency = n.urgency,
   })
   local out = hub_request('/api/v1/ingest', body)
-  if not out then return nil end
+  if not out then
+    return nil
+  end
   local meta = {
-    decision    = parse_field(out, 'decision'),
-    reason      = parse_field(out, 'reason'),
-    logical_id  = parse_field(out, 'logical_id'),
+    decision = parse_field(out, 'decision'),
+    reason = parse_field(out, 'reason'),
+    logical_id = parse_field(out, 'logical_id'),
     instance_id = parse_field(out, 'instance_id'),
-    native_id   = native_id,
-    generation  = generation,
+    native_id = native_id,
+    generation = generation,
     -- Whether the hub already announced this notification to the devices
     -- without it, this one included. It replaces the table this client used to
     -- keep of what it had echoed (D-67).
-    echoed      = out:match('"echoed":true') ~= nil,
+    echoed = out:match('"echoed":true') ~= nil,
   }
-  if not meta.decision then return nil end
+  if not meta.decision then
+    return nil
+  end
   return meta
 end
 
@@ -681,7 +784,9 @@ local count_image
 local count_tooltip
 
 local function ensure_count_widget()
-  if count_widget then return count_widget end
+  if count_widget then
+    return count_widget
+  end
 
   count_image = wibox.widget.imagebox()
   count_image.resize = true
@@ -692,14 +797,10 @@ local function ensure_count_widget()
   count_image.stylesheet = my_utils.svg_stylesheet(beautiful.fg_normal, 'stroke')
 
   local background_container = wibox.container.background(count_image)
-  background_container.shape = function(cr, width, height)
-    gears.shape.rounded_rect(cr, width, height, dpi(4))
-  end
+  background_container.shape = function(cr, width, height) gears.shape.rounded_rect(cr, width, height, dpi(4)) end
 
-  count_widget = wibox.container.margin(
-    background_container, dpi(1), nil, nil, dpi(2)
-  )
-  count_tooltip = awful.tooltip { objects = { count_widget }, text = '' }
+  count_widget = wibox.container.margin(background_container, dpi(1), nil, nil, dpi(2))
+  count_tooltip = awful.tooltip({ objects = { count_widget }, text = '' })
 
   count_widget:buttons(gears.table.join(
     awful.button({}, 1, function() notification_history.toggle() end),
@@ -714,11 +815,15 @@ end
 -- keeps its label up over the popup the click just opened. It reappears on the
 -- next mouse::enter, which needs the pointer to leave the badge first.
 local function hide_count_tooltip()
-  if count_tooltip then count_tooltip.visible = false end
+  if count_tooltip then
+    count_tooltip.visible = false
+  end
 end
 
 local function refresh_count_widget()
-  if not count_widget then return end
+  if not count_widget then
+    return
+  end
 
   local n = #entries
   if n == 0 then
@@ -740,12 +845,10 @@ local function refresh_count_widget()
 
   -- Update tooltip based on unread state
   if has_unseen then
-    count_tooltip.text = n .. ' notification' .. (n == 1 and '' or 's')
-      .. ' (including unread) in history'
+    count_tooltip.text = n .. ' notification' .. (n == 1 and '' or 's') .. ' (including unread) in history'
     count_widget.widget.bg = beautiful.warning_bg
   else
-    count_tooltip.text = n .. ' notification' .. (n == 1 and '' or 's')
-      .. ' in history'
+    count_tooltip.text = n .. ' notification' .. (n == 1 and '' or 's') .. ' in history'
     count_widget.widget.bg = nil
   end
 
@@ -758,21 +861,27 @@ end
 
 -- Fields are tab separated; escape so a payload can never forge a field or a
 -- record boundary. Backslash first, otherwise the other escapes get mangled.
-local function esc(s)
-  return (tostring(s or ''):gsub('\\', '\\\\'):gsub('\t', '\\t'):gsub('\n', '\\n'))
-end
+local function esc(s) return (tostring(s or ''):gsub('\\', '\\\\'):gsub('\t', '\\t'):gsub('\n', '\\n')) end
 
 local function unesc(s)
-  return (s:gsub('\\(.)', function(c)
-    if c == 't' then return '\t' end
-    if c == 'n' then return '\n' end
-    return c
-  end))
+  return (
+    s:gsub('\\(.)', function(c)
+      if c == 't' then
+        return '\t'
+      end
+      if c == 'n' then
+        return '\n'
+      end
+      return c
+    end)
+  )
 end
 
 -- Optional cache column: a missing or empty field is "not set", not "".
 local function unesc_optional(s)
-  if not s or s == '' then return nil end
+  if not s or s == '' then
+    return nil
+  end
   return unesc(s)
 end
 
@@ -796,8 +905,14 @@ end
 -- matching, which drops recurring notifications against their own older twins.
 local function serialize(e)
   return table.concat({
-    tostring(e.time), esc(e.urgency), esc(e.app), esc(e.title), esc(e.text),
-    tostring(e.seen or false), esc(e.hub_logical or ''), esc(e.hub_instance or ''),
+    tostring(e.time),
+    esc(e.urgency),
+    esc(e.app),
+    esc(e.title),
+    esc(e.text),
+    tostring(e.seen or false),
+    esc(e.hub_logical or ''),
+    esc(e.hub_instance or ''),
     -- Persisted for the same reason the ids are: without it a restored entry
     -- the hub was told to ignore turns into an ordinary id-less row and goes
     -- back to being matched by content.
@@ -811,64 +926,80 @@ local function serialize(e)
     -- never named in a sync, which is the same place a fail-open row sits.
     esc(e.hub_native or ''),
     tostring(e.hub_generation or 0),
+    -- The hub said it does not track this row (forget_ids). Persisted because
+    -- an id-less row is otherwise indistinguishable from one the hub never
+    -- heard of, and that one is offered to the hub again on every sync.
+    tostring(e.hub_untracked or false),
   }, '\t')
 end
 
-local function persistable(e)
-  return not matches_any(e.app, NO_PERSIST_APPS)
-end
+local function persistable(e) return not matches_any(e.app, NO_PERSIST_APPS) end
 
 -- Rewrite the whole cache file. Used after delete/clear and on load-trim; the
 -- hot path (a new notification) only appends.
 local function flush_cache()
   local f = io.open(CACHE_FILE, 'w')
-  if not f then return end
+  if not f then
+    return
+  end
   -- Oldest first on disk so a plain `tail` on the file reads chronologically.
   for i = #entries, 1, -1 do
-    if persistable(entries[i]) then f:write(serialize(entries[i]), '\n') end
+    if persistable(entries[i]) then
+      f:write(serialize(entries[i]), '\n')
+    end
   end
   f:close()
 end
 
 local function append_cache(e)
-  if not persistable(e) then return end
+  if not persistable(e) then
+    return
+  end
   local f = io.open(CACHE_FILE, 'a')
-  if not f then return end
+  if not f then
+    return
+  end
   f:write(serialize(e), '\n')
   f:close()
 end
 
 local function load_cache()
   local f = io.open(CACHE_FILE, 'r')
-  if not f then return end
+  if not f then
+    return
+  end
   local loaded = {}
   for line in f:lines() do
     local fields = split_tabs(line)
     if #fields >= 5 and tonumber(fields[1]) then
       -- Prepend: file is oldest-first, entries[] is newest-first.
       table.insert(loaded, 1, {
-        time    = tonumber(fields[1]),
+        time = tonumber(fields[1]),
         urgency = unesc(fields[2]),
-        app     = unesc(fields[3]),
-        title   = unesc(fields[4]),
-        text    = unesc(fields[5]),
-        seen    = (fields[6] or 'false') == 'true',
+        app = unesc(fields[3]),
+        title = unesc(fields[4]),
+        text = unesc(fields[5]),
+        seen = (fields[6] or 'false') == 'true',
         -- Absent in cache files written before the ids were persisted, so
         -- these stay nil for old lines and the content fallback still covers
         -- them.
-        hub_logical  = unesc_optional(fields[7]),
+        hub_logical = unesc_optional(fields[7]),
         hub_instance = unesc_optional(fields[8]),
         -- Absent on older lines too, which reads as false: a row written
         -- before ignore rules existed cannot have been ignored.
-        hub_ignored  = (fields[9] or 'false') == 'true',
+        hub_ignored = (fields[9] or 'false') == 'true',
         -- Same for the origin marker; an old line is assumed local, which is
         -- what every line written before echoes existed actually was.
-        remote       = (fields[10] or 'false') == 'true',
+        remote = (fields[10] or 'false') == 'true',
         -- Absent on every line written before generations. A row restored
         -- without one keeps its logical id but can no longer be reported
         -- against, so it is left out of `holding` and ages out of the ring.
-        hub_native     = unesc_optional(fields[11]),
+        hub_native = unesc_optional(fields[11]),
         hub_generation = tonumber(fields[12]),
+        -- Absent on older lines, which reads as false. Such a row is offered
+        -- to the hub once more; the worst case is one the hub had dropped on
+        -- purpose becoming tracked again.
+        hub_untracked = (fields[13] or 'false') == 'true',
       })
     end
   end
@@ -886,8 +1017,8 @@ end
 --------------------------------------------------------------------------------
 
 local popup
-local grabber_func   -- installed raw keygrabber callback, nil while not grabbing
-local focus_handler  -- dismiss signals, connected on show, disconnected on hide
+local grabber_func -- installed raw keygrabber callback, nil while not grabbing
+local focus_handler -- dismiss signals, connected on show, disconnected on hide
 
 -- Signals meaning "the user went somewhere else", so the popup should get out
 -- of the way.
@@ -905,7 +1036,9 @@ local focus_handler  -- dismiss signals, connected on show, disconnected on hide
 local DISMISS_SIGNALS = { 'focus', 'request::activate' }
 
 local function disconnect_dismiss()
-  if not focus_handler then return end
+  if not focus_handler then
+    return
+  end
   for _, sig in ipairs(DISMISS_SIGNALS) do
     client.disconnect_signal(sig, focus_handler)
   end
@@ -937,13 +1070,13 @@ local function place_top_right(d)
   local s = awful.screen.focused()
   local wibar_h = s.geometry.height - s.workarea.height
   awful.placement.top_right(d, {
-    parent         = s,
+    parent = s,
     honor_workarea = true,
-    margins        = {
-      top    = wibar_h + dpi(5),
-      right  = EDGE_MARGIN,
+    margins = {
+      top = wibar_h + dpi(5),
+      right = EDGE_MARGIN,
       bottom = EDGE_MARGIN,
-      left   = EDGE_MARGIN,
+      left = EDGE_MARGIN,
     },
   })
 end
@@ -967,28 +1100,30 @@ end
 -- Built on first use, not at require time: beautiful.init() has not run yet
 -- when rc.lua requires this module.
 local function ensure_popup()
-  if popup then return popup end
-  popup = awful.popup {
-    ontop         = true,
-    visible       = false,
-    shape         = gears.shape.rounded_rect,
-    border_width  = dpi(1),
-    border_color  = beautiful.border_focus,
-    bg            = beautiful.bg_normal,
+  if popup then
+    return popup
+  end
+  popup = awful.popup({
+    ontop = true,
+    visible = false,
+    shape = gears.shape.rounded_rect,
+    border_width = dpi(1),
+    border_color = beautiful.border_focus,
+    bg = beautiful.bg_normal,
     maximum_width = POPUP_WIDTH,
     minimum_width = POPUP_WIDTH,
-    placement     = place_top_right,
-    widget        = wibox.widget.textbox(''),
-  }
+    placement = place_top_right,
+    widget = wibox.widget.textbox(''),
+  })
   return popup
 end
 
 local function label(text, fg, width, ellipsize)
   return {
-    markup       = '<span foreground="' .. fg .. '">' .. gears.string.xml_escape(text) .. '</span>',
+    markup = '<span foreground="' .. fg .. '">' .. gears.string.xml_escape(text) .. '</span>',
     forced_width = width,
-    ellipsize    = ellipsize or 'end',
-    widget       = wibox.widget.textbox,
+    ellipsize = ellipsize or 'end',
+    widget = wibox.widget.textbox,
   }
 end
 
@@ -1011,7 +1146,7 @@ local function make_row(e, index)
   -- says so up front rather than after the fact.
   local app_label = e.remote and ('[R] ' .. e.app) or e.app
 
-  local row = wibox.widget {
+  local row = wibox.widget({
     {
       {
         label(relative_time(e.time), is_sel and beautiful.fg_normal_alt or DIM, COL_TIME),
@@ -1020,21 +1155,29 @@ local function make_row(e, index)
         -- Marker for entries a click still gets somewhere: either the source
         -- window is alive to raise, or the app still holds the notification
         -- and can be told to act on it.
-        label(((e.client and e.client.valid) or activatable(e)) and '⏎' or '',
-          DIM, COL_MARK),
+        label(((e.client and e.client.valid) or activatable(e)) and '⏎' or '', DIM, COL_MARK),
         spacing = ROW_SPACING,
-        layout  = wibox.layout.fixed.horizontal,
+        layout = wibox.layout.fixed.horizontal,
       },
-      left = ROW_PADDING, right = ROW_PADDING, top = dpi(3), bottom = dpi(3),
+      left = ROW_PADDING,
+      right = ROW_PADDING,
+      top = dpi(3),
+      bottom = dpi(3),
       widget = wibox.container.margin,
     },
-    bg     = is_sel and beautiful.bg_focus or beautiful.bg_normal,
+    bg = is_sel and beautiful.bg_focus or beautiful.bg_normal,
     widget = wibox.container.background,
-  }
+  })
 
   row:buttons(gears.table.join(
-    awful.button({}, 1, function() selected = index; act_jump() end),
-    awful.button({}, 3, function() selected = index; act_delete() end)
+    awful.button({}, 1, function()
+      selected = index
+      act_jump()
+    end),
+    awful.button({}, 3, function()
+      selected = index
+      act_delete()
+    end)
   ))
 
   return row
@@ -1043,56 +1186,78 @@ end
 -- Announce an empty list instead of rendering an empty popup. A popup with no
 -- rows has nothing to constrain its layout and ends up mis-sized off-screen.
 local function toast_empty()
-  naughty.notification {
+  naughty.notification({
     app_name = SELF_APP,
-    text     = 'No notifications in history',
-    timeout  = 2,
-  }
+    text = 'No notifications in history',
+    timeout = 2,
+  })
 end
 
 render = function()
   -- Callers must not render an empty list; show()/act_delete()/act_clear()
   -- close the popup and toast instead.
-  if #entries == 0 then return end
+  if #entries == 0 then
+    return
+  end
 
-  if selected < 1 then selected = 1 end
-  if selected > #entries then selected = #entries end
+  if selected < 1 then
+    selected = 1
+  end
+  if selected > #entries then
+    selected = #entries
+  end
   -- Keep the selection inside the viewport window.
-  if selected <= offset then offset = selected - 1 end
-  if selected > offset + VIEWPORT then offset = selected - VIEWPORT end
-  if offset < 0 then offset = 0 end
+  if selected <= offset then
+    offset = selected - 1
+  end
+  if selected > offset + VIEWPORT then
+    offset = selected - VIEWPORT
+  end
+  if offset < 0 then
+    offset = 0
+  end
 
   local rows = { layout = wibox.layout.fixed.vertical }
   for i = offset + 1, math.min(offset + VIEWPORT, #entries) do
     table.insert(rows, make_row(entries[i], i))
   end
 
-  local header = string.format('Notifications  %d/%d   ·   %s', selected, #entries,
-    hub_connected and 'hub ✓' or 'hub ✗')
+  local header = string.format(
+    'Notifications  %d/%d   ·   %s',
+    selected,
+    #entries,
+    hub_connected and 'hub ✓' or 'hub ✗'
+  )
   local footer = 'j/k move · ⏎ open · y yank · d drop · C clear · click row · Esc/q close'
 
-  ensure_popup():setup {
+  ensure_popup():setup({
     {
       {
         label(header, beautiful.fg_normal_alt, nil),
-        left = dpi(10), right = dpi(10), top = dpi(6), bottom = dpi(6),
+        left = dpi(10),
+        right = dpi(10),
+        top = dpi(6),
+        bottom = dpi(6),
         widget = wibox.container.margin,
       },
-      bg     = beautiful.bg_focus,
+      bg = beautiful.bg_focus,
       widget = wibox.container.background,
     },
     rows,
     {
       {
         label(footer, DIM, nil),
-        left = dpi(10), right = dpi(10), top = dpi(4), bottom = dpi(4),
+        left = dpi(10),
+        right = dpi(10),
+        top = dpi(4),
+        bottom = dpi(4),
         widget = wibox.container.margin,
       },
-      bg     = beautiful.bg_focus,
+      bg = beautiful.bg_focus,
       widget = wibox.container.background,
     },
     layout = wibox.layout.fixed.vertical,
-  }
+  })
 end
 
 --------------------------------------------------------------------------------
@@ -1105,7 +1270,9 @@ function notification_history.hide()
     grabber_func = nil
   end
   disconnect_dismiss()
-  if popup then popup.visible = false end
+  if popup then
+    popup.visible = false
+  end
 end
 
 -- Clicking a row says the same thing as clicking the popup it came from: you
@@ -1125,7 +1292,9 @@ end
 -- difference between "I went and looked" and "I do not need this".
 act_jump = function()
   local e = entries[selected]
-  if not e then return end
+  if not e then
+    return
+  end
   local target = (e.client and e.client.valid) and e.client or nil
 
   -- Before close_live, which would otherwise release the id as a plain
@@ -1154,11 +1323,11 @@ act_jump = function()
   if activated then
     return notification_history.hide()
   end
-  naughty.notification {
+  naughty.notification({
     app_name = SELF_APP,
-    text     = 'No live client - dismissed',
-    timeout  = 2,
-  }
+    text = 'No live client - dismissed',
+    timeout = 2,
+  })
   if #entries == 0 then
     return notification_history.hide()
   end
@@ -1169,7 +1338,9 @@ end
 
 local function act_yank()
   local e = entries[selected]
-  if not e then return end
+  if not e then
+    return
+  end
   local payload = (e.title ~= '' and e.text ~= '') and (e.title .. ': ' .. e.text) or (e.title .. e.text)
   awful.spawn.with_shell('printf %s ' .. shquote(payload) .. ' | xclip -selection clipboard')
   notification_history.hide()
@@ -1177,7 +1348,9 @@ end
 
 act_delete = function()
   local e = entries[selected]
-  if not e then return end
+  if not e then
+    return
+  end
   -- Dropping a row means "gone everywhere": the hub ends the logical and the
   -- other devices drop their copies. Entries shown while the hub was offline
   -- have no ids and stay local-only.
@@ -1205,7 +1378,9 @@ local function act_clear()
   -- request, the hub broadcasts the dismiss events from there.
   local ids = {}
   for _, e in ipairs(entries) do
-    if e.hub_logical then ids[#ids + 1] = e.hub_logical end
+    if e.hub_logical then
+      ids[#ids + 1] = e.hub_logical
+    end
   end
   hub_bulk_end(ids)
   -- Detach first, then close: the 'destroyed' handler must not double-report
@@ -1235,7 +1410,11 @@ end
 -- popup open with no keys and no way to close it.
 local function handle_key(mod, key)
   local has_shift = false
-  for _, m in ipairs(mod) do if m == 'Shift' then has_shift = true end end
+  for _, m in ipairs(mod) do
+    if m == 'Shift' then
+      has_shift = true
+    end
+  end
 
   if key == 'j' or key == 'Down' then
     selected = selected + 1
@@ -1269,9 +1448,13 @@ end
 -- Install the global keygrab. Only handles 'press' events, so the key release
 -- of the opening Win+n (grabber is installed during that press) is ignored.
 local function grab_keys()
-  if grabber_func then return end
+  if grabber_func then
+    return
+  end
   grabber_func = function(mod, key, event)
-    if event ~= 'press' then return end
+    if event ~= 'press' then
+      return
+    end
     if key == 'Escape' or key == 'q' or key == 'n' then
       return notification_history.hide()
     end
@@ -1308,8 +1491,8 @@ end
 -- 'destroyed' handler report immediately rather than waiting for the next
 -- pass, because a cross-device cancel should land in a second.
 
-local SYNC_INTERVAL = 60  -- sync every N seconds
-local SYNC_LIMIT    = 500 -- hub's per-call cap on `holding`; MAX_ENTRIES is below it
+local SYNC_INTERVAL = 60 -- sync every N seconds
+local SYNC_LIMIT = 500 -- hub's per-call cap on `holding`; MAX_ENTRIES is below it
 
 local debug = false -- flip to true to trace hub sync activity
 
@@ -1367,7 +1550,9 @@ local function drop_matching(pred, why)
       removed = removed + 1
     end
   end
-  if removed == 0 then return end
+  if removed == 0 then
+    return
+  end
   flush_cache()
   refresh_count_widget()
   if popup and popup.visible then
@@ -1409,9 +1594,9 @@ end
 -- is the only thing that ever crosses the pipe. No bodies, no unrelated
 -- traffic, nothing worth logging.
 local CLOSE_MATCH = table.concat({
-  "type='method_call'",
-  "interface='" .. NOTIFY_IFACE .. "'",
-  "member='CloseNotification'",
+  'type=\'method_call\'',
+  'interface=\'' .. NOTIFY_IFACE .. '\'',
+  'member=\'CloseNotification\'',
 }, ',')
 
 -- Act on a withdrawal of `id`, if this module is the one holding that id.
@@ -1432,8 +1617,7 @@ local function app_withdrew(id)
       -- not for this one, so it goes out here, ahead of the plain expiry
       -- release that drop_matching -> close_live would otherwise reach for.
       dbus_release(e, naughty_reason.dismissed_by_command)
-      drop_matching(function(x) return x == e end,
-        'app withdrew held id ' .. tostring(id))
+      drop_matching(function(x) return x == e end, 'app withdrew held id ' .. tostring(id))
       return
     end
   end
@@ -1445,15 +1629,21 @@ end
 local pending_close = false
 
 local function monitor_line(line)
-  if line == '' then return end
+  if line == '' then
+    return
+  end
   if not line:match('^%s') then
     pending_close = line:match('^method call ') ~= nil
       and line:find('member=CloseNotification', 1, true) ~= nil
     return
   end
-  if not pending_close then return end
+  if not pending_close then
+    return
+  end
   local id = line:match('^%s*uint32%s+(%d+)%s*$')
-  if not id then return end
+  if not id then
+    return
+  end
   pending_close = false
   app_withdrew(tonumber(id))
 end
@@ -1466,24 +1656,27 @@ local function start_close_monitor()
   monitor_gen = monitor_gen + 1
   local my_gen = monitor_gen
   pending_close = false
-  local pid = awful.spawn.with_line_callback(
-    { 'dbus-monitor', '--session', CLOSE_MATCH },
-    {
-      stdout = function(line)
-        if my_gen ~= monitor_gen then return end
-        monitor_line(line)
-      end,
-      stderr = function() end, -- the bus-address banner and its warnings
-      exit = function(reason, code)
-        if my_gen ~= monitor_gen then return end
-        dbg('CloseNotification monitor exit (' .. tostring(reason) .. '/'
-          .. tostring(code) .. '), restarting')
-        gears.timer.start_new(10, function()
-          if my_gen == monitor_gen then start_close_monitor() end
-          return false
-        end)
-      end,
-    })
+  local pid = awful.spawn.with_line_callback({ 'dbus-monitor', '--session', CLOSE_MATCH }, {
+    stdout = function(line)
+      if my_gen ~= monitor_gen then
+        return
+      end
+      monitor_line(line)
+    end,
+    stderr = function() end, -- the bus-address banner and its warnings
+    exit = function(reason, code)
+      if my_gen ~= monitor_gen then
+        return
+      end
+      dbg('CloseNotification monitor exit (' .. tostring(reason) .. '/' .. tostring(code) .. '), restarting')
+      gears.timer.start_new(10, function()
+        if my_gen == monitor_gen then
+          start_close_monitor()
+        end
+        return false
+      end)
+    end,
+  })
   -- awful.spawn answers with an error string when the binary is missing, and
   -- the exit callback never runs in that case, so nothing retries. Losing the
   -- monitor quietly is the right outcome: every other half of a held id keeps
@@ -1517,56 +1710,62 @@ local render_echo
 --
 -- So this is now: render it, unless the operator does not want echoes at all.
 local function handle_echo(data_json)
-  if REMOTE_NOTIFICATIONS == 'no' then return end
+  if REMOTE_NOTIFICATIONS == 'no' then
+    return
+  end
   local logical = parse_field(data_json, 'logical_id')
-  if not logical or logical == '' then return end
-  if remote_shown[logical] then return end
+  if not logical or logical == '' then
+    return
+  end
+  if remote_shown[logical] then
+    return
+  end
   render_echo(data_json, logical)
 end
 
 render_echo = function(data_json, logical)
   local device_id = parse_field(data_json, 'device_id')
   local device_name = parse_field(data_json, 'device_name')
-  local app         = parse_field(data_json, 'app')
-  local app_name    = parse_field(data_json, 'app_name')
-  local title       = oneline(parse_field(data_json, 'title') or '')
-  local body        = oneline(parse_field(data_json, 'body') or '')
+  local app = parse_field(data_json, 'app')
+  local app_name = parse_field(data_json, 'app_name')
+  local title = oneline(parse_field(data_json, 'title') or '')
+  local body = oneline(parse_field(data_json, 'body') or '')
 
-  local device_label = (device_name and device_name ~= '') and device_name
-    or (device_id or 'remote')
+  local device_label = (device_name and device_name ~= '') and device_name or (device_id or 'remote')
   local app_label = (app_name and app_name ~= '') and app_name or (app or 'remote')
 
   local e = {
-    time    = os.time(),
+    time = os.time(),
     urgency = 'normal',
-    app     = oneline(app_label),
-    title   = title,
-    text    = body,
-    client  = nil,
+    app = oneline(app_label),
+    title = title,
+    text = body,
+    client = nil,
     notification = nil,
     hub_instance = nil,
-    hub_logical  = logical,
-    seen    = false,
-    remote  = true,
+    hub_logical = logical,
+    seen = false,
+    remote = true,
   }
   table.insert(entries, 1, e)
   trim_entries()
   append_cache(e)
   refresh_count_widget()
   if popup and popup.visible then
-    if selected > 1 then selected = selected + 1 end
+    if selected > 1 then
+      selected = selected + 1
+    end
     render()
   end
   remote_shown[logical] = true
 
   if REMOTE_NOTIFICATIONS == 'popup' then
-    local n = naughty.notification {
-      app_name = SELF_APP,  -- dropped by record(), so never re-ingested locally
-      title    = device_label .. ': (' .. app_label .. ')',
-      text     = (title ~= '' and body ~= '') and (title .. ' · ' .. body)
-        or (title .. body),
-      urgency  = 'normal',
-    }
+    local n = naughty.notification({
+      app_name = SELF_APP, -- dropped by record(), so never re-ingested locally
+      title = device_label .. ': (' .. app_label .. ')',
+      text = (title ~= '' and body ~= '') and (title .. ' · ' .. body) or (title .. body),
+      urgency = 'normal',
+    })
     -- Link the live popup: dropping the history row closes it, and a user
     -- dismissal only marks the entry seen (remote copy, never a tombstone).
     e.notification = n
@@ -1600,9 +1799,7 @@ local function take_over_echo(logical)
       break
     end
   end
-  drop_matching(function(e)
-    return e.remote and e.hub_logical == logical
-  end, 'local copy took over the echo')
+  drop_matching(function(e) return e.remote and e.hub_logical == logical end, 'local copy took over the echo')
   remote_shown[logical] = nil
   return popped
 end
@@ -1628,24 +1825,31 @@ end
 --
 -- An echo is a row with no posting of this device's own, which is exactly the
 -- rows carrying no instance id (section 14.1).
-local function is_echo(e)
-  return not e.hub_instance
-end
+local function is_echo(e) return not e.hub_instance end
 
 -- Whether `retract` licenses dropping this row. An unrecognised value licenses
 -- nothing, which is the safe direction: it keeps a duplicate.
 local function retract_drops(retract, e)
-  if retract == 'all' then return true end
-  if retract == 'echo' then return is_echo(e) end
+  if retract == 'all' then
+    return true
+  end
+  if retract == 'echo' then
+    return is_echo(e)
+  end
   return false
 end
 
 -- Forget the hub ids on a row the hub no longer tracks, keeping the row itself.
 -- Returns whether anything changed, so the caller knows to rewrite the cache.
 local function forget_ids(e)
-  if not (e.hub_logical or e.hub_instance or e.hub_native) then return false end
+  if not (e.hub_logical or e.hub_instance or e.hub_native) then
+    return false
+  end
   e.hub_logical, e.hub_instance = nil, nil
   e.hub_native, e.hub_generation = nil, nil
+  -- Without the mark this row reads as one the hub never heard of, and
+  -- late_ingest would hand straight back what the hub just let go of (D-25).
+  e.hub_untracked = true
   return true
 end
 
@@ -1661,10 +1865,14 @@ local function handle_hub_event(data_json)
   -- `created` is a doorbell: it says a notification arrived somewhere and
   -- carries no content. Whether this device should render it is the hub's
   -- decision, and it arrives later as an `echo` frame (SPEC 8.4).
-  if ev_type ~= 'ended' and ev_type ~= 'untracked' then return end
+  if ev_type ~= 'ended' and ev_type ~= 'untracked' then
+    return
+  end
 
   local logical = parse_field(data_json, 'logical_id')
-  if not logical or logical == '' then return end
+  if not logical or logical == '' then
+    return
+  end
   local retract = parse_field(data_json, 'retract')
   local cause = parse_field(data_json, 'cause') or 'unknown'
 
@@ -1676,7 +1884,9 @@ local function handle_hub_event(data_json)
   if retract == 'none' then
     local changed = false
     for _, e in ipairs(entries) do
-      if e.hub_logical == logical and forget_ids(e) then changed = true end
+      if e.hub_logical == logical and forget_ids(e) then
+        changed = true
+      end
     end
     if changed then
       flush_cache()
@@ -1686,7 +1896,9 @@ local function handle_hub_event(data_json)
   end
 
   drop_matching(function(e)
-    if e.hub_logical ~= logical then return false end
+    if e.hub_logical ~= logical then
+      return false
+    end
     return retract_drops(retract, e)
   end, 'ended elsewhere (' .. cause .. ')')
 end
@@ -1699,17 +1911,131 @@ end
 local function parse_array(out, name)
   local items = {}
   local arr = out:match('"' .. name .. '":%[(.-)%]')
-  if not arr then return items end
-  for obj in arr:gmatch('{(.-)}') do items[#items + 1] = obj end
+  if not arr then
+    return items
+  end
+  for obj in arr:gmatch('{(.-)}') do
+    items[#items + 1] = obj
+  end
   return items
 end
 
-local function obj_str(obj, name)
-  return obj:match('"' .. name .. '":"([^"]*)"')
+local function obj_str(obj, name) return obj:match('"' .. name .. '":"([^"]*)"') end
+
+local function obj_num(obj, name) return tonumber(obj:match('"' .. name .. '":(%-?%d+)')) end
+
+-- Late ingest: rows shown while the hub could not be asked (D-68).
+--
+-- A fail-open row has no posting on the hub, so no sync can name it and no
+-- ending anywhere can reach it. It used to leave only by ring eviction, which
+-- on a quiet host never comes: the row sat here for good while the hub's
+-- Active list showed nothing. Each sync pass therefore offers such rows to the
+-- hub first, and the sync that follows already names them.
+--
+-- `post_show`, because the row is on screen: the hub may link it to a live
+-- copy elsewhere but will not retract it for something that ended in the past
+-- (D-09). The one `suppress` that mode can answer is a crap rule, which would
+-- have vetoed the popup had the hub been reachable, so the row goes.
+local LATE_BATCH = 10 -- rows offered per sync pass, bounds the curl burst
+local LATE_REFUSED = 3 -- hub refusals of one row before giving up on it
+
+local function late_pending(e)
+  return not e.remote
+    and not e.hub_ignored
+    and not e.hub_untracked
+    and not e.hub_native
+    and not e.hub_logical
+    and not e.hub_instance
 end
 
-local function obj_num(obj, name)
-  return tonumber(obj:match('"' .. name .. '":(%-?%d+)'))
+local function late_answer(e, out)
+  local decision = parse_field(out, 'decision')
+  if not decision then
+    -- The hub answered and refused this row, which a retry will not change.
+    -- Transport failures never get here, so they are not counted (D-38).
+    e.late_refused = (e.late_refused or 0) + 1
+    if e.late_refused >= LATE_REFUSED then
+      e.hub_untracked = true
+      return true
+    end
+    return false
+  end
+  if decision == 'ignore' then
+    e.hub_ignored = true
+    return true
+  end
+  if decision == 'suppress' then
+    drop_matching(function(x) return x == e end, 'late ingest suppressed')
+    return false
+  end
+  local logical = parse_field(out, 'logical_id')
+  if not logical or logical == '' then
+    return false
+  end
+  if out:match('"echoed":true') then
+    take_over_echo(logical)
+  end
+  e.hub_logical = logical
+  e.hub_instance = parse_field(out, 'instance_id')
+  e.hub_native, e.hub_generation = e.late_native, e.late_generation
+  dbg('late ingest landed as ' .. logical)
+  return true
+end
+
+-- Offer every pending row to the hub, then call `done` once all have answered
+-- or failed. Requests run in parallel; `done` is what sends the sync, so a
+-- sync can never be built while one of these is in flight and close the
+-- instance it just opened.
+local function late_ingest(done)
+  local pending = {}
+  for _, e in ipairs(entries) do
+    if late_pending(e) then
+      pending[#pending + 1] = e
+      if #pending >= LATE_BATCH then
+        break
+      end
+    end
+  end
+  if #pending == 0 then
+    return done()
+  end
+
+  local waiting, changed = #pending, false
+  for _, e in ipairs(pending) do
+    -- The posting identity is fixed on the first attempt and reused on every
+    -- retry, so an attempt whose answer was lost lands as a duplicate report
+    -- rather than as a second posting (SPEC 4, case 1).
+    if not e.late_native then
+      e.late_generation = next_generation()
+      e.late_native = HUB_SESSION .. ':late:' .. tostring(e.late_generation)
+    end
+    hub_post_async(
+      '/api/v1/ingest',
+      ingest_body({
+        mode = 'post_show',
+        native_id = e.late_native,
+        generation = e.late_generation,
+        app = e.app,
+        title = e.title,
+        text = e.text,
+        urgency = e.urgency,
+        time = e.time,
+      }),
+      function(out)
+        if out and late_answer(e, out) then
+          changed = true
+        end
+        waiting = waiting - 1
+        if waiting > 0 then
+          return
+        end
+        if changed then
+          flush_cache()
+        end
+        done()
+      end
+    )
+  end
 end
 
 local sync_pending = false
@@ -1729,13 +2055,11 @@ local sync_pending = false
 -- a logical the hub deleted on purpose comes back as an explicit answer rather
 -- than as an absence (D-25).
 --
--- Rows with no hub ids (shown while the hub was unreachable, fail-open) are not
--- in `holding`. The hub has no instance for them either, since their ingest
--- never landed, so there is nothing for it to close and nothing to ask about;
--- they age out of the ring. This client has no outbox by design (SPEC 13).
-local function hub_sync()
-  if sync_pending then return end
-
+-- Rows with no hub ids (shown while the hub was unreachable, fail-open) cannot
+-- be in `holding`: the hub has no instance for them, since their ingest never
+-- landed. hub_sync runs late_ingest ahead of this for exactly that reason, so
+-- by the time `holding` is built here they carry ids like any other row.
+local function send_sync()
   local holding, seen = {}, {}
   for _, e in ipairs(entries) do
     if e.hub_native and e.hub_generation then
@@ -1747,8 +2071,7 @@ local function hub_sync()
         e.hub_logical and (',"logical_id":' .. json_str(e.hub_logical)) or '',
         '}',
       })
-    elseif is_echo(e) and e.hub_logical and e.hub_logical ~= ''
-       and not seen[e.hub_logical] then
+    elseif is_echo(e) and e.hub_logical and e.hub_logical ~= '' and not seen[e.hub_logical] then
       -- An echo: no posting here, so it is named by logical id alone and the
       -- hub answers it in `echoes` (SPEC 8.4). It holds no instance either, so
       -- there is nothing for the hub to close on its behalf.
@@ -1762,23 +2085,22 @@ local function hub_sync()
     -- therefore cannot touch a row of this device's own. The row stays
     -- readable until the ring evicts it. One-time, bounded by MAX_ENTRIES, and
     -- it costs a hub Active-list row rather than anything on a screen.
-    if #holding >= SYNC_LIMIT then break end
+    if #holding >= SYNC_LIMIT then
+      break
+    end
   end
 
-  sync_pending = true
-  -- Deadman switch: a curl that never spawns means no callback ever arrives,
-  -- and the flag would otherwise disable re-checking forever.
-  gears.timer.start_new(20, function()
-    sync_pending = false
-    return false
-  end)
-
-  local body = '{"device_id":' .. json_str(hub_device())
-    .. ',"holding":[' .. table.concat(holding, ',') .. ']}'
+  local body = '{"device_id":'
+    .. json_str(hub_device())
+    .. ',"holding":['
+    .. table.concat(holding, ',')
+    .. ']}'
 
   hub_post_async('/api/v1/sync', body, function(out)
     sync_pending = false
-    if not out then return end
+    if not out then
+      return
+    end
 
     local changed = false
 
@@ -1821,7 +2143,9 @@ local function hub_sync()
     local untracked = {}
     for _, obj in ipairs(parse_array(out, 'untracked')) do
       local native = obj_str(obj, 'native_id')
-      if native then untracked[native] = true end
+      if native then
+        untracked[native] = true
+      end
     end
 
     for _, e in ipairs(entries) do
@@ -1833,21 +2157,31 @@ local function hub_sync()
     drop_matching(function(e)
       if e.hub_native then
         local v = by_native[e.hub_native]
-        if not v then return false end
+        if not v then
+          return false
+        end
         -- The hub is describing a different posting under this reusable key,
         -- so it is not about what is on screen (D-27).
-        if v.generation ~= e.hub_generation then return false end
+        if v.generation ~= e.hub_generation then
+          return false
+        end
         if v.retract == 'none' then
-          if forget_ids(e) then changed = true end
+          if forget_ids(e) then
+            changed = true
+          end
           return false
         end
         return retract_drops(v.retract, e)
       end
       if e.hub_logical then
         local v = by_logical[e.hub_logical]
-        if not v then return false end
+        if not v then
+          return false
+        end
         if v.retract == 'none' then
-          if forget_ids(e) then changed = true end
+          if forget_ids(e) then
+            changed = true
+          end
           return false
         end
         return retract_drops(v.retract, e)
@@ -1857,8 +2191,25 @@ local function hub_sync()
 
     -- drop_matching rewrites the cache when it removes something; a pass that
     -- only repaired or forgot ids still has to.
-    if changed then flush_cache() end
+    if changed then
+      flush_cache()
+    end
   end)
+end
+
+local function hub_sync()
+  if sync_pending then
+    return
+  end
+  sync_pending = true
+  -- Deadman switch: a curl that never spawns means no callback ever arrives,
+  -- and the flag would otherwise disable re-checking forever. Sized to cover
+  -- both legs, the late ingests and then the sync, at curl's 10s cap each.
+  gears.timer.start_new(30, function()
+    sync_pending = false
+    return false
+  end)
+  late_ingest(send_sync)
 end
 
 -- Debounced reconcile trigger for the record() path ("ask again about kept
@@ -1867,7 +2218,9 @@ end
 local sync_wakeup = nil
 
 local function schedule_sync(delay)
-  if sync_wakeup then sync_wakeup:stop() end
+  if sync_wakeup then
+    sync_wakeup:stop()
+  end
   sync_wakeup = gears.timer.start_new(delay or 10, function()
     sync_wakeup = nil
     hub_sync()
@@ -1886,14 +2239,20 @@ local function start_hub_stream()
   stream_gen = stream_gen + 1
   local my_gen = stream_gen
   awful.spawn.with_line_callback({
-    'curl', '-sSN',
-    '--connect-timeout', '5',
-    '--max-time', '600',
-    '-H', 'Authorization: Bearer ' .. HUB_TOKEN,
+    'curl',
+    '-sSN',
+    '--connect-timeout',
+    '5',
+    '--max-time',
+    '600',
+    '-H',
+    'Authorization: Bearer ' .. HUB_TOKEN,
     HUB_URL .. '/api/v1/events/stream',
   }, {
     stdout = function(line)
-      if my_gen ~= stream_gen then return end
+      if my_gen ~= stream_gen then
+        return
+      end
       hub_connected = true
       if line:sub(1, 6) == 'data: ' then
         handle_hub_event(line:sub(7))
@@ -1901,13 +2260,14 @@ local function start_hub_stream()
     end,
     stderr = function() end, -- curl -S messages are noise here
     exit = function(reason, code)
-      if my_gen ~= stream_gen then return end
+      if my_gen ~= stream_gen then
+        return
+      end
       hub_connected = false
       -- Includes the healthy --max-time churn every 10 minutes, so this is
       -- informational only. Reconnect shortly and reconcile to catch
       -- whatever was broadcast while the stream was down.
-      dbg('hub stream exit (' .. tostring(reason) .. '/' .. tostring(code)
-        .. '), reconnecting')
+      dbg('hub stream exit (' .. tostring(reason) .. '/' .. tostring(code) .. '), reconnecting')
       gears.timer.start_new(5, function()
         if my_gen == stream_gen then
           start_hub_stream()
@@ -1933,29 +2293,40 @@ end
 local function tracked_fields(n, args)
   -- Our own feedback toasts must never be recorded, or acting on an entry
   -- appends a new entry and the buffer grows on every keypress.
-  if n.app_name == SELF_APP then return end
+  if n.app_name == SELF_APP then
+    return
+  end
 
-  if not (n._private and n._private.freedesktop_hints)
-     and n.app_name ~= INTERNAL_APP then
+  if not (n._private and n._private.freedesktop_hints) and n.app_name ~= INTERNAL_APP then
     return
   end
 
   local title = oneline(strip_notification_markup((args and args.title) or n.title))
-  local text = oneline(strip_notification_markup(
-    (args and (args.message or args.text)) or n.message or n.text))
-  if title == '' and text == '' then return end
-  if matches_any(title .. ' ' .. text, IGNORE_PATTERNS) then return end
+  local text =
+    oneline(strip_notification_markup((args and (args.message or args.text)) or n.message or n.text))
+  if title == '' and text == '' then
+    return
+  end
+  if matches_any(title .. ' ' .. text, IGNORE_PATTERNS) then
+    return
+  end
 
   local app = (args and args.app_name) or n.app_name
-  if not app or app == '' then app = 'awesome' end
-  if matches_any(app, IGNORE_APPS) then return end
+  if not app or app == '' then
+    app = 'awesome'
+  end
+  if matches_any(app, IGNORE_APPS) then
+    return
+  end
 
   return title, text, app
 end
 
 local function record(n, args)
   local title, text, app = tracked_fields(n, args)
-  if not title then return end
+  if not title then
+    return
+  end
 
   -- Pre-show hub gate. 'added' is emitted synchronously right before naughty
   -- decides whether to display (request::display/fallback), and that decision
@@ -2024,35 +2395,38 @@ local function record(n, args)
   local target
   if n.clients then
     for _, c in ipairs(n.clients) do
-      if c and c.valid then target = c break end
+      if c and c.valid then
+        target = c
+        break
+      end
     end
   end
 
   -- Whether the hub holds a row for this notification. False when it was
   -- unreachable (fail-open, no ids at all) and when an ignore rule covers it
-  -- (the hub stored nothing and never will). Both leave the row local-only:
-  -- it is displayed like any other, it is simply not something the hub has an
-  -- opinion about.
+  -- (the hub stored nothing and never will). Both leave the row local-only
+  -- for now: it is displayed like any other. The ignored one stays that way;
+  -- the fail-open one is offered to the hub again by late_ingest.
   local tracked = meta ~= nil
     and meta.decision ~= 'ignore'
-    and meta.logical_id ~= nil and meta.logical_id ~= ''
+    and meta.logical_id ~= nil
+    and meta.logical_id ~= ''
 
   -- Only dbus-delivered notifications have an id an app knows about; the
   -- config's own internal toasts come in under INTERNAL_APP with no hints and
   -- nothing on the other end to activate.
   local dbus_id
-  if n._private and n._private.freedesktop_hints
-     and not matches_any(app, NO_HOLD_APPS) then
+  if n._private and n._private.freedesktop_hints and not matches_any(app, NO_HOLD_APPS) then
     dbus_id = n.id
   end
 
   table.insert(entries, 1, {
-    time    = os.time(),
+    time = os.time(),
     urgency = n.urgency or 'normal',
-    app     = oneline(app),
-    title   = title,
-    text    = text,
-    client  = target,
+    app = oneline(app),
+    title = title,
+    text = text,
+    client = target,
     -- Kept only to match this entry against naughty's 'destroyed' signal
     -- below, so dismissing the popup itself marks it seen. Not persisted:
     -- entries reloaded from disk never had a live notification anyway.
@@ -2062,13 +2436,13 @@ local function record(n, args)
     -- outlive the WM, so dropping a restored entry still has somewhere to
     -- report to.
     hub_instance = tracked and meta.instance_id or nil,
-    hub_logical  = tracked and meta.logical_id or nil,
+    hub_logical = tracked and meta.logical_id or nil,
     -- The posting this row is, as the hub names it (SPEC 1). Persisted for the
     -- same reason the ids are, and needed for the same report: an ending is
     -- addressed by (device, native id, generation), and after a restart the
     -- native id cannot be rederived - HUB_SESSION has changed, and naughty's
     -- counter has restarted underneath it.
-    hub_native     = tracked and meta.native_id or nil,
+    hub_native = tracked and meta.native_id or nil,
     hub_generation = tracked and meta.generation or nil,
     -- The hub answered 'ignore': an ignore rule covers this notification, so
     -- it holds no row for it and never will. The entry is kept and displayed
@@ -2076,16 +2450,18 @@ local function record(n, args)
     -- "hide it". Recorded to tell the two id-less cases apart when reading a
     -- cache file or the debug log: this one is permanent and deliberate, while
     -- "shown while the hub was unreachable" is neither.
-    hub_ignored  = meta ~= nil and meta.decision == 'ignore',
+    hub_ignored = meta ~= nil and meta.decision == 'ignore',
     -- Native notification id, used to invoke the default action from the row
     -- long after the popup is gone. Not persisted, unlike the hub ids: an id
     -- only means anything to the running process that was given it, and a
     -- restart has already dropped every one of them.
-    dbus_id   = dbus_id,
+    dbus_id = dbus_id,
     dbus_open = false, -- set once the expiring popup's close has been withheld
-    seen    = false,  -- track whether this notification was viewed
+    seen = false, -- track whether this notification was viewed
   })
-  if dbus_id then hold_open(n, entries[1]) end
+  if dbus_id then
+    hold_open(n, entries[1])
+  end
   trim_entries()
 
   append_cache(entries[1])
@@ -2094,7 +2470,9 @@ local function record(n, args)
   if popup and popup.visible then
     -- A new entry shifts everything down; follow the selection so the popup
     -- does not silently jump to a different notification under the cursor.
-    if selected > 1 then selected = selected + 1 end
+    if selected > 1 then
+      selected = selected + 1
+    end
     render()
   end
 
@@ -2109,7 +2487,9 @@ end
 --------------------------------------------------------------------------------
 
 function notification_history.show()
-  if #entries == 0 then return toast_empty() end
+  if #entries == 0 then
+    return toast_empty()
+  end
 
   -- Opening the popup is a natural "show me the truth now" moment: run the
   -- reconcile shortly after so stale rows do not survive a popup session.
@@ -2155,14 +2535,10 @@ end
 -- Badge middle-click wrapper. act_clear is a chunk-local declared after the
 -- widget builder, so the button closure cannot see it lexically (locals are
 -- visible only from their declaration point); route through the table.
-function notification_history.clear()
-  act_clear()
-end
+function notification_history.clear() act_clear() end
 
 -- Exposed for other widgets/scripts that may want the raw list.
-function notification_history.get_entries()
-  return entries
-end
+function notification_history.get_entries() return entries end
 
 -- Config-internal toasts wanting a history entry must use this app_name.
 notification_history.internal_app = INTERNAL_APP
@@ -2223,9 +2599,14 @@ naughty.connect_signal('destroyed', function(n, reason)
   if APP_RETRACT_REASONS[reason] then
     local e
     for i = 1, #entries do
-      if entries[i].notification == n then e = entries[i] break end
+      if entries[i].notification == n then
+        e = entries[i]
+        break
+      end
     end
-    if not e then return end
+    if not e then
+      return
+    end
     hub_event(e, 'source_withdrew', 'dismissed_by_command')
     -- This runs inside n's own destroy(), so n must not be destroyed again on
     -- the way out. drop_matching() -> close_live() would otherwise do exactly
@@ -2243,7 +2624,9 @@ naughty.connect_signal('destroyed', function(n, reason)
       entries[i].seen = true
       hub_event(entries[i], 'user_click', 'dismissed_by_user')
       refresh_count_widget()
-      if popup and popup.visible then render() end
+      if popup and popup.visible then
+        render()
+      end
       return
     end
   end
@@ -2264,7 +2647,9 @@ awesome.connect_signal('exit', function()
   end
   if sent then
     local conn = notify_bus()
-    if conn then pcall(function() conn:flush_sync(nil) end) end
+    if conn then
+      pcall(function() conn:flush_sync(nil) end)
+    end
   end
 end)
 
@@ -2274,8 +2659,14 @@ start_hub_stream()
 -- Bus-local and needs no network, so it starts with the stream rather than
 -- behind the reconcile delay.
 start_close_monitor()
-gears.timer.start_new(5, function() hub_sync() return false end)
-gears.timer.start_new(SYNC_INTERVAL, function() hub_sync() return true end)
+gears.timer.start_new(5, function()
+  hub_sync()
+  return false
+end)
+gears.timer.start_new(SYNC_INTERVAL, function()
+  hub_sync()
+  return true
+end)
 
 return notification_history
 -- vim: set ts=2 sw=2 tw=0 et :
