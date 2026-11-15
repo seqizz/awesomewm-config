@@ -50,16 +50,14 @@ printmore = false
 beautiful.init(config_path .. "my_modules/my_theme.lua")
 
 -- WezTerm emits its toasts (e.g. the snippet-capture feedback) at critical
--- urgency, which naughty renders with its bright-red critical preset. Recolor
--- just wezterm's notifications to a calm gold-on-dark style with a real
--- timeout. Appended after naughty's default rules so it wins for these.
+-- urgency, which would give them the red critical accent and no expiry.
+-- Demote just wezterm's notifications to normal urgency with a real timeout;
+-- my_modules/notifications.lua picks the colors from the urgency.
 local ruled = require('ruled')
 ruled.notification.connect_signal('request::rules', function()
   ruled.notification.append_rule {
     rule       = { app_name = 'wezterm' },
     properties = {
-      bg      = '#282828',
-      fg      = '#d79921',
       timeout = 4,
       urgency = 'normal',
     },
@@ -77,6 +75,9 @@ dofile(config_path .. "my_modules/rc_tags.lua")
 
 -- stuff related to volume/brightness OSD notifications
 dofile(config_path .. "my_modules/rc_fn_actions.lua")
+
+-- naughty popups drawn in the OSD's style
+require("my_modules/notifications")
 
 -- stuff including usernames etc
 dofile(config_path .. "my_modules/rc_secret.lua")
@@ -1001,7 +1002,7 @@ nixos_profile.refresh({ force = true })
 
 tag.connect_signal('request::screen', function(t)
   -- recover tags on a removed screen
-  naughty.notification({ text = 'Recovering tag: ' .. t.name })
+  osd.toast('Recovering tag ' .. t.name, { icon = 'tag' })
   for s in screen do
     t.screen = s
     my_dropdown.screen = s

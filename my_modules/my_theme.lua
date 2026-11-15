@@ -36,7 +36,6 @@ theme.fg_normal_alt   = "#fabd2f"
 theme.fg_focus        = "#ffffff"
 theme.fg_urgent       = "#ffffff"
 theme.fg_minimize     = "#ffffff"
-theme.bg_notification = theme.bg_normal
 
 theme.useless_gap   = dpi(2)
 theme.border_width  = dpi(1)
@@ -63,6 +62,7 @@ theme.border_radius        = 2
 theme.osd_bg               = theme.bg_normal .. "d8"
 theme.osd_media_fg         = theme.fg_normal_alt
 theme.osd_mute_fg          = theme.warning_bg
+theme.osd_info_fg          = theme.fg_normal
 
 -- relative paths, so fucking easy with lua..
 local base_dir = string.gsub(debug.getinfo(1).source, "^@(.+/)[^/]+$", "%1")
@@ -86,15 +86,24 @@ theme.thing_icon_right = base_dir .. 'assets/thing_icon_right.svg'
 
 -- Notifications
 -- theme.notification_font = "Operator Mono Lig, Twitter Color Emoji"
-theme.notification_opacity = 0.9
-theme.notification_margin = dpi(15)
+theme.notification_margin = dpi(12)
 theme.notification_icon_size = dpi(50)
 theme.notification_max_width = dpi(600)
-local ntf_shape = function(cr, width, height)
-   shape.partially_rounded_rect(cr, width, height, true, false, true, true, 18)
+-- Surface matches the OSD popup (same translucent bg, hairline border, corner
+-- radius) so the two read as one family when they are on screen together. The
+-- bg already carries its alpha, hence no notification_opacity on top of it.
+theme.notification_shape = function(cr, width, height)
+   shape.rounded_rect(cr, width, height, theme.border_radius)
 end
-theme.notification_shape = ntf_shape
-theme.notification_bg = theme.bg_notification
+theme.notification_bg = theme.osd_bg
+theme.notification_fg = theme.fg_normal
+theme.notification_border_width = dpi(1)
+theme.notification_border_color = theme.osd_info_fg
+theme.notification_spacing = dpi(6)
+-- Accent (border + title) per urgency, same roles as the OSD's per-mode accents
+theme.notification_accent_low      = "#928374"
+theme.notification_accent_normal   = theme.osd_info_fg
+theme.notification_accent_critical = theme.osd_mute_fg
 
 -- Disable taglist squares (not needed with powerline shapes)
 -- local taglist_square_size = dpi(4)

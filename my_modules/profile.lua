@@ -8,7 +8,6 @@
 local awful = require('awful')
 local beautiful = require('beautiful')
 local gears = require('gears')
-local naughty = require('naughty')
 local my_theme = require('my_modules/my_theme')
 
 local PROFILE_FILE = '/etc/nixos-profile'
@@ -97,10 +96,10 @@ function profile.refresh(opts)
   profile.apply()
 
   if previous ~= nil then
-    naughty.notify({
-      title = 'NixOS profile',
-      text = ('%s → %s'):format(previous, profile.name),
-      fg = PROFILES[profile.name].accent,
+    osd.toast(('%s → %s'):format(previous, profile.name), {
+      icon = 'nixos',
+      sub = 'NixOS profile',
+      accent = PROFILES[profile.name].accent,
       timeout = 5,
     })
   end

@@ -1,4 +1,5 @@
--- Unified on-screen display for volume, brightness, mute and media state.
+-- Unified on-screen display for volume, brightness, mute and media state, plus
+-- the window manager's own one-line confirmations (osd.toast).
 --
 -- One popup serves every event type: content, accent color and width change per
 -- mode. The previous split (a transparent slider popup plus a rotated textbox
@@ -44,6 +45,7 @@ end
 local ANIM = 0.2 -- slide/fade duration, same both directions
 local BAR_ANIM = 0.28 -- bar fill trails the popup slightly, reads as weight
 local TIMEOUT = 1.8 -- on-screen time after the last event
+local TOAST_TIMEOUT = 2.5 -- toasts carry a sentence, not a level: reading time
 local SLIDE = dpi(40) -- travel distance on show/hide
 
 local MARGIN_TOP = dpi(100)
@@ -53,6 +55,7 @@ local PAD = dpi(10)
 local WIDTH_LEVEL = dpi(56)
 local WIDTH_MEDIA = dpi(320)
 local WIDTH_CARD = dpi(170) -- short one-line cards (mic state)
+local WIDTH_TOAST = dpi(400)
 local BAR_LEN = dpi(250)
 local BAR_THICK = dpi(20)
 
@@ -60,6 +63,8 @@ local BAR_THICK = dpi(20)
 -- this is a character budget rather than a pixel one.
 local MEDIA_TITLE_CHARS = 28
 local MEDIA_SUB_CHARS = 36
+local TOAST_TITLE_CHARS = 40
+local TOAST_SUB_CHARS = 50
 
 -- Nerd Font glyphs live in the private use area. Building them from codepoints
 -- keeps this file readable in an editor without the font, and avoids \u{}
@@ -89,6 +94,13 @@ local GLYPH = {
   previous = pua(0xf048), -- nf-fa-step_backward
   mic = pua(0xf130), -- nf-fa-microphone
   mic_off = pua(0xf131), -- nf-fa-microphone_slash
+  info = pua(0xf05a), -- nf-fa-info_circle
+  warning = pua(0xf071), -- nf-fa-exclamation_triangle
+  pin = pua(0xf08d), -- nf-fa-thumb_tack
+  split = pua(0xf0db), -- nf-fa-columns
+  launch = pua(0xf135), -- nf-fa-rocket
+  tag = pua(0xf02b), -- nf-fa-tag
+  nixos = pua(0xf313), -- nf-linux-nixos
 }
 
 local ACCENT = {
@@ -96,6 +108,8 @@ local ACCENT = {
   brightness = beautiful.slider_brightness_fg,
   mute = beautiful.osd_mute_fg or beautiful.warning_bg,
   media = beautiful.osd_media_fg or beautiful.fg_normal_alt,
+  info = beautiful.osd_info_fg or beautiful.fg_normal,
+  warn = beautiful.osd_mute_fg or beautiful.warning_bg,
 }
 
 -- {{{ small helpers
@@ -489,7 +503,9 @@ local function apply_width(width)
   end
 end
 
-local function show(mode, width, widget)
+-- opts.accent overrides the mode's color, opts.timeout its on-screen time.
+local function show(mode, width, widget, opts)
+  opts = opts or {}
   local s, geo = osd_target(awful.screen.focused())
   local new_anchor_x = geo.x + geo.width - width - MARGIN_RIGHT
 
@@ -498,7 +514,7 @@ local function show(mode, width, widget)
   -- bounds before content: the widget is laid out the moment it is assigned
   apply_width(width)
   popup.widget = widget
-  popup.border_color = ACCENT[mode] or ACCENT.volume
+  popup.border_color = opts.accent or ACCENT[mode] or ACCENT.volume
 
   -- Tracked here rather than read back from the popup: the anchor also moves
   -- when the mode changes, since each mode has its own width.
@@ -530,7 +546,7 @@ local function show(mode, width, widget)
   if hide_timer then
     hide_timer:stop()
   end
-  hide_timer = gears.timer.start_new(TIMEOUT, function()
+  hide_timer = gears.timer.start_new(opts.timeout or TIMEOUT, function()
     hide_timer = nil
     osd.hide()
     return false
@@ -649,20 +665,58 @@ function osd.brightness(value)
 end
 
 -- Icon + one or two lines of text, no bar. Used by anything whose state is not
--- a level: media transport and the mic toggle.
-local function show_card(mode, glyph, line1, line2, width)
-  local accent = ACCENT[mode] or ACCENT.media
+-- a level: media transport, the mic toggle and toasts.
+-- opts: accent/timeout as in show(), title_chars/sub_chars for cards wider than
+-- the media one, whose character budgets are the default.
+local function show_card(mode, glyph, line1, line2, width, opts)
+  opts = opts or {}
+  local accent = opts.accent or ACCENT[mode] or ACCENT.media
 
   media_icon.markup = span(glyph, accent, beautiful.font_name .. ' 20')
-  media_title.markup = span(truncate(line1, MEDIA_TITLE_CHARS), accent, beautiful.font)
+  media_title.markup =
+    span(truncate(line1, opts.title_chars or MEDIA_TITLE_CHARS), accent, beautiful.font)
 
   -- an empty second textbox still claims a line, so drop it instead
   media_sub.visible = line2 ~= nil and line2 ~= ''
   if media_sub.visible then
-    media_sub.markup = span(truncate(line2, MEDIA_SUB_CHARS), beautiful.fg_normal, beautiful.font_small)
+    media_sub.markup = span(
+      truncate(line2, opts.sub_chars or MEDIA_SUB_CHARS),
+      beautiful.fg_normal,
+      beautiful.font_small
+    )
   end
 
-  show(mode, width or WIDTH_MEDIA, media_layout)
+  show(mode, width or WIDTH_MEDIA, media_layout, opts)
+end
+
+-- One-line confirmation of something the window manager itself just did
+-- (sticky toggled, client suspended, split ratio changed). These are not
+-- notifications: nothing can be clicked, nothing is worth re-reading, and a
+-- newer one replacing an older one is the wanted behavior, which is exactly
+-- what the single OSD slot gives and a naughty stack does not.
+--
+-- opts.icon    key into GLYPH, defaults to the info circle
+-- opts.sub     second, dimmer line
+-- opts.mode    'info' (default) or 'warn' for "that did not work"
+-- opts.accent  explicit color, for callers with a color of their own
+-- opts.timeout seconds on screen
+function osd.toast(text, opts)
+  opts = opts or {}
+  local mode = opts.mode or 'info'
+
+  show_card(
+    mode,
+    GLYPH[opts.icon] or (mode == 'warn' and GLYPH.warning or GLYPH.info),
+    text,
+    opts.sub,
+    WIDTH_TOAST,
+    {
+      accent = opts.accent,
+      timeout = opts.timeout or TOAST_TIMEOUT,
+      title_chars = TOAST_TITLE_CHARS,
+      sub_chars = TOAST_SUB_CHARS,
+    }
+  )
 end
 
 -- Mic state is tracked by hand in rc_fn_actions (the headset mutes in hardware,

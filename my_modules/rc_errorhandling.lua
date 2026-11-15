@@ -5,7 +5,8 @@ local notification_history = require("my_modules/notification_history")
 
 if awesome.startup_errors then
   naughty.notification({
-    preset = naughty.config.presets.critical,
+    urgency = 'critical',
+    timeout = 0,
     app_name = notification_history.internal_app,
     title = "Oops, there were errors during startup!",
     text = awesome.startup_errors
@@ -21,7 +22,8 @@ do
     in_error = true
 
     naughty.notification({
-      preset = naughty.config.presets.critical,
+      urgency = 'critical',
+      timeout = 0,
       app_name = notification_history.internal_app,
       title = "Oops, an error happened!",
       text = tostring(err)

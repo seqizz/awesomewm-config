@@ -2,7 +2,6 @@ local awful = require("awful")
 local wibox = require("wibox")
 local gears = require("gears")
 local beautiful = require("beautiful")
-local naughty = require("naughty")
 local my_utils = require('my_modules/my_utils')
 local my_theme = require('my_modules/my_theme')
 local geo_helpers = require('my_modules/geo_helpers')
@@ -28,18 +27,14 @@ function suspend_toggle(c)
       c.border_color = beautiful.border_normal
       c.border_width = beautiful.border_width
       c.opacity = 1
-      naughty.notification {
-        text = "waking up client: " .. c.class .. " (" .. c.pid .. ")"
-      }
+      osd.toast("Waking up " .. tostring(c.class), { icon = "play", sub = "pid " .. c.pid })
       awful.spawn("kill -18 " .. c.pid)
     else
       -- working, let's suspend
       c.border_color = '#ff0000'
       c.border_width = 10
       c.opacity = 0.8
-      naughty.notification {
-        text = "suspending client: " .. c.class .. " (" .. c.pid .. ")"
-      }
+      osd.toast("Suspending " .. tostring(c.class), { icon = "pause", sub = "pid " .. c.pid })
       awful.spawn("kill -19 " .. c.pid)
     end
   end)
@@ -78,9 +73,7 @@ function sticky_toggle(c)
     c.ontop = true
     c.sticky = true
   end
-  naughty.notification {
-    text = "Sticky set to " .. tostring(c.sticky)
-  }
+  osd.toast(c.sticky and "Sticky on" or "Sticky off", { icon = "pin", sub = c.class })
 end
 
 function float_toggle(c)
@@ -547,7 +540,7 @@ function hide_stickies()
   end
   if my_utils.table_length(stickies) == 0 then
     -- no sticky found
-    naughty.notification {text = "Can't find a damn sticky window", timeout = 1}
+    osd.toast("Can't find a damn sticky window", { mode = "warn", timeout = 1 })
     return
   end
   for idx, c in ipairs(stickies) do
@@ -585,7 +578,7 @@ function run_once(program, grep_for, on_tag)
     "pgrep -f " .. grep_for,
     function(stdout, stderr, reason, exit_code)
       if exit_code ~= 0 then
-        naughty.notification { text = "starting " .. program .. " once" }
+        osd.toast("Starting " .. program, { icon = "launch" })
         if on_tag ~= nil then
           awful.spawn.with_shell(program, {tag = on_tag})
         else
@@ -732,11 +725,7 @@ function cycle_screen_split(s, screens_table)
     -- No fake screen here: get_screens only splits outputs wider than 3000px or
     -- with an aspect ratio above 2, so on a laptop panel there is no boundary to
     -- move. Say so, otherwise the key looks broken.
-    naughty.notification {
-      app_name = 'screen_split',
-      text = 'No fake screen split on this output',
-      timeout = 2,
-    }
+    osd.toast('No fake screen split on this output', { mode = 'warn', timeout = 2 })
     return
   end
 
@@ -754,14 +743,16 @@ function cycle_screen_split(s, screens_table)
   end
 
   local left_width, right_width = set_split_boundary(left, right, total * target)
-  naughty.notification {
-    app_name = 'screen_split',
-    text = string.format('split %d/%d  (%dpx / %dpx)',
-                         math.floor(left_width / total * 100 + 0.5),
-                         math.floor(right_width / total * 100 + 0.5),
-                         left_width, right_width),
-    timeout = 2,
-  }
+  osd.toast(
+    string.format('Split %d/%d',
+                  math.floor(left_width / total * 100 + 0.5),
+                  math.floor(right_width / total * 100 + 0.5)),
+    {
+      icon = 'split',
+      sub = string.format('%dpx / %dpx', left_width, right_width),
+      timeout = 2,
+    }
+  )
 end
 
 local function set_wallpaper(s)

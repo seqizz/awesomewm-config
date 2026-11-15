@@ -87,19 +87,14 @@ local NO_PERSIST_APPS = {
 -- WM self-chatter: state confirmations that are meaningless once read. Matched
 -- against "title text" so they never enter the buffer at all.
 -- Patterns are matched against a lowercased haystack, so keep them lowercase.
-local IGNORE_PATTERNS = {
-  '^sticky set to',
-  '^recovering tag:',
-  '^suspending client:',
-  '^waking up client:',
-  '^starting .+ once$',
-}
+-- Empty because the config's own confirmations go through osd.toast and never
+-- become notifications; this is the knob for any that do.
+local IGNORE_PATTERNS = {}
 
 -- Senders to drop entirely, matched against a lowercased app_name. Knob for
 -- chatty apps whose toasts are never worth re-reading (e.g. a music player
 -- announcing every track change).
 local IGNORE_APPS = {
-  '^screen_split$', -- Win+F6 split ratio readout, transient by design
   '^pasystray$',
   '^blueman$',
 }
