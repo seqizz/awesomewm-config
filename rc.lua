@@ -1152,6 +1152,11 @@ end)
 -- https://github.com/awesomeWM/awesome/issues/3182 waiting for proper fix
 naughty.connect_signal('destroyed', function(n, reason)
   local client_to_jump = nil
+  -- An action button already told the app what to do, raising it on top of
+  -- that would undo the point of answering from the popup.
+  if n.closing_by_action then
+    return
+  end
   if reason == require('naughty.constants').notification_closed_reason.dismissed_by_user then
     if n.clients then
       -- notification thingy (maybe) gave us some client names, use them

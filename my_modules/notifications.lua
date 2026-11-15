@@ -57,13 +57,30 @@ local function title_widget(accent)
   return tb
 end
 
+-- Pressing an action button ("Mark as read", "Reply") is a complete answer to
+-- the notification: the sender gets the action and the popup closes. naughty
+-- closes it with the same reason as a click on the body, so the notification
+-- is flagged for the duration of the call, which is what lets a `destroyed`
+-- handler tell the two apart (rc.lua raises the source client only for a body
+-- click). The close happens synchronously inside invoke().
+local function flag_action_invocations(n)
+  for _, action in ipairs(n.actions or {}) do
+    local invoke = action.invoke
+    action.invoke = function(self, ...)
+      n.closing_by_action = true
+      invoke(self, ...)
+      n.closing_by_action = false
+    end
+  end
+end
+
 naughty.connect_signal('request::display', function(n)
   local accent = accent_for(n)
 
+  flag_action_invocations(n)
+
   -- bg, shape and border width come from beautiful.notification_*, which the
-  -- theme derives from the OSD's values. No `background_role` widget in the
-  -- template on purpose: naughty would then restyle it from the notification's
-  -- own colors and zero the popup border.
+  -- theme derives from the OSD's values.
   naughty.layout.box({
     notification = n,
     border_color = accent,
