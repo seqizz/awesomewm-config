@@ -432,12 +432,12 @@ calendarwidget = lain.widget.cal({
 
 -- change tag names dynamically
 refresh_tag_name = function()
-  for s = 1, screen.count() do
+  for s in screen do
     -- get a list of all tags
-    local atags = screen[s].tags
-    for i, t in ipairs(atags) do
+    local atags = s.tags
+    for _, t in ipairs(atags) do
       local clients_on_this_tag = 0
-      for i, c in ipairs(t:clients()) do
+      for _, c in ipairs(t:clients()) do
         if not c.skip_taskbar then
           clients_on_this_tag = clients_on_this_tag + 1
         end

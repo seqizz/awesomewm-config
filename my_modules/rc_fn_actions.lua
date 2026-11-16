@@ -206,22 +206,36 @@ function fn_process_action(action, direction, player)
     end
 
     -- use ddcutil if we are on external monitor, otherwise use brightnessctl
-    if detect_external_monitor() then
+    local external = detect_external_monitor()
+    if external then
       set_command = 'sudo ddcutil setvcp 10 ' .. symbol .. ' 5'
-      get_command = 'get-ddc-current-brightness'
-      max_command = 'get-ddc-max-brightness'
     else
       set_command = 'brightnessctl -q s 5%-' .. symbol
-      get_command = 'brightnessctl -q get'
-      max_command = 'brightnessctl -q max'
     end
 
     helpers.async(set_command, function(out)
-      awful.spawn.easy_async(get_command, function(current)
-        awful.spawn.easy_async(max_command, function(max)
+      if external then
+        awful.spawn.easy_async('get-ddc-current-brightness', function(current)
+          awful.spawn.easy_async('get-ddc-max-brightness', function(max)
+            osd.brightness(100 * tonumber(current) / tonumber(max))
+          end)
+        end)
+      else
+        -- brightnessctl -m reports current and max brightness on one
+        -- machine-readable line, so a single call replaces the get+max pair.
+        -- The CSV header (and any other line without numbers) is skipped.
+        awful.spawn.easy_async('brightnessctl -m', function(out)
+          local current, max
+          for line in out:gmatch('[^\r\n]+') do
+            local f = {}
+            for field in line:gmatch('[^,]+') do f[#f + 1] = field end
+            if f[4] and f[5] and tonumber(f[4]) and tonumber(f[5]) then
+              current, max = f[4], f[5]
+            end
+          end
           osd.brightness(100 * tonumber(current) / tonumber(max))
         end)
-      end)
+      end
     end)
 
   -- Case 5: Media keys
