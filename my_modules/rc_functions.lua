@@ -245,6 +245,10 @@ function real_fullscreen_toggle(c)
 end
 
 function move_or_expand(c, action, direction)
+  -- Any movement chord closes the floating-movement guide, even when the
+  -- client is flush to a screen edge and its geometry does not change (the
+  -- guide's own geometry-change dismissal would miss that case).
+  if movement_guide then movement_guide.dismiss() end
   -- Check if client is floating
   if c.floating then
     if action == "expand" then

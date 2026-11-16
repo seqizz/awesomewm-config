@@ -32,6 +32,7 @@ This is the reason I'm still not using Wayland. Too good to lose.
   - ~~Keyboard layout toggle~~ (disabled, as I'm using a single layout now)
   - Interactive Spotify widget (when app is running)
     - Can also swallow the client
+  - Floating-window movement guide (F10) renders Move/Expand/Shrink chords per edge around the focused floating window
 
 
 #### Window related shortcuts

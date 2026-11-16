@@ -27,6 +27,9 @@ local touch_widget = require("my_modules/touchscreen")
 local autolock_widget = require("my_modules/autolock")
 local dynamic_separator = require("my_modules/dynamic_separator")
 local notification_history = require("my_modules/notification_history")
+-- Floating-window movement guide: F10 shows Move/Expand/Shrink hints around the
+-- focused floating client. Exposes a global `movement_guide` for move_or_expand.
+require("my_modules/movement_guide")
 -- local keyboard_widget = require("my_modules/keyboard")
 local helpers = require("my_modules/geo_helpers")
 local edid = require('my_modules/edid')
@@ -855,6 +858,8 @@ globalkeys = gears.table.join(
   -- Cycle between available layouts
   awful.key({ win          }, "space",                      function() awful.layout.inc(1) end),
   awful.key({ win          }, "x",                          function() awful.spawn("pcmanfm-qt") end),
+  -- Floating-window movement guide: hints for Move/Expand/Shrink per edge
+  awful.key({}, "F10", nil, function() movement_guide.toggle() end),
   awful.key({ win,         }, "Tab",                        function() awful.tag.viewnext(get_screen_of_focused()) end),
   -- There is no "win-capslock", we meant win-tab probably
   awful.key({ win,         }, "Caps_Lock",                  function() awful.tag.viewnext(get_screen_of_focused()) end),
@@ -1137,9 +1142,18 @@ end)
 -- pile up there instead of on the edge of the monitor. Hand every popup to the
 -- half that owns the physical right edge, matching where the OSD shows up.
 --
--- 'added' is emitted synchronously before naughty decides how to display the
--- notification, which is the last point where its screen can still be changed.
-naughty.connect_signal('added', function(n)
+-- The screen is picked in request::screen ('new'), which register() emits
+-- before it inserts the notification into naughty.notifications[s][position]
+-- and stamps `idx`. Changing the screen after that point moves the entry via
+-- update_index, which leaves `idx` stale, and cleanup() then fails its
+-- `notifications[scr][position][idx] == self` assert when a later popup is
+-- closed before an earlier one on the same screen.
+-- Works whether it runs before or after naughty.default_screen_handler: a nil
+-- n.screen makes panel_right_screen fall back to the focused screen.
+naughty.connect_signal('request::screen', function(n, context)
+  if context ~= 'new' then
+    return
+  end
   local ok, s = pcall(panel_right_screen, n.screen)
   if ok and s and s ~= n.screen then
     pcall(function() n.screen = s end)
