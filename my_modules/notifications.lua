@@ -16,6 +16,32 @@ local wibox = require('wibox')
 local dpi = beautiful.xresources.apply_dpi
 local my_utils = require('my_modules/my_utils')
 
+-- naughty owns notification placement, but its layout does not know about the
+-- separate OSD popup. Track the visible boxes so the OSD can reserve the
+-- space below the top-right stack. Weak keys keep destroyed boxes collectable
+-- even if signal cleanup is delayed.
+local active_boxes = setmetatable({}, { __mode = 'k' })
+
+local function update_notification_bottom(screen)
+  local bottom = nil
+
+  for box, box_screen in pairs(active_boxes) do
+    if box_screen == screen and box:get_position() == 'top_right' then
+      local geo = box:geometry()
+      if geo.height > 0 then
+        local edge = geo.y + geo.height
+        if not bottom or edge > bottom then
+          bottom = edge
+        end
+      end
+    end
+  end
+
+  if osd and osd.set_notification_bottom then
+    osd.set_notification_bottom(screen, bottom)
+  end
+end
+
 -- Urgency is the only thing that picks the accent. Colors a sender or a rule
 -- puts on the notification itself (bg, border_color) are deliberately not
 -- honored: one app with its own palette is enough to break the family look.
@@ -81,7 +107,7 @@ naughty.connect_signal('request::display', function(n)
 
   -- bg, shape and border width come from beautiful.notification_*, which the
   -- theme derives from the OSD's values.
-  naughty.layout.box({
+  local box = naughty.layout.box({
     notification = n,
     border_color = accent,
     widget_template = {
@@ -111,4 +137,22 @@ naughty.connect_signal('request::display', function(n)
       widget = wibox.container.constraint,
     },
   })
+
+  if not box then
+    return
+  end
+
+  local screen = box.screen
+  active_boxes[box] = screen
+
+  box:connect_signal('property::geometry', function()
+    update_notification_bottom(screen)
+  end)
+
+  n:connect_signal('destroyed', function()
+    active_boxes[box] = nil
+    update_notification_bottom(screen)
+  end)
+
+  update_notification_bottom(screen)
 end)

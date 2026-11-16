@@ -50,6 +50,7 @@ local SLIDE = dpi(40) -- travel distance on show/hide
 
 local MARGIN_TOP = dpi(100)
 local MARGIN_RIGHT = dpi(5)
+local NOTIFICATION_GAP = dpi(8)
 local PAD = dpi(10)
 
 local WIDTH_LEVEL = dpi(56)
@@ -70,11 +71,7 @@ local TOAST_SUB_CHARS = 50
 -- keeps this file readable in an editor without the font, and avoids \u{}
 -- escapes (Lua 5.3+ only, awesome is also built against LuaJIT in places).
 local function pua(cp)
-  return string.char(
-    0xe0 + math.floor(cp / 0x1000),
-    0x80 + math.floor(cp % 0x1000 / 0x40),
-    0x80 + cp % 0x40
-  )
+  return string.char(0xe0 + math.floor(cp / 0x1000), 0x80 + math.floor(cp % 0x1000 / 0x40), 0x80 + cp % 0x40)
 end
 
 local GLYPH = {
@@ -143,12 +140,7 @@ local function truncate(s, limit)
 end
 
 local function span(text, color, font)
-  return string.format(
-    '<span foreground="%s" font_desc="%s">%s</span>',
-    color,
-    font,
-    pango_escape(text)
-  )
+  return string.format('<span foreground="%s" font_desc="%s">%s</span>', color, font, pango_escape(text))
 end
 
 -- }}}
@@ -237,6 +229,7 @@ local popup = awful.popup({
 
 local anchor_x, anchor_y = 0, 0 -- where the popup rests while visible
 local last_screen = nil -- screen the popup was last placed on
+local notification_bottom = setmetatable({}, { __mode = 'k' })
 local shown = false
 local hide_timer, hide_done_timer
 
@@ -450,9 +443,7 @@ end
 -- the switchers in use (rofi-pulse-select, pavucontrol) are separate processes
 -- and cannot. That case is covered by osd.volume re-reading the sink whenever
 -- the popup comes up fresh, at the cost of a frame on the old icon.
-function osd.invalidate_sink()
-  sink_stamp = 0
-end
+function osd.invalidate_sink() sink_stamp = 0 end
 
 local function volume_glyph(value)
   if sink_glyph then
@@ -488,6 +479,40 @@ local function osd_target(s)
   return panel_right_screen(s), geo
 end
 
+local function anchor_y_for(s, geo)
+  local y = geo.y + MARGIN_TOP
+  local bottom = notification_bottom[s]
+
+  if bottom and bottom + NOTIFICATION_GAP > y then
+    y = bottom + NOTIFICATION_GAP
+  end
+
+  return y
+end
+
+-- Naughty notifications use the same top-right corner. Keep the OSD below
+-- their stack while both are visible, then return to its normal position when
+-- the last notification closes. The notification module owns the stack
+-- geometry; this API only reserves its bottom edge on the relevant screen.
+function osd.set_notification_bottom(screen, bottom)
+  if not screen then
+    return
+  end
+
+  local old = notification_bottom[screen]
+  if old == bottom then
+    return
+  end
+
+  notification_bottom[screen] = bottom
+
+  if shown and last_screen == screen then
+    local _, geo = osd_target(screen)
+    anchor_y = anchor_y_for(screen, geo)
+    popup.y = anchor_y
+  end
+end
+
 -- awful.popup resolves its width as min(max(fit, minimum_width), maximum_width),
 -- so the two bounds must never be crossed while they are being moved: growing
 -- the popup (the narrow level bar to the wide media card) with minimum first
@@ -521,7 +546,7 @@ local function show(mode, width, widget, opts)
   local moved = last_screen ~= s or anchor_x ~= new_anchor_x
   last_screen = s
   anchor_x = new_anchor_x
-  anchor_y = geo.y + MARGIN_TOP
+  anchor_y = anchor_y_for(s, geo)
 
   if hide_done_timer then
     hide_done_timer:stop()
@@ -563,20 +588,22 @@ local function show(mode, width, widget, opts)
       snap(anchor_x, 1)
     end
 
-    dbg(string.format(
-      'mode=%s want_w=%d geo=%dx%d+%d+%d opacity=%.2f visible=%s bar=%.1f/%s clock=%s',
-      mode,
-      width,
-      popup.width,
-      popup.height,
-      popup.x,
-      popup.y,
-      popup.opacity,
-      tostring(popup.visible),
-      bar.value,
-      bar_anim and tostring(bar_anim.target) or 'no-anim',
-      RUBATO_TIMEOUTS and tostring(next(RUBATO_TIMEOUTS[1])) or 'none'
-    ))
+    dbg(
+      string.format(
+        'mode=%s want_w=%d geo=%dx%d+%d+%d opacity=%.2f visible=%s bar=%.1f/%s clock=%s',
+        mode,
+        width,
+        popup.width,
+        popup.height,
+        popup.x,
+        popup.y,
+        popup.opacity,
+        tostring(popup.visible),
+        bar.value,
+        bar_anim and tostring(bar_anim.target) or 'no-anim',
+        RUBATO_TIMEOUTS and tostring(next(RUBATO_TIMEOUTS[1])) or 'none'
+      )
+    )
 
     return false
   end)
@@ -673,17 +700,13 @@ local function show_card(mode, glyph, line1, line2, width, opts)
   local accent = opts.accent or ACCENT[mode] or ACCENT.media
 
   media_icon.markup = span(glyph, accent, beautiful.font_name .. ' 20')
-  media_title.markup =
-    span(truncate(line1, opts.title_chars or MEDIA_TITLE_CHARS), accent, beautiful.font)
+  media_title.markup = span(truncate(line1, opts.title_chars or MEDIA_TITLE_CHARS), accent, beautiful.font)
 
   -- an empty second textbox still claims a line, so drop it instead
   media_sub.visible = line2 ~= nil and line2 ~= ''
   if media_sub.visible then
-    media_sub.markup = span(
-      truncate(line2, opts.sub_chars or MEDIA_SUB_CHARS),
-      beautiful.fg_normal,
-      beautiful.font_small
-    )
+    media_sub.markup =
+      span(truncate(line2, opts.sub_chars or MEDIA_SUB_CHARS), beautiful.fg_normal, beautiful.font_small)
   end
 
   show(mode, width or WIDTH_MEDIA, media_layout, opts)
