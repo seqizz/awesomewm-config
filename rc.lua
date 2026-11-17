@@ -83,7 +83,7 @@ dofile(config_path .. "my_modules/rc_fn_actions.lua")
 require("my_modules/notifications")
 
 -- stuff including usernames etc
-dofile(config_path .. "my_modules/rc_secret.lua")
+dofile(config_path .. "my_modules/secret.lua")
 
 -- @Reference: disable notification system
 -- package.loaded["naughty.dbus"] = {}
