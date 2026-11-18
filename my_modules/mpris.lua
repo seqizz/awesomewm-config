@@ -5,7 +5,7 @@ local my_theme = require('my_modules/my_theme')
 local dpi = require('beautiful').xresources.apply_dpi
 local gears = require('gears')
 
--- Players we follow, in priority order. playerctl picks the first present one.
+-- Players we follow; which one is shown is decided by pick_player() below.
 -- Keeping an explicit allowlist stops browser video (firefox/chromium) from
 -- hijacking the widget when it starts playing an MPRIS stream.
 local PLAYERS = 'spotify,trayplay,jellyfin-tui'
@@ -32,8 +32,18 @@ local mprisimage, mprisimage_lifted = my_utils.svg_icon({
   color = my_theme.fg_normal,
 })
 
+-- Count of followed players that are playing at the same time, shown only when
+-- there is more than one: the widget itself can only ever describe one of them.
+local mpriscount = wibox.widget({
+  widget = wibox.widget.textbox,
+  valign = 'center',
+  font = my_theme.font_small,
+  visible = false,
+})
+
 local mpriswidget = wibox.widget({
   mprisimage_lifted,
+  mpriscount,
   mpristext,
   layout = wibox.layout.fixed.horizontal,
 })
@@ -59,7 +69,7 @@ end
 -- single source of truth for widget state.
 local follow_pid = nil
 
--- Name of the player that produced the last update. Media buttons act on this
+-- Name of the player the widget shows. Media buttons act on this
 -- player explicitly so controls always hit whatever the widget is showing.
 local current_player = nil
 
@@ -212,16 +222,33 @@ function mpriswidget:raise_toggle()
   end
 
   local action_name = spec.action or 'hide_toggle'
-  dbg('[mpris] raise_toggle: player=[' .. player .. '] action=[' .. action_name .. '] client=[' .. tostring(c) .. ']')
+  dbg(
+    '[mpris] raise_toggle: player=['
+      .. player
+      .. '] action=['
+      .. action_name
+      .. '] client=['
+      .. tostring(c)
+      .. ']'
+  )
   ACTIONS[action_name](spec, c)
 
   mpriswidget:check()
 end
 
 local visible_state = nil -- last emitted visibility, so we only signal on change
-local hide_timer = nil -- debounces hiding to ride out transient empty lines
-local last_title = '' -- keep song text stable across empty-metadata blips
-local last_artist = '' -- same, for the artist shown in the OSD card
+local hide_timer = nil -- debounces hiding to ride out transient dbus churn
+
+-- Every followed player that exists right now, keyed by playerName:
+--   status, title, artist -- as last reported
+--   seq                   -- bumped on each change, orders players by activity
+--   play_seq              -- seq at the moment the player last started playing
+local players = {}
+local seq = 0
+
+-- player/status/title/artist the widget last rendered, so repeated lines for an
+-- unchanged state neither redraw nor re-signal
+local shown = nil
 
 -- Emit the visibility signal only when it actually changes. Players push many
 -- property updates while playing; re-signalling every time makes the widget flicker.
@@ -238,6 +265,34 @@ local function cancel_hide()
     hide_timer:stop()
     hide_timer = nil
   end
+end
+
+-- Lists the players behind the count badge. Attached to the widget only while
+-- the badge is shown, so hovering a single player does not pop an empty box.
+local playing_tooltip = awful.tooltip({})
+local playing_count = 0
+
+local function set_playing(names)
+  local count = #names
+
+  if count > 1 then
+    mpriscount:set_markup_silently(my_utils.create_markup({
+      text = tostring(count),
+      fg = my_theme.warning_bg,
+    }))
+    playing_tooltip:set_text(count .. ' players playing: ' .. table.concat(names, ', '))
+  end
+
+  if (count > 1) ~= (playing_count > 1) then
+    mpriscount.visible = count > 1
+    if count > 1 then
+      playing_tooltip:add_to_object(mpriswidget)
+    else
+      playing_tooltip:remove_from_object(mpriswidget)
+    end
+  end
+
+  playing_count = count
 end
 
 -- Split a follow line into its four SEP-separated fields, missing ones empty.
@@ -257,25 +312,88 @@ local function split_fields(line)
   return fields[1] or '', fields[2] or '', fields[3] or '', fields[4] or ''
 end
 
-local function apply_line(line)
-  -- format is: status \31 playerName \31 title \31 artist
-  local status, player, title, artist = split_fields(line)
+-- Fold one `status \31 playerName \31 title \31 artist` line into `players`.
+-- Returns the player name, or nil for the empty line playerctl prints when no
+-- followed player is present.
+local function ingest(line)
+  local status, name, title, artist = split_fields(line)
 
-  -- playerctl emits an empty line when no followed player is present; keep the
-  -- nil player the rest of this module expects in that case
-  if player == '' then
-    player = nil
+  if status == '' or name == '' then
+    return nil
   end
 
-  dbg('[mpris] parsed status=[' .. status .. '] player=[' .. tostring(player) .. '] title=[' .. title .. ']')
+  local p = players[name]
+  if not p then
+    p = { status = '', title = '', artist = '' }
+    players[name] = p
+  end
 
-  if status == '' then
-    -- Empty lines also appear transiently during track changes / dbus churn.
-    -- Debounce the hide so the widget stays put unless the player is really gone.
+  -- metadata can momentarily arrive empty mid-track; reuse the last good title
+  if title == '' then
+    title, artist = p.title, p.artist
+  end
+
+  if p.status ~= status or p.title ~= title or p.artist ~= artist then
+    seq = seq + 1
+    p.seq = seq
+    if status == 'Playing' and p.status ~= 'Playing' then
+      p.play_seq = seq
+    end
+    p.status, p.title, p.artist = status, title, artist
+    dbg('[mpris] player=[' .. name .. '] status=[' .. status .. '] title=[' .. title .. ']')
+  end
+
+  return name
+end
+
+-- Which player the widget shows: the one that started playing most recently.
+-- With nothing playing, the one already shown stays (a paused player keeps its
+-- place), and failing that the one with the most recent activity.
+local function pick_player()
+  local best, best_seq = nil, -1
+
+  for name, p in pairs(players) do
+    if p.status == 'Playing' and p.play_seq > best_seq then
+      best, best_seq = name, p.play_seq
+    end
+  end
+  if best then
+    return best
+  end
+
+  if current_player and players[current_player] then
+    return current_player
+  end
+
+  for name, p in pairs(players) do
+    if p.seq > best_seq then
+      best, best_seq = name, p.seq
+    end
+  end
+  return best
+end
+
+-- Redraw from `players`: count badge, shown player, visibility.
+local function refresh()
+  local playing = {}
+  for name, p in pairs(players) do
+    if p.status == 'Playing' then
+      playing[#playing + 1] = name
+    end
+  end
+  table.sort(playing)
+  set_playing(playing)
+
+  local name = pick_player()
+
+  if not name then
+    -- Players also drop off the bus transiently during dbus churn. Debounce the
+    -- hide so the widget stays put unless they are really gone.
     if not hide_timer then
       hide_timer = gears.timer.start_new(2, function()
         hide_timer = nil
         current_player = nil
+        shown = nil
         mpriswidget.forced_width = dpi(0)
         set_visible(false)
         return false
@@ -285,52 +403,91 @@ local function apply_line(line)
   end
 
   cancel_hide()
-  current_player = player
+  current_player = name
 
-  -- metadata can momentarily arrive empty mid-track; reuse the last good title
-  if title ~= '' then
-    last_title = title
-    last_artist = artist
+  local p = players[name]
+  local signature = table.concat({ name, p.status, p.title, p.artist }, SEP)
+  if signature == shown then
+    return
   end
+  shown = signature
 
   -- keep the previous semantics: only 'Paused' shows the paused icon
-  local is_playing = status ~= 'Paused'
-
-  mpriswidget:set(last_title, is_playing)
+  mpriswidget:set(p.title, p.status ~= 'Paused')
   mpriswidget.forced_width = nil
   set_visible(true)
 
   -- The follower is the only thing that knows about a state change the instant
   -- it happens, so the media OSD rides along here instead of polling
   -- `playerctl status` after a blind delay. Consumers decide whether an update
-  -- is worth showing; this fires on every track and status change.
+  -- is worth showing; this fires on every track and status change, and when
+  -- the widget moves to another player.
   awesome.emit_signal('widget::mpris::update', {
-    status = status,
-    player = player,
-    title = last_title,
-    artist = last_artist,
+    status = p.status,
+    player = name,
+    title = p.title,
+    artist = p.artist,
   })
+end
+
+local FORMAT = '{{status}}' .. SEP .. '{{playerName}}' .. SEP .. '{{title}}' .. SEP .. '{{artist}}'
+
+local resync_timer = nil -- coalesces bursts of follower lines into one snapshot
+
+-- Replace `players` with a fresh snapshot of every followed player. The follow
+-- stream only reports players that exist, so one that quit would otherwise
+-- stay in the table (and on the widget) forever.
+local function resync()
+  if resync_timer then
+    return
+  end
+
+  resync_timer = gears.timer.start_new(0.3, function()
+    resync_timer = nil
+
+    awful.spawn.easy_async(
+      { 'playerctl', '-a', '-p', PLAYERS, 'metadata', '--format', FORMAT },
+      function(stdout)
+        local present = {}
+        for line in stdout:gmatch('[^\n]+') do
+          local name = ingest(line)
+          if name then
+            present[name] = true
+          end
+        end
+
+        for name in pairs(players) do
+          if not present[name] then
+            dbg('[mpris] player gone: [' .. name .. ']')
+            players[name] = nil
+          end
+        end
+
+        refresh()
+      end
+    )
+
+    return false
+  end)
 end
 
 local function start_follow()
   -- argv table (no shell), so the 0x1f delimiter and titles pass through verbatim.
   -- NOTE: `metadata` is the required subcommand; --follow makes it stream.
-  local cmd = {
-    'playerctl',
-    '-p',
-    PLAYERS,
-    'metadata',
-    '--follow',
-    '--format',
-    '{{status}}' .. SEP .. '{{playerName}}' .. SEP .. '{{title}}' .. SEP .. '{{artist}}',
-  }
+  -- -a reports every followed player, each on its own line: without it
+  -- playerctl streams only the first present player of the list, even while
+  -- that one sits paused and another one plays.
+  local cmd = { 'playerctl', '-a', '-p', PLAYERS, 'metadata', '--follow', '--format', FORMAT }
 
   dbg('[mpris] start_follow: ' .. table.concat(cmd, ' '))
 
   follow_pid = awful.spawn.with_line_callback(cmd, {
     stdout = function(line)
       dbg('[mpris] stdout: [' .. line .. ']')
-      apply_line(line)
+      if ingest(line) then
+        refresh()
+      end
+      resync()
     end,
 
     stderr = function(line) dbg('[mpris] stderr: [' .. line .. ']') end,
@@ -351,11 +508,13 @@ local function start_follow()
 end
 
 -- Cheap idempotent nudge: media keybindings/buttons call this to guarantee the
--- follower is alive. Track/status updates themselves arrive via --follow.
+-- follower is alive, and to catch a player that quit without the stream saying
+-- so. Track/status updates themselves arrive via --follow.
 function mpriswidget:check()
   if not follow_pid then
     start_follow()
   end
+  resync()
 end
 
 -- Start hidden; the follower reveals the widget once a player appears.
