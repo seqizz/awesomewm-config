@@ -97,6 +97,7 @@ local IGNORE_PATTERNS = {}
 local IGNORE_APPS = {
   '^pasystray$',
   '^blueman$',
+  '^slack$',
 }
 
 -- Dimmed gruvbox gray for secondary text (timestamps, hints, low urgency).
@@ -297,8 +298,7 @@ local function activatable(e)
     return true
   end
   local n = e.notification
-  return (n and n._private and not n._private.is_destroyed and not (n._hub_closed or n._hub_veto))
-      and true
+  return (n and n._private and not n._private.is_destroyed and not (n._hub_closed or n._hub_veto)) and true
     or false
 end
 
